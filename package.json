@@ -1,0 +1,23 @@
+{
+  "name": "localdocsearch",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Offline local document search CLI for Windows",
+  "type": "module",
+  "bin": {
+    "docsearch": "dist/src/cli.js"
+  },
+  "engines": {
+    "node": ">=22.17.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/src/cli.js",
+    "test": "npm run build && node --test dist/test/smoke.test.js",
+    "check": "npm run test"
+  },
+  "devDependencies": {
+    "@types/node": "22.17.0",
+    "typescript": "5.9.3"
+  }
+}

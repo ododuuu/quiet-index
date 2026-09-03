@@ -1,0 +1,9 @@
+node_modules/
+dist/
+coverage/
+*.log
+*.db
+*.db-shm
+*.db-wal
+.localdocsearch/
+.DS_Store
