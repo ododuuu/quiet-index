@@ -1,51 +1,52 @@
-# Project status
+# 專案狀態
 
-Last updated: 2026-09-03
+最後更新：2026-09-03
 
-## Current state
+## 目前狀態
 
-- Milestone: M0 — project foundation and specification
-- Status: implemented and verified locally; awaiting user review
-- Product code: CLI placeholder only; no scanner, parser, database, or search implementation yet
-- Target environment: company Windows computer with Node.js 22.17.0 x64
-- Local development environment: macOS with a newer Node.js version; passing locally does not replace Windows acceptance
+- 里程碑：M0——專案基礎與規格
+- 狀態：已完成本機實作與驗證，等待使用者審閱
+- 產品程式碼：目前只有 CLI 骨架，尚未實作掃描器、解析器、資料庫與搜尋
+- 目標環境：具有 Node.js 22.17.0 x64 的公司 Windows 電腦
+- 本機開發環境：macOS；本機測試通過不能取代 Windows 驗收
 
-## Completed
+## 已完成
 
-- Created a standalone Node.js and TypeScript project under `work/localdocsearch`.
-- Added strict TypeScript configuration and Node's built-in test runner.
-- Added the initial CLI entry point and smoke tests.
-- Added product specification and cross-conversation handoff documents.
+- 已在 `work/localdocsearch` 建立獨立 Node.js 與 TypeScript 專案。
+- 已加入嚴格 TypeScript 設定與 Node.js 內建測試執行器。
+- 已加入初始 CLI 入口與基本冒煙測試。
+- 已加入產品規格與跨對話交接文件。
+- 已將所有專案文件統一改為繁體中文。
 
-## Active next milestone
+## 下一個進行中里程碑
 
-M1 — CLI foundation and Markdown/text indexing spike.
+M1——CLI 基礎與 Markdown／純文字索引垂直切片。
 
-Planned M1 slice:
+M1 預定範圍：
 
-1. Parse `index <root>` arguments and validate the root directory.
-2. Recursively discover `.md` and `.txt` files.
-3. Convert them into the common document model.
-4. Store documents and sections with `node:sqlite`.
-5. Implement exact filename/content search and snippets.
-6. Add automated tests and Windows acceptance steps.
+1. 解析 `index <root>` 參數並驗證根目錄。
+2. 遞迴找出 `.md` 與 `.txt` 文件。
+3. 將文件轉成統一資料模型。
+4. 使用 `node:sqlite` 保存文件與內容區塊。
+5. 實作檔名／內容精確搜尋與命中片段。
+6. 加入自動測試及 Windows 驗收步驟。
 
-Do not begin Office or PDF parsers until this vertical slice works end to end; those formats are part of the usable MVP, not abandoned scope.
+這個垂直切片完整運作前，不開始 Office 或 PDF 解析器；這些格式仍屬於可用 MVP，並未從範圍移除。
 
-## Pending user decisions
+## 等待使用者決定
 
-- Confirm whether index data should default to `%LOCALAPPDATA%\\LocalDocSearch` (recommended) or live beside the executable.
-- Confirm whether `docsearch search` should automatically run a quick incremental sync or require a separate `index` command.
-- Confirm the provisional per-file size limit of 100 MB.
+- 確認索引資料預設放在 `%LOCALAPPDATA%\\LocalDocSearch`（建議），或放在可攜式程式旁。
+- 確認 `docsearch search` 是否自動執行快速增量同步，或要求使用者另外執行 `index`。
+- 確認暫定的單檔 100 MB 大小限制。
 
-## Verification
+## 驗證結果
 
-- `npm install`: passed; 3 development packages installed, 0 reported vulnerabilities.
-- `npm test`: passed on 2026-09-03; 2 tests passed, 0 failed.
-- TypeScript strict build: passed.
-- The escalated local shell exposed Node.js 22.13.1 and therefore emitted an engine warning because the real target is the company's verified Node.js 22.17.0; this does not replace target-machine testing.
-- Not run yet: company Windows acceptance.
+- `npm install`：通過；安裝 3 個開發套件，回報 0 個弱點。
+- `npm test`：於 2026-09-03 通過；2 項測試成功、0 項失敗。
+- TypeScript 嚴格模式編譯：通過。
+- 受控本機 shell 使用 Node.js 22.13.1，因此針對目標版本 22.17.0 顯示版本警告；這不取代目標電腦測試。
+- 公司 Windows 驗收：尚未執行。
 
-## Suggested commit
+## 建議 commit 訊息
 
-`chore: establish LocalDocSearch project and specification`
+`docs: 統一使用繁體中文專案文件`

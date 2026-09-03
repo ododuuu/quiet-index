@@ -1,46 +1,46 @@
-# LocalDocSearch Product Specification
+# LocalDocSearch 產品規格
 
-- Version: Draft 0.1
-- Date: 2026-09-03
-- Status: ready for user review
+- 版本：草案 0.1
+- 日期：2026-09-03
+- 狀態：等待使用者審閱
 
-## 1. Product statement
+## 1. 產品定義
 
-LocalDocSearch is a portable, offline Windows command-line tool that indexes one user-selected root directory and searches filenames and extracted content from common work-document formats without administrator privileges or external AI services.
+LocalDocSearch 是可攜式、純本機的 Windows 命令列工具；它能為使用者指定的一個根目錄建立索引，搜尋常見工作文件的檔名與可擷取文字，而且不需要管理員權限或外部 AI 服務。
 
-## 2. Target environment
+## 2. 目標環境
 
-- Windows company computer.
-- Node.js 22.17.0 x64 is available.
-- The program runs from a user-writable directory without a traditional installer.
-- No assumption is made that self-built executables, background services, native add-ons, MCP, or external data transmission are permitted.
-- Package installation has been technically demonstrated for `fflate@0.8.3`, `fast-xml-parser@5.11.1`, and `pdfjs-dist@6.3.289`; formal company-policy approval remains the user's responsibility.
+- 公司 Windows 電腦。
+- 已確認 Node.js 22.17.0 x64 可用。
+- 程式從使用者可寫入目錄執行，不使用傳統安裝程式。
+- 不假設公司允許自製執行檔、背景服務、原生擴充套件、MCP 或對外傳輸文件內容。
+- 已技術驗證 `fflate@0.8.3`、`fast-xml-parser@5.11.1`、`pdfjs-dist@6.3.289` 可以安裝並載入；正式政策是否允許仍由使用者確認。
 
-## 3. MVP scope
+## 3. MVP 範圍
 
-### Included document formats
+### 支援格式
 
-| Format | Content extracted | Location retained |
+| 格式 | 擷取內容 | 保留位置 |
 |---|---|---|
-| `.md` | headings and text | heading/section |
-| `.txt` | plain text | line or text range |
-| `.docx` | paragraphs and tables | paragraph/section/table |
-| `.pptx` | slide text and, where available, speaker notes | slide number |
-| `.xlsx` | displayed cell text | worksheet and cell/range |
-| `.pdf` | extractable text | page number |
+| `.md` | 標題與文字 | 標題／段落 |
+| `.txt` | 純文字 | 行號或文字範圍 |
+| `.docx` | 段落與表格 | 段落／章節／表格 |
+| `.pptx` | 投影片文字與可取得的講者備註 | 投影片頁碼 |
+| `.xlsx` | 儲存格顯示文字 | 工作表與儲存格／範圍 |
+| `.pdf` | 可擷取文字 | 頁碼 |
 
-Filename and metadata remain searchable when content extraction fails. Scanned PDFs without a text layer are marked `no_text`; OCR is not part of the MVP.
+內容擷取失敗時，檔名與基本資訊仍可搜尋。沒有文字層的掃描型 PDF 標記為 `no_text`；OCR 不屬於 MVP。
 
-### Explicitly excluded from the MVP
+### MVP 明確不包含
 
-- Legacy `.doc`, `.ppt`, and `.xls` files.
-- OCR, embeddings, vector databases, RAG, MCP, GUI, NTFS MFT, and USN Journal.
-- External APIs receiving document content.
-- Administrator privileges, Windows services, or policy bypasses.
+- 舊版 `.doc`、`.ppt`、`.xls`。
+- OCR、embedding、向量資料庫、RAG、MCP、GUI、NTFS MFT、USN Journal。
+- 將文件內容送到外部 API。
+- 管理員權限、Windows Service 或任何政策繞過方式。
 
-## 4. User interface
+## 4. 使用介面
 
-The planned executable commands are:
+預定命令如下：
 
 ```text
 docsearch index <root>
@@ -49,248 +49,248 @@ docsearch status
 docsearch rebuild
 ```
 
-During development, the equivalent form is:
+開發期間使用下列等效方式：
 
 ```text
 node dist/src/cli.js <command>
 ```
 
-Only one active root directory is supported in the MVP. Running `index <root>` selects that root for later `search`, `status`, and `rebuild` commands.
+MVP 只支援一個使用中的根目錄。執行 `index <root>` 後，後續的 `search`、`status` 與 `rebuild` 都針對該目錄。
 
-## 5. Functional requirements
+## 5. 功能需求
 
-### FR-01 Root selection
+### FR-01 根目錄選擇
 
-- `index <root>` accepts an absolute or relative directory path.
-- A nonexistent path returns a clear error and nonzero exit code without a stack trace by default.
-- A path that is not a directory is rejected.
+- `index <root>` 接受絕對或相對目錄路徑。
+- 路徑不存在時顯示清楚錯誤並回傳非零結束碼，預設不顯示原始 stack trace。
+- 指定路徑不是目錄時拒絕執行。
 
-### FR-02 Recursive discovery
+### FR-02 遞迴尋找文件
 
-- The scanner recursively discovers supported files under the active root.
-- It skips `.git`, `node_modules`, `.localdocsearch`, Office temporary files beginning with `~$`, and configured exclusions.
-- An inaccessible directory or file is reported and skipped without stopping the entire scan.
+- 掃描器遞迴尋找根目錄下的支援格式。
+- 略過 `.git`、`node_modules`、`.localdocsearch`、以 `~$` 開頭的 Office 暫存檔與設定中的排除項目。
+- 無權限目錄或檔案應回報並略過，不得使整次掃描中止。
 
-### FR-03 Unified document model
+### FR-03 統一文件模型
 
-Each parsed document contains at least:
+每份解析後文件至少包含：
 
-- stable document identity;
-- absolute path and filename;
-- extension, size, and last-modified time;
-- parsing status and optional error information;
-- zero or more sections containing text, optional heading, and source location.
+- 穩定的文件識別值。
+- 絕對路徑與檔名。
+- 副檔名、大小與最後修改時間。
+- 解析狀態與可選錯誤資訊。
+- 零個或多個文字區塊，各自包含文字、可選標題及來源位置。
 
-Search and storage code must depend on this model rather than on individual source formats.
+搜尋與儲存程式必須依賴統一模型，不得直接依賴個別來源格式。
 
-### FR-04 Content extraction
+### FR-04 內容擷取
 
-- Each format is handled by a dedicated parser behind a common parser contract.
-- A parser failure affects only that file.
-- Unsupported, encrypted, corrupted, oversized, and textless documents receive distinct statuses where detection is practical.
-- Parsing never modifies the source document.
+- 每種格式由獨立解析器處理，並共同遵守解析器契約。
+- 單一檔案解析失敗不得影響其他檔案。
+- 在可辨識的情況下，對不支援、加密、損壞、過大及無文字文件使用不同狀態。
+- 解析過程不得修改來源文件。
 
-### FR-05 Local index
+### FR-05 本機索引
 
-- Parsed metadata and text are stored locally using SQLite.
-- The initial implementation uses Node's built-in `node:sqlite` if it remains compatible with Node.js 22.17.0.
-- At minimum, the schema separates documents from searchable sections.
-- Index storage defaults to a user-writable location and is excluded from Git.
+- 使用 SQLite 在本機保存解析後的基本資訊與文字。
+- 若 Node.js 22.17.0 的相容性驗證通過，初版採用 Node.js 內建 `node:sqlite`。
+- 資料表至少分開保存文件與可搜尋文字區塊。
+- 索引預設存放在使用者可寫入的位置，且不得提交到 Git。
 
-### FR-06 Incremental indexing
+### FR-06 增量索引
 
-- A repeated index operation compares current metadata with stored metadata.
-- New files are inserted, changed files are re-parsed, unchanged files are skipped, and deleted files are removed.
-- Replacing one document's metadata and sections is atomic.
-- The same update may run repeatedly without producing duplicate records.
+- 重複執行索引時，比較目前檔案資訊與已儲存資訊。
+- 新檔案新增、修改檔重新解析、未變更檔略過、已刪除檔從索引移除。
+- 一份文件的基本資訊與文字區塊必須以 transaction 原子更新。
+- 相同更新重複執行不得產生重複資料。
 
-### FR-07 Search behavior
+### FR-07 搜尋行為
 
-- Search covers filename, optional heading, and section content.
-- The first implementation uses case-insensitive normalized substring matching rather than semantic search.
-- Chinese queries do not require whitespace tokenization.
-- Empty or whitespace-only queries are rejected with a clear message.
-- `--limit` accepts a positive integer and uses a documented default.
+- 搜尋範圍包含檔名、可選標題及文字區塊內容。
+- 初版採用忽略大小寫、經正規化的子字串比對，不使用語意搜尋。
+- 中文查詢不要求先以空白切詞。
+- 空字串或全空白查詢必須拒絕並顯示清楚訊息。
+- `--limit` 只接受正整數，且必須有明確預設值。
 
-### FR-08 Ranking
+### FR-08 排序
 
-Results are ordered using deterministic rules, initially:
+初始排序規則由高到低如下：
 
-1. exact filename match;
-2. filename contains query;
-3. heading contains query;
-4. content contains query;
-5. last-modified time as a secondary tie-breaker.
+1. 檔名完全符合。
+2. 檔名包含查詢文字。
+3. 標題包含查詢文字。
+4. 內容包含查詢文字。
+5. 最後修改時間作為次要排序條件。
 
-Exact weights remain an implementation detail but must be covered by tests.
+確切分數屬於實作細節，但必須有自動測試。
 
-### FR-09 Result output
+### FR-09 結果顯示
 
-Each result displays:
+每筆結果顯示：
 
-- full file path;
-- document format;
-- source location such as heading, slide, worksheet/cell, or page;
-- a readable snippet around the match;
-- last-modified time;
-- enough ranking information for debugging when verbose output is enabled.
+- 完整檔案路徑。
+- 文件格式。
+- 標題、投影片、工作表／儲存格或頁碼等來源位置。
+- 命中位置附近的可讀片段。
+- 最後修改時間。
+- 使用詳細模式時，顯示足以除錯的排序資訊。
 
-No-result, no-supported-file, and empty-index states use different messages.
+沒有結果、沒有支援文件與索引尚未建立必須使用不同訊息。
 
-### FR-10 Status and rebuild
+### FR-10 狀態與重建
 
-- `status` reports the active root, index location, document counts by status, last successful sync, and errors.
-- `rebuild` discards derived index records and recreates them from source files without deleting source documents.
-- Destructive index replacement must target only the resolved LocalDocSearch data files.
+- `status` 顯示目前根目錄、索引位置、各狀態文件數量、最後成功同步時間及錯誤。
+- `rebuild` 只刪除衍生索引資料並從來源文件重新建立，不得刪除來源文件。
+- 重建索引前必須精確解析 LocalDocSearch 資料檔位置，不得使用寬泛刪除目標。
 
-### FR-11 File changes
+### FR-11 文件變更
 
-- The MVP must support reliable updates through repeated incremental `index` operations.
-- A foreground `watch` mode may be added after explicit indexing is stable.
-- FileSystemWatcher-style events are treated as hints; a later reconciliation scan remains necessary because events may repeat or be missed.
+- MVP 必須能透過再次執行增量 `index` 可靠更新索引。
+- 明確索引穩定後，可加入前景執行的 `watch` 模式。
+- 檔案監控事件只能視為提示；因事件可能重複或遺漏，仍需重新掃描校正。
 
-## 6. Search normalization and snippets
+## 6. 文字正規化與命中片段
 
-- Normalize query and searchable text with Unicode normalization and case folding appropriate to JavaScript.
-- Preserve original text for display.
-- Produce snippets from original text, centered near the first or highest-value match.
-- Collapse line breaks and excessive whitespace only for result display.
-- Do not implement complex Chinese segmentation until measured queries demonstrate a need.
+- 查詢與可搜尋文字使用 Unicode 正規化及 JavaScript 適用的大小寫轉換。
+- 顯示結果時保留原始文字。
+- 命中片段以原始文字產生，中心位於第一個或價值最高的命中附近。
+- 只有在結果顯示時合併換行與過多空白。
+- 實際查詢尚未證明有需要前，不實作複雜中文斷詞。
 
-## 7. Proposed architecture
+## 7. 預定架構
 
 ```text
 CLI
- ├─ Index command ──> SyncService ──> FileScanner
- │                         │              │
- │                         │              └─ discovered files
- │                         ├─> ParserRegistry ──> format parsers
- │                         └─> IndexStore (SQLite)
+ ├─ index 命令 ──> SyncService ──> FileScanner
+ │                       │              │
+ │                       │              └─ 找到的文件
+ │                       ├─> ParserRegistry ──> 各格式解析器
+ │                       └─> IndexStore（SQLite）
  │
- └─ Search command ─> SearchService ──> IndexStore
-                              └─ normalization, ranking, snippets
+ └─ search 命令 ─> SearchService ──> IndexStore
+                            └─ 正規化、排序、命中片段
 ```
 
-Primary modules:
+主要模組：
 
-- `cli`: parse commands, validate CLI arguments, format user-facing output.
-- `FileScanner`: discover candidate files and isolate filesystem errors.
-- `ParserRegistry`: select a parser by file extension.
-- `DocumentParser`: common parsing contract.
-- Format parsers: Markdown/text, DOCX, PPTX, XLSX, and PDF.
-- `SyncService`: compare filesystem state with index state and coordinate updates.
-- `IndexStore`: own SQLite schema, transactions, persistence, and raw queries.
-- `SearchService`: normalize queries, rank matches, group results, and create snippets.
+- `cli`：解析命令、驗證參數並格式化顯示結果。
+- `FileScanner`：尋找候選文件並隔離檔案系統錯誤。
+- `ParserRegistry`：依副檔名選擇解析器。
+- `DocumentParser`：所有解析器共同遵守的契約。
+- 各格式解析器：Markdown／純文字、DOCX、PPTX、XLSX、PDF。
+- `SyncService`：比較檔案系統與索引狀態並協調更新。
+- `IndexStore`：管理 SQLite schema、transaction、持久化與原始查詢。
+- `SearchService`：正規化查詢、排序命中、合併結果並產生片段。
 
-## 8. Initial data model
+## 8. 初始資料模型
 
-### Document
+### 文件
 
-- `id`: internal stable integer key.
-- `path`: unique normalized absolute path.
-- `filename`: display filename.
-- `extension`: normalized lowercase extension.
-- `size_bytes`: file size at last indexing.
-- `modified_at_ms`: source modification timestamp.
-- `indexed_at_ms`: successful processing timestamp.
-- `status`: `indexed`, `no_text`, `unsupported`, `too_large`, or `error`.
-- `error_code` and `error_message`: nullable diagnostic fields.
+- `id`：內部穩定整數鍵。
+- `path`：唯一且正規化的絕對路徑。
+- `filename`：顯示用檔名。
+- `extension`：統一為小寫的副檔名。
+- `size_bytes`：最後索引時的檔案大小。
+- `modified_at_ms`：來源檔案最後修改時間。
+- `indexed_at_ms`：成功處理時間。
+- `status`：`indexed`、`no_text`、`unsupported`、`too_large` 或 `error`。
+- `error_code`、`error_message`：可為空的錯誤資訊。
 
-### Section
+### 文字區塊
 
-- `id`: internal integer key.
-- `document_id`: parent document foreign key.
-- `ordinal`: stable order within the document.
-- `heading`: optional section title.
-- `content`: searchable original text.
-- `location_kind`: `section`, `line`, `slide`, `sheet_cell`, or `page`.
-- `location_value`: human-readable location data.
+- `id`：內部整數鍵。
+- `document_id`：所屬文件的外鍵。
+- `ordinal`：區塊在文件內的穩定順序。
+- `heading`：可選的區塊標題。
+- `content`：保留原文的可搜尋文字。
+- `location_kind`：`section`、`line`、`slide`、`sheet_cell` 或 `page`。
+- `location_value`：供使用者閱讀的位置資訊。
 
-## 9. Error and exit-code policy
+## 9. 錯誤與結束碼政策
 
-- Expected user errors display concise Chinese messages without raw stack traces.
-- Unexpected internal errors include a stable error code and optional verbose diagnostic output.
-- One unreadable document does not make the indexing command fail if other documents can be processed.
-- Command exit codes distinguish success, invalid usage, invalid root/configuration, and fatal internal failure.
+- 可預期的使用錯誤顯示簡短繁體中文訊息，預設不顯示原始 stack trace。
+- 非預期內部錯誤包含穩定錯誤碼，詳細模式才顯示診斷資訊。
+- 只要其他文件仍可處理，單一文件無法讀取不應使整個索引命令失敗。
+- 結束碼區分成功、命令使用錯誤、根目錄／設定錯誤及致命內部錯誤。
 
-## 10. Non-functional requirements
+## 10. 非功能需求
 
-### Privacy and security
+### 隱私與安全
 
-- No telemetry or network request is required for indexing and searching.
-- Logs must not include full document content.
-- Test fixtures must not contain company files or copied company text.
-- SQLite indexes are treated as sensitive derived copies of source documents.
+- 建立索引與搜尋不需要遙測或網路請求。
+- 日誌不得包含完整文件內容。
+- 測試資料不得包含公司文件或複製自公司的文字。
+- SQLite 索引包含衍生的文件文字，必須視為敏感資料。
 
-### Portability
+### 可攜性
 
-- Target Node.js 22.17.0 x64.
-- Avoid native npm add-ons requiring compilation or administrator privileges.
-- Support execution from a user-writable portable project directory.
+- 目標版本為 Node.js 22.17.0 x64。
+- 避免需要編譯或管理員權限的原生 npm 擴充套件。
+- 支援從使用者可寫入的可攜式專案目錄執行。
 
-### Performance
+### 效能
 
-Provisional baseline for measurement, not a promise until Windows testing:
+以下是等待 Windows 實測的暫定基準，不是尚未量測的承諾：
 
-- 1,000 mixed test documents after indexing.
-- Warm search target: under 2 seconds at the 95th percentile.
-- Unchanged incremental scan should avoid content parsing.
-- Record initial index time, unchanged scan time, search latency, index size, and process memory.
+- 已完成索引的 1,000 份混合測試文件。
+- 暖機後搜尋第 95 百分位目標小於 2 秒。
+- 沒有變更的增量掃描不得重新解析內容。
+- 記錄初次索引時間、無變更掃描時間、搜尋延遲、索引大小與行程記憶體。
 
-## 11. Test strategy
+## 11. 測試策略
 
-- Unit tests cover normalization, extension filtering, parser selection, snippets, ranking, and change detection.
-- Parser contract tests run the same expectations against every supported format.
-- Integration tests create temporary directories and verify scan-to-index-to-search behavior.
-- Fixture tests cover Chinese paths, Chinese queries, empty files, corrupted files, encrypted/unsupported cases where practical, and source deletion.
-- Regression tests accompany every fixed defect.
-- User acceptance runs separately on the company Windows computer.
+- 單元測試涵蓋正規化、副檔名篩選、解析器選擇、片段、排序與變更判斷。
+- 解析器契約測試對每個支援格式執行相同基本要求。
+- 整合測試建立暫存目錄，驗證掃描、索引到搜尋的完整流程。
+- 測試資料涵蓋中文路徑、中文查詢、空檔案、損壞文件、可實作的加密／不支援案例及來源刪除。
+- 每個已修復缺陷都要加入回歸測試。
+- 使用者另外在公司 Windows 電腦執行實際驗收。
 
-## 12. Milestones
+## 12. 里程碑
 
-### M0 — Foundation
+### M0——專案基礎
 
-- Project structure, strict TypeScript, tests, SPEC, decision log, status, and handoff process.
+建立專案結構、嚴格 TypeScript、測試、SPEC、決策紀錄、狀態與交接流程。
 
-### M1 — Vertical slice
+### M1——垂直切片
 
-- CLI, root validation, Markdown/text scanning, common model, SQLite persistence, substring search, snippets, and automated tests.
+完成 CLI、根目錄驗證、Markdown／純文字掃描、統一模型、SQLite、子字串搜尋、片段與測試。
 
-### M2 — Office formats
+### M2——Office 格式
 
-- DOCX, PPTX, and XLSX parsers using ZIP/XML packages already tested in the company environment.
+使用已在公司環境技術驗證的 ZIP／XML 套件完成 DOCX、PPTX、XLSX 解析器。
 
-### M3 — PDF
+### M3——PDF
 
-- Text-based PDF parser, page locations, and explicit no-text/encrypted/error behavior.
+完成文字型 PDF 解析、頁碼位置及無文字／加密／錯誤行為。
 
-### M4 — Incremental reliability
+### M4——增量更新可靠性
 
-- New/changed/deleted detection, transactions, rebuild, exclusions, status, and error reporting.
+完成新增、修改、刪除判斷、transaction、重建、排除規則、狀態與錯誤報告。
 
-### M5 — Quality and delivery
+### M5——品質與交付
 
-- Ranking refinement, performance measurements, Windows acceptance, portable run instructions, README, demo, and application evidence.
+完成排序改善、效能測量、Windows 驗收、可攜式執行說明、README、Demo 與書審材料。
 
-MCP and OCR remain later optional work and cannot delay M1–M5.
+MCP 與 OCR 屬於後續選配，不得延誤 M1～M5。
 
-## 13. Acceptance criteria for the usable MVP
+## 13. 可用 MVP 驗收條件
 
-The MVP is accepted when the user can place supported files under one Windows root directory and:
+使用者將支援格式文件放在同一個 Windows 根目錄後，能夠：
 
-1. index the directory without administrator privileges;
-2. search Chinese or English text in filenames and extractable content;
-3. see a path, location, snippet, and modification time for each result;
-4. receive useful messages for no results, no supported files, invalid roots, unreadable files, and textless PDFs;
-5. update the index after files are added, modified, or deleted;
-6. run automated tests successfully;
-7. review recorded performance measurements;
-8. operate the tool without any document content being sent outside the computer.
+1. 不使用管理員權限建立索引。
+2. 以中文或英文搜尋檔名及可擷取內容。
+3. 在每筆結果看到路徑、來源位置、命中片段與修改時間。
+4. 對沒有結果、沒有支援文件、錯誤根目錄、無法讀取文件及無文字 PDF 看到明確訊息。
+5. 在文件新增、修改或刪除後更新索引。
+6. 成功執行自動測試。
+7. 查看已記錄的效能測量結果。
+8. 在整個操作過程中不將文件內容傳出電腦。
 
-## 14. Decisions requiring user confirmation
+## 14. 等待使用者確認的決策
 
-1. **Index location**: default to `%LOCALAPPDATA%\\LocalDocSearch` (recommended) or store beside the portable program.
-2. **Search freshness**: make `search` perform a quick incremental sync automatically, or require the user to run `index` first.
-3. **Maximum file size**: accept the provisional 100 MB per-file limit or choose another value.
+1. **索引位置**：預設使用 `%LOCALAPPDATA%\\LocalDocSearch`（建議），或存放在可攜式程式旁。
+2. **搜尋新鮮度**：`search` 自動執行快速增量同步，或要求使用者先執行 `index`。
+3. **單檔大小上限**：接受暫定的 100 MB，或指定其他數值。
 
-These decisions do not block the M0 project foundation but should be resolved before M1 behavior is finalized.
+上述決策不影響 M0 專案基礎，但必須在確定 M1 行為前完成。

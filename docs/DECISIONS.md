@@ -1,31 +1,37 @@
-# Decision log
+# 設計決策紀錄
 
-## D001 — Use Node.js and TypeScript
+## D001 — 使用 Node.js 與 TypeScript
 
-- Status: accepted
-- Decision: target Node.js 22.17.0 x64 and write application code in strict TypeScript.
-- Reason: the company computer can run Node.js, npm packages were technically verified, and no usable .NET SDK is installed.
+- 狀態：已確認
+- 決策：以 Node.js 22.17.0 x64 為目標環境，應用程式碼採用嚴格模式 TypeScript。
+- 原因：公司電腦可以執行 Node.js，已技術驗證 npm 套件可用，而且沒有可用的 .NET SDK。
 
-## D002 — Use only local document processing
+## D002 — 文件僅在本機處理
 
-- Status: accepted
-- Decision: parsing, indexing, and searching remain on the user's computer.
-- Reason: company document contents must not be assumed safe to transmit to external AI or embedding services.
+- 狀態：已確認
+- 決策：文件解析、建立索引與搜尋都留在使用者電腦。
+- 原因：不得假設公司文件可以傳送給外部 AI 或 embedding 服務。
 
-## D003 — Make multi-format search part of the usable MVP
+## D003 — 可用 MVP 必須支援多種格式
 
-- Status: accepted
-- Decision: the usable MVP includes Markdown, text, DOCX, PPTX, XLSX, and text-based PDF.
-- Reason: a Markdown-only tool does not solve the user's actual document-search problem.
+- 狀態：已確認
+- 決策：可用 MVP 包含 Markdown、純文字、DOCX、PPTX、XLSX 與文字型 PDF。
+- 原因：只支援 Markdown 無法解決使用者真正的文件搜尋需求。
 
-## D004 — Deliver formats incrementally through one common model
+## D004 — 透過統一模型逐步交付各格式
 
-- Status: accepted
-- Decision: prove the full scan-to-search path with Markdown/text first, then add Office and PDF parsers without changing the search core.
-- Reason: this controls implementation risk without redefining the final product as Markdown-only.
+- 狀態：已確認
+- 決策：先以 Markdown／純文字打通完整掃描到搜尋流程，再加入 Office 與 PDF 解析器，且不改寫搜尋核心。
+- 原因：這能控制實作風險，同時不會把最終產品縮減成只支援 Markdown。
 
-## D005 — Prefer packages already tested in the company environment
+## D005 — 優先使用已在公司環境測試的套件
 
-- Status: accepted with policy caveat
-- Decision: plan around `fflate`, `fast-xml-parser`, and `pdfjs-dist`; use Node's built-in SQLite when feasible.
-- Reason: those packages imported successfully on the company computer, although technical success is not equivalent to formal company approval.
+- 狀態：已確認，但保留公司政策限制
+- 決策：規劃使用 `fflate`、`fast-xml-parser` 與 `pdfjs-dist`；可行時採用 Node.js 內建 SQLite。
+- 原因：這些套件已在公司電腦成功載入，但技術上能執行不等於公司已正式核准。
+
+## D006 — 專案文件統一使用繁體中文
+
+- 狀態：已確認
+- 決策：所有說明文件、SPEC、狀態、交接與決策紀錄使用繁體中文；程式識別字、命令與通用技術名稱保留英文。
+- 原因：使用者需要直接審閱、驗收並將文件整理成書審與面試材料。

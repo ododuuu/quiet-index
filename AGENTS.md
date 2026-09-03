@@ -1,20 +1,21 @@
-# LocalDocSearch agent instructions
+# LocalDocSearch AI 協作指示
 
-Before changing code, read these files in order:
+修改程式碼前，依序閱讀下列文件：
 
 1. `docs/SPEC.md`
 2. `docs/STATUS.md`
 3. `docs/DECISIONS.md`
 4. `docs/HANDOFF.md`
 
-## Working rules
+## 工作規則
 
-- Treat this repository as the formal LocalDocSearch product; do not mix it with the learning website in the parent workspace.
-- Preserve the agreed Node.js and TypeScript direction unless the user explicitly changes it.
-- Keep all document processing local and do not upload document contents to external services.
-- Do not add MCP, AI, embeddings, OCR, GUI, or legacy Office formats before the core CLI is stable.
-- Do not silently change product behavior; record proposed behavior in `docs/SPEC.md` and decisions in `docs/DECISIONS.md`.
-- Implement only the active milestone in `docs/STATUS.md`.
-- Add or update automated tests for every behavior change.
-- At the end of every work session, update `docs/STATUS.md` and add significant decisions to `docs/DECISIONS.md`.
-- Never claim Windows validation was performed unless the user actually ran it on the company computer and reported the result.
+- 本儲存庫是正式的 LocalDocSearch 產品，不得與上層工作區的教材網站混用。
+- 除非使用者明確變更，否則維持已決定的 Node.js 與 TypeScript 技術方向。
+- 所有文件處理都必須留在本機，不得將文件內容上傳至外部服務。
+- 核心 CLI 穩定前，不得加入 MCP、AI、embedding、OCR、GUI 或舊版 Office 格式。
+- 不得自行改變產品行為；預定行為寫入 `docs/SPEC.md`，設計決策寫入 `docs/DECISIONS.md`。
+- 每次只實作 `docs/STATUS.md` 指定的進行中里程碑。
+- 每項行為變更都必須新增或更新自動測試。
+- 所有專案說明文件、規格、狀態與決策紀錄都使用繁體中文；程式識別字、命令與通用技術名稱可保留英文。
+- 每次工作結束時更新 `docs/STATUS.md`，並將重要決策加入 `docs/DECISIONS.md`。
+- 除非使用者確實在公司 Windows 電腦完成驗收並回報，否則不得宣稱已通過 Windows 驗證。
