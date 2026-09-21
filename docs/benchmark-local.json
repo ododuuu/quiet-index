@@ -1,0 +1,2121 @@
+{
+  "generatedAt": "2026-09-16T01:20:53.420Z",
+  "platform": "darwin",
+  "release": "25.6.0",
+  "arch": "arm64",
+  "node": "v26.7.0",
+  "cpu": "Apple M2",
+  "ramBytes": 17179869184,
+  "storageType": "NVMe SSD（APPLE SSD AP1024Z；system_profiler 確認）",
+  "version": "0.5.0",
+  "revision": "46669a14c89ca079d6d92013c6bd8afbb998bfae",
+  "sourceSha256": "bb713e86328b97c627e47e949270ebab51fbcb72eb8e27cf9e21de220c0a0931",
+  "dependencies": {
+    "fast-xml-parser": "5.11.1",
+    "fflate": "0.8.3",
+    "pdfjs-dist": "6.3.289"
+  },
+  "dataset": {
+    "version": "m5-synthetic-v1",
+    "seed": 20260916,
+    "count": 1000,
+    "formatCounts": {
+      "txt": 167,
+      "md": 167,
+      "docx": 167,
+      "pptx": 167,
+      "xlsx": 166,
+      "pdf": 166
+    },
+    "sourceBytes": 1535089,
+    "blockCount": 1333,
+    "indexBytes": 3813376
+  },
+  "method": "每組暖機 3 次、正式 10 次；獨立 CLI 程序啟動至結束，包含輸出及量測預載；nearest-rank；limit=20。",
+  "memoryMethod": "maxRssKiB 為 Node resourceUsage 的 OS 峰值（KiB）；sampledPeakRss 為 5ms 取樣（bytes，可能漏短暫峰值）。",
+  "limitation": "合成小文件；Office 為解析器所需的最小 XML 套件，未保證可供 Office 編輯；PDF 重用兩頁中英文字層樣本。不能推論大型／複雜實際文件表現。",
+  "index": {
+    "initial": {
+      "runs": [
+        {
+          "ms": 3830.1407090000002,
+          "maxRssKiB": 325584,
+          "sampledPeakRss": 333348864,
+          "sampleIntervalMs": 5,
+          "summary": {
+            "found": 1000,
+            "updated": 1000,
+            "added": 1000,
+            "reprocessed": 0,
+            "unchanged": 0,
+            "removed": 0,
+            "parserCalls": 1000,
+            "statuses": {
+              "indexed": 1000,
+              "no_text": 0,
+              "unsupported": 0,
+              "too_large": 0,
+              "encrypted": 0,
+              "error": 0
+            },
+            "skipped": {
+              "builtin": 0,
+              "user": 0,
+              "unsupported": 0,
+              "link": 0
+            },
+            "readErrors": 0,
+            "elapsedMs": 3650.15,
+            "blockCount": 1333
+          }
+        },
+        {
+          "ms": 3815.830417000001,
+          "maxRssKiB": 389600,
+          "sampledPeakRss": 398934016,
+          "sampleIntervalMs": 5,
+          "summary": {
+            "found": 1000,
+            "updated": 1000,
+            "added": 1000,
+            "reprocessed": 0,
+            "unchanged": 0,
+            "removed": 0,
+            "parserCalls": 1000,
+            "statuses": {
+              "indexed": 1000,
+              "no_text": 0,
+              "unsupported": 0,
+              "too_large": 0,
+              "encrypted": 0,
+              "error": 0
+            },
+            "skipped": {
+              "builtin": 0,
+              "user": 0,
+              "unsupported": 0,
+              "link": 0
+            },
+            "readErrors": 0,
+            "elapsedMs": 3642.27,
+            "blockCount": 1333
+          }
+        },
+        {
+          "ms": 3841.7756249999984,
+          "maxRssKiB": 325584,
+          "sampledPeakRss": 333381632,
+          "sampleIntervalMs": 5,
+          "summary": {
+            "found": 1000,
+            "updated": 1000,
+            "added": 1000,
+            "reprocessed": 0,
+            "unchanged": 0,
+            "removed": 0,
+            "parserCalls": 1000,
+            "statuses": {
+              "indexed": 1000,
+              "no_text": 0,
+              "unsupported": 0,
+              "too_large": 0,
+              "encrypted": 0,
+              "error": 0
+            },
+            "skipped": {
+              "builtin": 0,
+              "user": 0,
+              "unsupported": 0,
+              "link": 0
+            },
+            "readErrors": 0,
+            "elapsedMs": 3667.45,
+            "blockCount": 1333
+          }
+        }
+      ],
+      "medianMs": 3830.1407090000002
+    },
+    "unchanged": {
+      "runs": [
+        {
+          "ms": 206.59387500000003,
+          "maxRssKiB": 131968,
+          "sampledPeakRss": 135135232,
+          "sampleIntervalMs": 5,
+          "summary": {
+            "found": 1000,
+            "updated": 0,
+            "added": 0,
+            "reprocessed": 0,
+            "unchanged": 1000,
+            "removed": 0,
+            "parserCalls": 0,
+            "statuses": {
+              "indexed": 0,
+              "no_text": 0,
+              "unsupported": 0,
+              "too_large": 0,
+              "encrypted": 0,
+              "error": 0
+            },
+            "skipped": {
+              "builtin": 0,
+              "user": 0,
+              "unsupported": 0,
+              "link": 0
+            },
+            "readErrors": 0,
+            "elapsedMs": 37.88,
+            "blockCount": 1333
+          }
+        },
+        {
+          "ms": 230.9456250000003,
+          "maxRssKiB": 132336,
+          "sampledPeakRss": 135512064,
+          "sampleIntervalMs": 5,
+          "summary": {
+            "found": 1000,
+            "updated": 0,
+            "added": 0,
+            "reprocessed": 0,
+            "unchanged": 1000,
+            "removed": 0,
+            "parserCalls": 0,
+            "statuses": {
+              "indexed": 0,
+              "no_text": 0,
+              "unsupported": 0,
+              "too_large": 0,
+              "encrypted": 0,
+              "error": 0
+            },
+            "skipped": {
+              "builtin": 0,
+              "user": 0,
+              "unsupported": 0,
+              "link": 0
+            },
+            "readErrors": 0,
+            "elapsedMs": 38.32,
+            "blockCount": 1333
+          }
+        },
+        {
+          "ms": 207.51791700000103,
+          "maxRssKiB": 132448,
+          "sampledPeakRss": 135626752,
+          "sampleIntervalMs": 5,
+          "summary": {
+            "found": 1000,
+            "updated": 0,
+            "added": 0,
+            "reprocessed": 0,
+            "unchanged": 1000,
+            "removed": 0,
+            "parserCalls": 0,
+            "statuses": {
+              "indexed": 0,
+              "no_text": 0,
+              "unsupported": 0,
+              "too_large": 0,
+              "encrypted": 0,
+              "error": 0
+            },
+            "skipped": {
+              "builtin": 0,
+              "user": 0,
+              "unsupported": 0,
+              "link": 0
+            },
+            "readErrors": 0,
+            "elapsedMs": 38.22,
+            "blockCount": 1333
+          }
+        }
+      ],
+      "medianMs": 207.51791700000103
+    },
+    "changed": {
+      "runs": [
+        {
+          "ms": 211.50670900000023,
+          "maxRssKiB": 132896,
+          "sampledPeakRss": 136085504,
+          "sampleIntervalMs": 5,
+          "summary": {
+            "found": 1000,
+            "updated": 20,
+            "added": 10,
+            "reprocessed": 10,
+            "unchanged": 980,
+            "removed": 10,
+            "parserCalls": 20,
+            "statuses": {
+              "indexed": 20,
+              "no_text": 0,
+              "unsupported": 0,
+              "too_large": 0,
+              "encrypted": 0,
+              "error": 0
+            },
+            "skipped": {
+              "builtin": 0,
+              "user": 0,
+              "unsupported": 0,
+              "link": 0
+            },
+            "readErrors": 0,
+            "elapsedMs": 47.1,
+            "blockCount": 1333
+          }
+        },
+        {
+          "ms": 216.75204099999974,
+          "maxRssKiB": 132992,
+          "sampledPeakRss": 136183808,
+          "sampleIntervalMs": 5,
+          "summary": {
+            "found": 1000,
+            "updated": 20,
+            "added": 10,
+            "reprocessed": 10,
+            "unchanged": 980,
+            "removed": 10,
+            "parserCalls": 20,
+            "statuses": {
+              "indexed": 20,
+              "no_text": 0,
+              "unsupported": 0,
+              "too_large": 0,
+              "encrypted": 0,
+              "error": 0
+            },
+            "skipped": {
+              "builtin": 0,
+              "user": 0,
+              "unsupported": 0,
+              "link": 0
+            },
+            "readErrors": 0,
+            "elapsedMs": 50.48,
+            "blockCount": 1333
+          }
+        },
+        {
+          "ms": 227.44795800000065,
+          "maxRssKiB": 132928,
+          "sampledPeakRss": 136118272,
+          "sampleIntervalMs": 5,
+          "summary": {
+            "found": 1000,
+            "updated": 20,
+            "added": 10,
+            "reprocessed": 10,
+            "unchanged": 980,
+            "removed": 10,
+            "parserCalls": 20,
+            "statuses": {
+              "indexed": 20,
+              "no_text": 0,
+              "unsupported": 0,
+              "too_large": 0,
+              "encrypted": 0,
+              "error": 0
+            },
+            "skipped": {
+              "builtin": 0,
+              "user": 0,
+              "unsupported": 0,
+              "link": 0
+            },
+            "readErrors": 0,
+            "elapsedMs": 59.32,
+            "blockCount": 1333
+          }
+        }
+      ],
+      "medianMs": 216.75204099999974
+    }
+  },
+  "search": {
+    "p50Ms": 57.195207999997365,
+    "p95Ms": 65.61795800000073,
+    "queries": [
+      {
+        "query": "合成",
+        "expectedFiles": [
+          "合成-00999-group6.pptx",
+          "合成-00998-group5.docx",
+          "合成-00997-group4.md",
+          "合成-00996-group9.txt",
+          "合成-00995-group8.pdf",
+          "合成-00994-group5.xlsx",
+          "合成-00993-group4.pptx",
+          "合成-00992-group7.docx",
+          "合成-00991-group2.md",
+          "合成-00990-group5.txt",
+          "合成-00989-group0.pdf",
+          "合成-00988-group9.xlsx",
+          "合成-00987-group8.pptx",
+          "合成-00986-group7.docx",
+          "合成-00985-group4.md",
+          "合成-00984-group7.txt",
+          "合成-00983-group8.pdf",
+          "合成-00982-group9.xlsx",
+          "合成-00981-group8.pptx",
+          "合成-00980-group1.docx"
+        ],
+        "totalMatches": 1000,
+        "samples": [
+          {
+            "ms": 62.69133399999919,
+            "maxRssKiB": 76672,
+            "sampledPeakRss": 78512128,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 62.67041700000118,
+            "maxRssKiB": 76448,
+            "sampledPeakRss": 78282752,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 61.84741600000052,
+            "maxRssKiB": 76544,
+            "sampledPeakRss": 78381056,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 67.38154199999917,
+            "maxRssKiB": 76560,
+            "sampledPeakRss": 78397440,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 65.61795800000073,
+            "maxRssKiB": 76496,
+            "sampledPeakRss": 78331904,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 69.88474999999926,
+            "maxRssKiB": 76816,
+            "sampledPeakRss": 78659584,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 64.51433300000099,
+            "maxRssKiB": 76624,
+            "sampledPeakRss": 78462976,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 64.99833299999955,
+            "maxRssKiB": 76608,
+            "sampledPeakRss": 78446592,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 62.453833999999915,
+            "maxRssKiB": 76512,
+            "sampledPeakRss": 78348288,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 62.504666999999245,
+            "maxRssKiB": 76528,
+            "sampledPeakRss": 78348288,
+            "sampleIntervalMs": 5
+          }
+        ],
+        "p50Ms": 62.69133399999919,
+        "p95Ms": 69.88474999999926
+      },
+      {
+        "query": "report",
+        "expectedFiles": [
+          "合成-00999-group6.pptx",
+          "合成-00998-group5.docx",
+          "合成-00997-group4.md",
+          "合成-00996-group9.txt",
+          "合成-00994-group5.xlsx",
+          "合成-00993-group4.pptx",
+          "合成-00992-group7.docx",
+          "合成-00991-group2.md",
+          "合成-00990-group5.txt",
+          "合成-00988-group9.xlsx",
+          "合成-00987-group8.pptx",
+          "合成-00986-group7.docx",
+          "合成-00985-group4.md",
+          "合成-00984-group7.txt",
+          "合成-00982-group9.xlsx",
+          "合成-00981-group8.pptx",
+          "合成-00980-group1.docx",
+          "合成-00979-group6.md",
+          "合成-00978-group7.txt",
+          "合成-00976-group5.xlsx"
+        ],
+        "totalMatches": 834,
+        "samples": [
+          {
+            "ms": 64.54216599999927,
+            "maxRssKiB": 76528,
+            "sampledPeakRss": 78364672,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 63.75087499999972,
+            "maxRssKiB": 76528,
+            "sampledPeakRss": 78364672,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 62.25995800000055,
+            "maxRssKiB": 76448,
+            "sampledPeakRss": 78266368,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 62.24779099999978,
+            "maxRssKiB": 76560,
+            "sampledPeakRss": 78397440,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 63.68458400000054,
+            "maxRssKiB": 76496,
+            "sampledPeakRss": 78315520,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 62.99474999999984,
+            "maxRssKiB": 76496,
+            "sampledPeakRss": 78331904,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 63.720124999999825,
+            "maxRssKiB": 76656,
+            "sampledPeakRss": 78495744,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 62.971708000000945,
+            "maxRssKiB": 76608,
+            "sampledPeakRss": 78430208,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 63.04912499999955,
+            "maxRssKiB": 76640,
+            "sampledPeakRss": 78479360,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 63.654082999999446,
+            "maxRssKiB": 76528,
+            "sampledPeakRss": 78364672,
+            "sampleIntervalMs": 5
+          }
+        ],
+        "p50Ms": 63.04912499999955,
+        "p95Ms": 64.54216599999927
+      },
+      {
+        "query": "中文搜尋",
+        "expectedFiles": [
+          "合成-00999-group6.pptx",
+          "合成-00998-group5.docx",
+          "合成-00997-group4.md",
+          "合成-00996-group9.txt",
+          "合成-00994-group5.xlsx",
+          "合成-00993-group4.pptx",
+          "合成-00992-group7.docx",
+          "合成-00991-group2.md",
+          "合成-00990-group5.txt",
+          "合成-00988-group9.xlsx",
+          "合成-00987-group8.pptx",
+          "合成-00986-group7.docx",
+          "合成-00985-group4.md",
+          "合成-00984-group7.txt",
+          "合成-00982-group9.xlsx",
+          "合成-00981-group8.pptx",
+          "合成-00980-group1.docx",
+          "合成-00979-group6.md",
+          "合成-00978-group7.txt",
+          "合成-00976-group5.xlsx"
+        ],
+        "totalMatches": 834,
+        "samples": [
+          {
+            "ms": 63.25379199999952,
+            "maxRssKiB": 76464,
+            "sampledPeakRss": 78299136,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 62.142916000000696,
+            "maxRssKiB": 76560,
+            "sampledPeakRss": 78397440,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 64.49575000000004,
+            "maxRssKiB": 76528,
+            "sampledPeakRss": 78348288,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 62.62229099999968,
+            "maxRssKiB": 76608,
+            "sampledPeakRss": 78446592,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 62.99183300000004,
+            "maxRssKiB": 76528,
+            "sampledPeakRss": 78348288,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 62.895792000002984,
+            "maxRssKiB": 76464,
+            "sampledPeakRss": 78282752,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 64.28941599999962,
+            "maxRssKiB": 76704,
+            "sampledPeakRss": 78528512,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 64.72058300000208,
+            "maxRssKiB": 76496,
+            "sampledPeakRss": 78315520,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 62.60283299999719,
+            "maxRssKiB": 76496,
+            "sampledPeakRss": 78331904,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 62.79637500000172,
+            "maxRssKiB": 76496,
+            "sampledPeakRss": 78315520,
+            "sampleIntervalMs": 5
+          }
+        ],
+        "p50Ms": 62.895792000002984,
+        "p95Ms": 64.72058300000208
+      },
+      {
+        "query": "budget",
+        "expectedFiles": [
+          "合成-00999-group6.pptx",
+          "合成-00998-group5.docx",
+          "合成-00997-group4.md",
+          "合成-00996-group9.txt",
+          "合成-00994-group5.xlsx",
+          "合成-00993-group4.pptx",
+          "合成-00992-group7.docx",
+          "合成-00991-group2.md",
+          "合成-00990-group5.txt",
+          "合成-00988-group9.xlsx",
+          "合成-00987-group8.pptx",
+          "合成-00986-group7.docx",
+          "合成-00985-group4.md",
+          "合成-00984-group7.txt",
+          "合成-00982-group9.xlsx",
+          "合成-00981-group8.pptx",
+          "合成-00980-group1.docx",
+          "合成-00979-group6.md",
+          "合成-00978-group7.txt",
+          "合成-00976-group5.xlsx"
+        ],
+        "totalMatches": 834,
+        "samples": [
+          {
+            "ms": 63.19012499999735,
+            "maxRssKiB": 76576,
+            "sampledPeakRss": 78413824,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 63.15916599999764,
+            "maxRssKiB": 76528,
+            "sampledPeakRss": 78364672,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 64.13316599999962,
+            "maxRssKiB": 76496,
+            "sampledPeakRss": 78315520,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 63.16675000000032,
+            "maxRssKiB": 76432,
+            "sampledPeakRss": 78266368,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 64.37274999999863,
+            "maxRssKiB": 76592,
+            "sampledPeakRss": 78413824,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 66.70395799999824,
+            "maxRssKiB": 76528,
+            "sampledPeakRss": 78348288,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 63.8870829999978,
+            "maxRssKiB": 76560,
+            "sampledPeakRss": 78381056,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 64.9922080000033,
+            "maxRssKiB": 76592,
+            "sampledPeakRss": 78413824,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 62.798791999997775,
+            "maxRssKiB": 76512,
+            "sampledPeakRss": 78331904,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 63.2410830000008,
+            "maxRssKiB": 76512,
+            "sampledPeakRss": 78348288,
+            "sampleIntervalMs": 5
+          }
+        ],
+        "p50Ms": 63.2410830000008,
+        "p95Ms": 66.70395799999824
+      },
+      {
+        "query": "標題-0",
+        "expectedFiles": [
+          "合成-00949-group0.md",
+          "合成-00943-group0.md",
+          "合成-00927-group0.pptx",
+          "合成-00915-group0.pptx",
+          "合成-00897-group0.pptx",
+          "合成-00795-group0.pptx",
+          "合成-00787-group0.md",
+          "合成-00781-group0.md",
+          "合成-00777-group0.pptx",
+          "合成-00763-group0.md",
+          "合成-00735-group0.pptx",
+          "合成-00733-group0.md",
+          "合成-00727-group0.md",
+          "合成-00721-group0.md",
+          "合成-00711-group0.pptx",
+          "合成-00699-group0.pptx",
+          "合成-00691-group0.md",
+          "合成-00679-group0.md",
+          "合成-00673-group0.md",
+          "合成-00669-group0.pptx"
+        ],
+        "totalMatches": 67,
+        "samples": [
+          {
+            "ms": 56.85545899999852,
+            "maxRssKiB": 72624,
+            "sampledPeakRss": 74366976,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 57.109583999997994,
+            "maxRssKiB": 72688,
+            "sampledPeakRss": 74432512,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 57.65141600000061,
+            "maxRssKiB": 72480,
+            "sampledPeakRss": 74219520,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 56.453582999998616,
+            "maxRssKiB": 72368,
+            "sampledPeakRss": 74104832,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 56.27162500000122,
+            "maxRssKiB": 72592,
+            "sampledPeakRss": 74334208,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 56.01629099999991,
+            "maxRssKiB": 72544,
+            "sampledPeakRss": 74285056,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 56.96887499999866,
+            "maxRssKiB": 72608,
+            "sampledPeakRss": 74350592,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 58.094333000000915,
+            "maxRssKiB": 72592,
+            "sampledPeakRss": 74334208,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 58.78712499999892,
+            "maxRssKiB": 72608,
+            "sampledPeakRss": 74350592,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 56.64154100000087,
+            "maxRssKiB": 72528,
+            "sampledPeakRss": 74268672,
+            "sampleIntervalMs": 5
+          }
+        ],
+        "p50Ms": 56.85545899999852,
+        "p95Ms": 58.78712499999892
+      },
+      {
+        "query": "標題-3",
+        "expectedFiles": [
+          "合成-00970-group3.xlsx",
+          "合成-00962-group3.docx",
+          "合成-00946-group3.xlsx",
+          "合成-00940-group3.xlsx",
+          "合成-00908-group3.docx",
+          "合成-00902-group3.docx",
+          "合成-00896-group3.docx",
+          "合成-00890-group3.docx",
+          "合成-00878-group3.docx",
+          "合成-00860-group3.docx",
+          "合成-00854-group3.docx",
+          "合成-00818-group3.docx",
+          "合成-00808-group3.xlsx",
+          "合成-00806-group3.docx",
+          "合成-00802-group3.xlsx",
+          "合成-00782-group3.docx",
+          "合成-00766-group3.xlsx",
+          "合成-00764-group3.docx",
+          "合成-00758-group3.docx",
+          "合成-00730-group3.xlsx"
+        ],
+        "totalMatches": 73,
+        "samples": [
+          {
+            "ms": 60.42520799999693,
+            "maxRssKiB": 72496,
+            "sampledPeakRss": 74235904,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 59.16620799999873,
+            "maxRssKiB": 72544,
+            "sampledPeakRss": 74285056,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 62.8123749999977,
+            "maxRssKiB": 72576,
+            "sampledPeakRss": 74317824,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 63.55945900000006,
+            "maxRssKiB": 72560,
+            "sampledPeakRss": 74301440,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 63.513458000001265,
+            "maxRssKiB": 72464,
+            "sampledPeakRss": 74203136,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 62.07066599999962,
+            "maxRssKiB": 72480,
+            "sampledPeakRss": 74219520,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 64.2524169999997,
+            "maxRssKiB": 72384,
+            "sampledPeakRss": 74121216,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 62.379500000002736,
+            "maxRssKiB": 72592,
+            "sampledPeakRss": 74334208,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 64.85920799999803,
+            "maxRssKiB": 72544,
+            "sampledPeakRss": 74285056,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 63.7556250000016,
+            "maxRssKiB": 72432,
+            "sampledPeakRss": 74170368,
+            "sampleIntervalMs": 5
+          }
+        ],
+        "p50Ms": 62.8123749999977,
+        "p95Ms": 64.85920799999803
+      },
+      {
+        "query": "group0",
+        "expectedFiles": [
+          "合成-00989-group0.pdf",
+          "合成-00965-group0.pdf",
+          "合成-00959-group0.pdf",
+          "合成-00949-group0.md",
+          "合成-00943-group0.md",
+          "合成-00927-group0.pptx",
+          "合成-00915-group0.pptx",
+          "合成-00905-group0.pdf",
+          "合成-00897-group0.pptx",
+          "合成-00893-group0.pdf",
+          "合成-00887-group0.pdf",
+          "合成-00833-group0.pdf",
+          "合成-00821-group0.pdf",
+          "合成-00795-group0.pptx",
+          "合成-00791-group0.pdf",
+          "合成-00787-group0.md",
+          "合成-00785-group0.pdf",
+          "合成-00781-group0.md",
+          "合成-00779-group0.pdf",
+          "合成-00777-group0.pptx"
+        ],
+        "totalMatches": 105,
+        "samples": [
+          {
+            "ms": 108.85433300000295,
+            "maxRssKiB": 72848,
+            "sampledPeakRss": 74596352,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 58.912834000002476,
+            "maxRssKiB": 72848,
+            "sampledPeakRss": 74596352,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 56.4832920000008,
+            "maxRssKiB": 72848,
+            "sampledPeakRss": 74596352,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 56.503208000001905,
+            "maxRssKiB": 72768,
+            "sampledPeakRss": 74514432,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 56.742041000001336,
+            "maxRssKiB": 72672,
+            "sampledPeakRss": 74416128,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 60.6873749999977,
+            "maxRssKiB": 72832,
+            "sampledPeakRss": 74579968,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 61.00533400000131,
+            "maxRssKiB": 72848,
+            "sampledPeakRss": 74596352,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 62.35966600000029,
+            "maxRssKiB": 72624,
+            "sampledPeakRss": 74366976,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 61.17304200000217,
+            "maxRssKiB": 72768,
+            "sampledPeakRss": 74514432,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 57.93829200000255,
+            "maxRssKiB": 72672,
+            "sampledPeakRss": 74416128,
+            "sampleIntervalMs": 5
+          }
+        ],
+        "p50Ms": 58.912834000002476,
+        "p95Ms": 108.85433300000295
+      },
+      {
+        "query": "group7",
+        "expectedFiles": [
+          "合成-00992-group7.docx",
+          "合成-00986-group7.docx",
+          "合成-00984-group7.txt",
+          "合成-00978-group7.txt",
+          "合成-00968-group7.docx",
+          "合成-00966-group7.txt",
+          "合成-00964-group7.xlsx",
+          "合成-00958-group7.xlsx",
+          "合成-00952-group7.xlsx",
+          "合成-00944-group7.docx",
+          "合成-00928-group7.xlsx",
+          "合成-00922-group7.xlsx",
+          "合成-00910-group7.xlsx",
+          "合成-00904-group7.xlsx",
+          "合成-00900-group7.txt",
+          "合成-00892-group7.xlsx",
+          "合成-00888-group7.txt",
+          "合成-00866-group7.docx",
+          "合成-00834-group7.txt",
+          "合成-00824-group7.docx"
+        ],
+        "totalMatches": 89,
+        "samples": [
+          {
+            "ms": 57.1273340000007,
+            "maxRssKiB": 72592,
+            "sampledPeakRss": 74334208,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 56.512792000001355,
+            "maxRssKiB": 72656,
+            "sampledPeakRss": 74399744,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 56.021749999999884,
+            "maxRssKiB": 72768,
+            "sampledPeakRss": 74514432,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 55.52924999999959,
+            "maxRssKiB": 72880,
+            "sampledPeakRss": 74612736,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 56.376249999997526,
+            "maxRssKiB": 72880,
+            "sampledPeakRss": 74629120,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 60.37645800000246,
+            "maxRssKiB": 72784,
+            "sampledPeakRss": 74530816,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 88.21983399999954,
+            "maxRssKiB": 72992,
+            "sampledPeakRss": 74743808,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 62.89741700000013,
+            "maxRssKiB": 72640,
+            "sampledPeakRss": 74383360,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 77.7189580000013,
+            "maxRssKiB": 72800,
+            "sampledPeakRss": 74530816,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 58.358290999996825,
+            "maxRssKiB": 72832,
+            "sampledPeakRss": 74579968,
+            "sampleIntervalMs": 5
+          }
+        ],
+        "p50Ms": 57.1273340000007,
+        "p95Ms": 88.21983399999954
+      },
+      {
+        "query": "token-0",
+        "expectedFiles": [
+          "合成-00949-group0.md",
+          "合成-00943-group0.md",
+          "合成-00927-group0.pptx",
+          "合成-00915-group0.pptx",
+          "合成-00897-group0.pptx",
+          "合成-00795-group0.pptx",
+          "合成-00787-group0.md",
+          "合成-00781-group0.md",
+          "合成-00777-group0.pptx",
+          "合成-00763-group0.md",
+          "合成-00735-group0.pptx",
+          "合成-00733-group0.md",
+          "合成-00727-group0.md",
+          "合成-00721-group0.md",
+          "合成-00711-group0.pptx",
+          "合成-00699-group0.pptx",
+          "合成-00691-group0.md",
+          "合成-00679-group0.md",
+          "合成-00673-group0.md",
+          "合成-00669-group0.pptx"
+        ],
+        "totalMatches": 67,
+        "samples": [
+          {
+            "ms": 63.13179200000013,
+            "maxRssKiB": 76256,
+            "sampledPeakRss": 78086144,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 63.452916999998706,
+            "maxRssKiB": 76464,
+            "sampledPeakRss": 78282752,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 64.72162499999831,
+            "maxRssKiB": 76384,
+            "sampledPeakRss": 78200832,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 64.08979199999885,
+            "maxRssKiB": 76288,
+            "sampledPeakRss": 78118912,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 81.1274169999997,
+            "maxRssKiB": 76432,
+            "sampledPeakRss": 78266368,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 68.4798750000009,
+            "maxRssKiB": 76464,
+            "sampledPeakRss": 78299136,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 76.47433300000193,
+            "maxRssKiB": 76304,
+            "sampledPeakRss": 78135296,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 72.80512499999895,
+            "maxRssKiB": 76368,
+            "sampledPeakRss": 78184448,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 62.27533300000141,
+            "maxRssKiB": 76384,
+            "sampledPeakRss": 78200832,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 63.46608400000332,
+            "maxRssKiB": 76432,
+            "sampledPeakRss": 78266368,
+            "sampleIntervalMs": 5
+          }
+        ],
+        "p50Ms": 64.08979199999885,
+        "p95Ms": 81.1274169999997
+      },
+      {
+        "query": "token-9",
+        "expectedFiles": [
+          "合成-00996-group9.txt",
+          "合成-00988-group9.xlsx",
+          "合成-00982-group9.xlsx",
+          "合成-00974-group9.docx",
+          "合成-00960-group9.txt",
+          "合成-00956-group9.docx",
+          "合成-00950-group9.docx",
+          "合成-00942-group9.txt",
+          "合成-00934-group9.xlsx",
+          "合成-00932-group9.docx",
+          "合成-00930-group9.txt",
+          "合成-00924-group9.txt",
+          "合成-00884-group9.docx",
+          "合成-00864-group9.txt",
+          "合成-00844-group9.xlsx",
+          "合成-00840-group9.txt",
+          "合成-00822-group9.txt",
+          "合成-00814-group9.xlsx",
+          "合成-00810-group9.txt",
+          "合成-00804-group9.txt"
+        ],
+        "totalMatches": 97,
+        "samples": [
+          {
+            "ms": 64.26854099999764,
+            "maxRssKiB": 76448,
+            "sampledPeakRss": 78266368,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 62.75391700000182,
+            "maxRssKiB": 76496,
+            "sampledPeakRss": 78331904,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 62.8782919999976,
+            "maxRssKiB": 76416,
+            "sampledPeakRss": 78249984,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 63.13850000000093,
+            "maxRssKiB": 76368,
+            "sampledPeakRss": 78200832,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 62.09675000000061,
+            "maxRssKiB": 76352,
+            "sampledPeakRss": 78184448,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 62.63041599999997,
+            "maxRssKiB": 76352,
+            "sampledPeakRss": 78184448,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 63.367207999999664,
+            "maxRssKiB": 76496,
+            "sampledPeakRss": 78331904,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 62.1987079999999,
+            "maxRssKiB": 76432,
+            "sampledPeakRss": 78266368,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 62.368875000000116,
+            "maxRssKiB": 76384,
+            "sampledPeakRss": 78217216,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 63.10920899999837,
+            "maxRssKiB": 76512,
+            "sampledPeakRss": 78348288,
+            "sampleIntervalMs": 5
+          }
+        ],
+        "p50Ms": 62.75391700000182,
+        "p95Ms": 64.26854099999764
+      },
+      {
+        "query": "First page searchable text",
+        "expectedFiles": [
+          "合成-00995-group8.pdf",
+          "合成-00989-group0.pdf",
+          "合成-00983-group8.pdf",
+          "合成-00977-group6.pdf",
+          "合成-00971-group8.pdf",
+          "合成-00965-group0.pdf",
+          "合成-00959-group0.pdf",
+          "合成-00953-group2.pdf",
+          "合成-00947-group2.pdf",
+          "合成-00941-group6.pdf",
+          "合成-00935-group4.pdf",
+          "合成-00929-group2.pdf",
+          "合成-00923-group4.pdf",
+          "合成-00917-group2.pdf",
+          "合成-00911-group4.pdf",
+          "合成-00905-group0.pdf",
+          "合成-00899-group4.pdf",
+          "合成-00893-group0.pdf",
+          "合成-00887-group0.pdf",
+          "合成-00881-group6.pdf"
+        ],
+        "totalMatches": 166,
+        "samples": [
+          {
+            "ms": 57.42099999999846,
+            "maxRssKiB": 72816,
+            "sampledPeakRss": 74563584,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 56.543250000002445,
+            "maxRssKiB": 72880,
+            "sampledPeakRss": 74629120,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 57.08937499999956,
+            "maxRssKiB": 72576,
+            "sampledPeakRss": 74317824,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 55.84375,
+            "maxRssKiB": 72752,
+            "sampledPeakRss": 74498048,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 57.33666699999958,
+            "maxRssKiB": 72752,
+            "sampledPeakRss": 74498048,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 58.24737499999901,
+            "maxRssKiB": 72736,
+            "sampledPeakRss": 74481664,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 57.6697920000006,
+            "maxRssKiB": 72528,
+            "sampledPeakRss": 74268672,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 56.380708999997296,
+            "maxRssKiB": 72576,
+            "sampledPeakRss": 74317824,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 57.91362500000105,
+            "maxRssKiB": 72656,
+            "sampledPeakRss": 74399744,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 56.466082999999344,
+            "maxRssKiB": 72800,
+            "sampledPeakRss": 74547200,
+            "sampleIntervalMs": 5
+          }
+        ],
+        "p50Ms": 57.08937499999956,
+        "p95Ms": 58.24737499999901
+      },
+      {
+        "query": "第二頁中文測試",
+        "expectedFiles": [
+          "合成-00995-group8.pdf",
+          "合成-00989-group0.pdf",
+          "合成-00983-group8.pdf",
+          "合成-00977-group6.pdf",
+          "合成-00971-group8.pdf",
+          "合成-00965-group0.pdf",
+          "合成-00959-group0.pdf",
+          "合成-00953-group2.pdf",
+          "合成-00947-group2.pdf",
+          "合成-00941-group6.pdf",
+          "合成-00935-group4.pdf",
+          "合成-00929-group2.pdf",
+          "合成-00923-group4.pdf",
+          "合成-00917-group2.pdf",
+          "合成-00911-group4.pdf",
+          "合成-00905-group0.pdf",
+          "合成-00899-group4.pdf",
+          "合成-00893-group0.pdf",
+          "合成-00887-group0.pdf",
+          "合成-00881-group6.pdf"
+        ],
+        "totalMatches": 166,
+        "samples": [
+          {
+            "ms": 57.35112500000105,
+            "maxRssKiB": 72688,
+            "sampledPeakRss": 74432512,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 58.38262499999837,
+            "maxRssKiB": 72752,
+            "sampledPeakRss": 74498048,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 56.629000000000815,
+            "maxRssKiB": 72736,
+            "sampledPeakRss": 74481664,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 57.304958000000624,
+            "maxRssKiB": 72848,
+            "sampledPeakRss": 74596352,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 56.15495799999917,
+            "maxRssKiB": 72800,
+            "sampledPeakRss": 74547200,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 57.01508299999841,
+            "maxRssKiB": 72768,
+            "sampledPeakRss": 74514432,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 56.8013749999991,
+            "maxRssKiB": 72784,
+            "sampledPeakRss": 74530816,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 56.14087499999732,
+            "maxRssKiB": 72752,
+            "sampledPeakRss": 74498048,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 57.07099999999991,
+            "maxRssKiB": 72736,
+            "sampledPeakRss": 74481664,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 56.557207999998354,
+            "maxRssKiB": 72592,
+            "sampledPeakRss": 74334208,
+            "sampleIntervalMs": 5
+          }
+        ],
+        "p50Ms": 56.8013749999991,
+        "p95Ms": 58.38262499999837
+      },
+      {
+        "query": "definitely-absent-93821",
+        "expectedFiles": [],
+        "totalMatches": 0,
+        "samples": [
+          {
+            "ms": 47.09533399999782,
+            "maxRssKiB": 68480,
+            "sampledPeakRss": 70107136,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 47.774083000000246,
+            "maxRssKiB": 68432,
+            "sampledPeakRss": 70074368,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 47.43170800000007,
+            "maxRssKiB": 68384,
+            "sampledPeakRss": 70025216,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 50.241125000000466,
+            "maxRssKiB": 68448,
+            "sampledPeakRss": 70090752,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 46.8025000000016,
+            "maxRssKiB": 68512,
+            "sampledPeakRss": 70156288,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 47.18145799999911,
+            "maxRssKiB": 68384,
+            "sampledPeakRss": 70025216,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 47.03900000000067,
+            "maxRssKiB": 68560,
+            "sampledPeakRss": 70205440,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 47.170334000002185,
+            "maxRssKiB": 68400,
+            "sampledPeakRss": 70041600,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 47.284624999996595,
+            "maxRssKiB": 68464,
+            "sampledPeakRss": 70107136,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 46.77937500000189,
+            "maxRssKiB": 68496,
+            "sampledPeakRss": 70123520,
+            "sampleIntervalMs": 5
+          }
+        ],
+        "p50Ms": 47.170334000002185,
+        "p95Ms": 50.241125000000466
+      },
+      {
+        "query": "合成",
+        "types": "pdf",
+        "expectedFiles": [
+          "合成-00995-group8.pdf",
+          "合成-00989-group0.pdf",
+          "合成-00983-group8.pdf",
+          "合成-00977-group6.pdf",
+          "合成-00971-group8.pdf",
+          "合成-00965-group0.pdf",
+          "合成-00959-group0.pdf",
+          "合成-00953-group2.pdf",
+          "合成-00947-group2.pdf",
+          "合成-00941-group6.pdf",
+          "合成-00935-group4.pdf",
+          "合成-00929-group2.pdf",
+          "合成-00923-group4.pdf",
+          "合成-00917-group2.pdf",
+          "合成-00911-group4.pdf",
+          "合成-00905-group0.pdf",
+          "合成-00899-group4.pdf",
+          "合成-00893-group0.pdf",
+          "合成-00887-group0.pdf",
+          "合成-00881-group6.pdf"
+        ],
+        "totalMatches": 166,
+        "samples": [
+          {
+            "ms": 44.25300000000061,
+            "maxRssKiB": 64464,
+            "sampledPeakRss": 66011136,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 43.47587500000009,
+            "maxRssKiB": 64352,
+            "sampledPeakRss": 65896448,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 43.077916999998706,
+            "maxRssKiB": 64464,
+            "sampledPeakRss": 66011136,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 43.98099999999977,
+            "maxRssKiB": 64416,
+            "sampledPeakRss": 65961984,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 45.49424999999974,
+            "maxRssKiB": 64336,
+            "sampledPeakRss": 65880064,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 44.43095900000117,
+            "maxRssKiB": 64304,
+            "sampledPeakRss": 65847296,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 43.67262499999924,
+            "maxRssKiB": 64384,
+            "sampledPeakRss": 65929216,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 43.377833999998984,
+            "maxRssKiB": 64416,
+            "sampledPeakRss": 65961984,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 43.42924999999741,
+            "maxRssKiB": 64368,
+            "sampledPeakRss": 65912832,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 43.9130839999998,
+            "maxRssKiB": 64320,
+            "sampledPeakRss": 65863680,
+            "sampleIntervalMs": 5
+          }
+        ],
+        "p50Ms": 43.67262499999924,
+        "p95Ms": 45.49424999999974
+      },
+      {
+        "query": "report",
+        "types": "docx,pptx",
+        "expectedFiles": [
+          "合成-00999-group6.pptx",
+          "合成-00998-group5.docx",
+          "合成-00993-group4.pptx",
+          "合成-00992-group7.docx",
+          "合成-00987-group8.pptx",
+          "合成-00986-group7.docx",
+          "合成-00981-group8.pptx",
+          "合成-00980-group1.docx",
+          "合成-00975-group4.pptx",
+          "合成-00974-group9.docx",
+          "合成-00969-group6.pptx",
+          "合成-00968-group7.docx",
+          "合成-00963-group2.pptx",
+          "合成-00962-group3.docx",
+          "合成-00957-group4.pptx",
+          "合成-00956-group9.docx",
+          "合成-00951-group2.pptx",
+          "合成-00950-group9.docx",
+          "合成-00945-group6.pptx",
+          "合成-00944-group7.docx"
+        ],
+        "totalMatches": 334,
+        "samples": [
+          {
+            "ms": 55.41895800000202,
+            "maxRssKiB": 74048,
+            "sampledPeakRss": 75825152,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 57.195207999997365,
+            "maxRssKiB": 74080,
+            "sampledPeakRss": 75857920,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 55.02537499999744,
+            "maxRssKiB": 74096,
+            "sampledPeakRss": 75874304,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 53.9709159999984,
+            "maxRssKiB": 73952,
+            "sampledPeakRss": 75726848,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 56.21287500000108,
+            "maxRssKiB": 74224,
+            "sampledPeakRss": 76005376,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 58.461458000001585,
+            "maxRssKiB": 74160,
+            "sampledPeakRss": 75939840,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 58.42450000000099,
+            "maxRssKiB": 74032,
+            "sampledPeakRss": 75808768,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 59.89704199999687,
+            "maxRssKiB": 73984,
+            "sampledPeakRss": 75759616,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 56.00841700000092,
+            "maxRssKiB": 74032,
+            "sampledPeakRss": 75808768,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 54.38987500000076,
+            "maxRssKiB": 74272,
+            "sampledPeakRss": 76054528,
+            "sampleIntervalMs": 5
+          }
+        ],
+        "p50Ms": 56.00841700000092,
+        "p95Ms": 59.89704199999687
+      },
+      {
+        "query": "中文搜尋",
+        "types": "txt,md",
+        "expectedFiles": [
+          "合成-00997-group4.md",
+          "合成-00996-group9.txt",
+          "合成-00991-group2.md",
+          "合成-00990-group5.txt",
+          "合成-00985-group4.md",
+          "合成-00984-group7.txt",
+          "合成-00979-group6.md",
+          "合成-00978-group7.txt",
+          "合成-00973-group2.md",
+          "合成-00972-group5.txt",
+          "合成-00967-group6.md",
+          "合成-00966-group7.txt",
+          "合成-00961-group4.md",
+          "合成-00960-group9.txt",
+          "合成-00955-group4.md",
+          "合成-00954-group1.txt",
+          "合成-00949-group0.md",
+          "合成-00948-group3.txt",
+          "合成-00943-group0.md",
+          "合成-00942-group9.txt"
+        ],
+        "totalMatches": 334,
+        "samples": [
+          {
+            "ms": 55.79125000000204,
+            "maxRssKiB": 73568,
+            "sampledPeakRss": 75333632,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 53.733374999999796,
+            "maxRssKiB": 73568,
+            "sampledPeakRss": 75333632,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 53.844082999999955,
+            "maxRssKiB": 73584,
+            "sampledPeakRss": 75350016,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 54.487208999998984,
+            "maxRssKiB": 72768,
+            "sampledPeakRss": 74514432,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 53.335291999999754,
+            "maxRssKiB": 73520,
+            "sampledPeakRss": 75284480,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 54.3894169999985,
+            "maxRssKiB": 73648,
+            "sampledPeakRss": 75415552,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 53.373333999999886,
+            "maxRssKiB": 73424,
+            "sampledPeakRss": 75186176,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 52.67545899999823,
+            "maxRssKiB": 73568,
+            "sampledPeakRss": 75333632,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 53.168625000002066,
+            "maxRssKiB": 73552,
+            "sampledPeakRss": 75300864,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 55.40508299999783,
+            "maxRssKiB": 72912,
+            "sampledPeakRss": 74661888,
+            "sampleIntervalMs": 5
+          }
+        ],
+        "p50Ms": 53.733374999999796,
+        "p95Ms": 55.79125000000204
+      },
+      {
+        "query": "budget",
+        "types": "xlsx",
+        "expectedFiles": [
+          "合成-00994-group5.xlsx",
+          "合成-00988-group9.xlsx",
+          "合成-00982-group9.xlsx",
+          "合成-00976-group5.xlsx",
+          "合成-00970-group3.xlsx",
+          "合成-00964-group7.xlsx",
+          "合成-00958-group7.xlsx",
+          "合成-00952-group7.xlsx",
+          "合成-00946-group3.xlsx",
+          "合成-00940-group3.xlsx",
+          "合成-00934-group9.xlsx",
+          "合成-00928-group7.xlsx",
+          "合成-00922-group7.xlsx",
+          "合成-00916-group1.xlsx",
+          "合成-00910-group7.xlsx",
+          "合成-00904-group7.xlsx",
+          "合成-00898-group5.xlsx",
+          "合成-00892-group7.xlsx",
+          "合成-00886-group5.xlsx",
+          "合成-00880-group1.xlsx"
+        ],
+        "totalMatches": 166,
+        "samples": [
+          {
+            "ms": 52.124040999999124,
+            "maxRssKiB": 67584,
+            "sampledPeakRss": 69206016,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 50.13308400000096,
+            "maxRssKiB": 67504,
+            "sampledPeakRss": 69124096,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 52.46479100000215,
+            "maxRssKiB": 67552,
+            "sampledPeakRss": 69173248,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 50.66449999999895,
+            "maxRssKiB": 67712,
+            "sampledPeakRss": 69337088,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 50.086959000000206,
+            "maxRssKiB": 67696,
+            "sampledPeakRss": 69320704,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 51.078333000001294,
+            "maxRssKiB": 67488,
+            "sampledPeakRss": 69107712,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 50.420334000002185,
+            "maxRssKiB": 67696,
+            "sampledPeakRss": 69320704,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 52.21899999999732,
+            "maxRssKiB": 67600,
+            "sampledPeakRss": 69222400,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 52.82641700000022,
+            "maxRssKiB": 67728,
+            "sampledPeakRss": 69353472,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 53.677167000001646,
+            "maxRssKiB": 67600,
+            "sampledPeakRss": 69222400,
+            "sampleIntervalMs": 5
+          }
+        ],
+        "p50Ms": 51.078333000001294,
+        "p95Ms": 53.677167000001646
+      },
+      {
+        "query": "標題",
+        "types": "md,docx",
+        "expectedFiles": [
+          "合成-00998-group5.docx",
+          "合成-00997-group4.md",
+          "合成-00992-group7.docx",
+          "合成-00991-group2.md",
+          "合成-00986-group7.docx",
+          "合成-00985-group4.md",
+          "合成-00980-group1.docx",
+          "合成-00979-group6.md",
+          "合成-00974-group9.docx",
+          "合成-00973-group2.md",
+          "合成-00968-group7.docx",
+          "合成-00967-group6.md",
+          "合成-00962-group3.docx",
+          "合成-00961-group4.md",
+          "合成-00956-group9.docx",
+          "合成-00955-group4.md",
+          "合成-00950-group9.docx",
+          "合成-00949-group0.md",
+          "合成-00944-group7.docx",
+          "合成-00943-group0.md"
+        ],
+        "totalMatches": 334,
+        "samples": [
+          {
+            "ms": 47.09441700000025,
+            "maxRssKiB": 66112,
+            "sampledPeakRss": 67698688,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 48.82941700000083,
+            "maxRssKiB": 66096,
+            "sampledPeakRss": 67682304,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 46.98474999999962,
+            "maxRssKiB": 65984,
+            "sampledPeakRss": 67567616,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 46.987708000000566,
+            "maxRssKiB": 66112,
+            "sampledPeakRss": 67698688,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 46.37004099999831,
+            "maxRssKiB": 66096,
+            "sampledPeakRss": 67682304,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 46.54545800000051,
+            "maxRssKiB": 66016,
+            "sampledPeakRss": 67600384,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 47.354834000001574,
+            "maxRssKiB": 66176,
+            "sampledPeakRss": 67764224,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 49.499665999999706,
+            "maxRssKiB": 65968,
+            "sampledPeakRss": 67551232,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 47.53874999999971,
+            "maxRssKiB": 66224,
+            "sampledPeakRss": 67813376,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 46.12816699999894,
+            "maxRssKiB": 65968,
+            "sampledPeakRss": 67551232,
+            "sampleIntervalMs": 5
+          }
+        ],
+        "p50Ms": 46.987708000000566,
+        "p95Ms": 49.499665999999706
+      },
+      {
+        "query": "report",
+        "types": "txt",
+        "expectedFiles": [
+          "合成-00996-group9.txt",
+          "合成-00990-group5.txt",
+          "合成-00984-group7.txt",
+          "合成-00978-group7.txt",
+          "合成-00972-group5.txt",
+          "合成-00966-group7.txt",
+          "合成-00960-group9.txt",
+          "合成-00954-group1.txt",
+          "合成-00948-group3.txt",
+          "合成-00942-group9.txt",
+          "合成-00936-group3.txt",
+          "合成-00930-group9.txt",
+          "合成-00924-group9.txt",
+          "合成-00918-group5.txt",
+          "合成-00912-group1.txt",
+          "合成-00906-group1.txt",
+          "合成-00900-group7.txt",
+          "合成-00894-group3.txt",
+          "合成-00888-group7.txt",
+          "合成-00882-group3.txt"
+        ],
+        "totalMatches": 167,
+        "samples": [
+          {
+            "ms": 50.473792000000685,
+            "maxRssKiB": 67664,
+            "sampledPeakRss": 69287936,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 50.67216700000063,
+            "maxRssKiB": 67648,
+            "sampledPeakRss": 69271552,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 51.68695899999875,
+            "maxRssKiB": 67632,
+            "sampledPeakRss": 69255168,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 50.177959000000556,
+            "maxRssKiB": 67520,
+            "sampledPeakRss": 69140480,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 51.075041000000056,
+            "maxRssKiB": 67712,
+            "sampledPeakRss": 69337088,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 50.77349999999933,
+            "maxRssKiB": 67600,
+            "sampledPeakRss": 69222400,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 50.17550000000119,
+            "maxRssKiB": 67488,
+            "sampledPeakRss": 69107712,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 51.33366599999863,
+            "maxRssKiB": 67520,
+            "sampledPeakRss": 69140480,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 50.50579199999993,
+            "maxRssKiB": 67616,
+            "sampledPeakRss": 69238784,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 50.73012500000186,
+            "maxRssKiB": 67712,
+            "sampledPeakRss": 69337088,
+            "sampleIntervalMs": 5
+          }
+        ],
+        "p50Ms": 50.67216700000063,
+        "p95Ms": 51.68695899999875
+      },
+      {
+        "query": "合成-00000",
+        "expectedFiles": [
+          "合成-00000-group1.txt"
+        ],
+        "totalMatches": 1,
+        "samples": [
+          {
+            "ms": 56.07074999999895,
+            "maxRssKiB": 72416,
+            "sampledPeakRss": 74153984,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 55.207375000001775,
+            "maxRssKiB": 72272,
+            "sampledPeakRss": 74006528,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 56.719709000000876,
+            "maxRssKiB": 72256,
+            "sampledPeakRss": 73990144,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 56.79870800000208,
+            "maxRssKiB": 72304,
+            "sampledPeakRss": 74039296,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 57.57087500000125,
+            "maxRssKiB": 72240,
+            "sampledPeakRss": 73973760,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 56.59416699999929,
+            "maxRssKiB": 72304,
+            "sampledPeakRss": 74039296,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 56.43304100000023,
+            "maxRssKiB": 72352,
+            "sampledPeakRss": 74088448,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 63.69945800000278,
+            "maxRssKiB": 72464,
+            "sampledPeakRss": 74203136,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 62.71741699999984,
+            "maxRssKiB": 72352,
+            "sampledPeakRss": 74088448,
+            "sampleIntervalMs": 5
+          },
+          {
+            "ms": 57.20837500000198,
+            "maxRssKiB": 72240,
+            "sampledPeakRss": 73973760,
+            "sampleIntervalMs": 5
+          }
+        ],
+        "p50Ms": 56.719709000000876,
+        "p95Ms": 63.69945800000278
+      }
+    ]
+  },
+  "correctness": {
+    "fullResultsChecked": true,
+    "incrementalChangesChecked": true,
+    "unchangedParserCalls": 0
+  },
+  "targetPassed": true,
+  "windowsAcceptance": "需由使用者在公司 Windows 回報；本報告僅代表上述 platform。"
+}

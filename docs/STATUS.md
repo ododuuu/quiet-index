@@ -1,52 +1,66 @@
 # 專案狀態
 
-最後更新：2026-09-03
+最後更新：2026-09-21（M23 payload 級保守 Bloom 候選在目前 Mac 完成）
 
 ## 目前狀態
 
-- 里程碑：M0——專案基礎與規格
-- 狀態：已完成本機實作與驗證，等待使用者審閱
-- 產品程式碼：目前只有 CLI 骨架，尚未實作掃描器、解析器、資料庫與搜尋
-- 目標環境：具有 Node.js 22.17.0 x64 的公司 Windows 電腦
-- 本機開發環境：macOS；本機測試通過不能取代 Windows 驗收
+- 里程碑：M23——payload 級 Bloom 排除無關文字區塊，全文核對維持不變。
+- 0.26.0 M23 新增 payload／block 對應與 1 KiB payload 級 trigram Bloom；文件 Bloom 先排除不可能文件，再只解壓含可能 trigram 的完整文字區塊。跨 payload 片語、短詞、舊索引或無 payload 候選均安全回退，搜尋結果語意未變。M20～M23 相關自動測試 6 項通過；完整全套在此受限 sandbox 仍有 M11 原生監看逾時，且 M15 CLI 因預設索引位置唯讀而得到 4（預期 3），待可寫入的標準環境重跑。Windows 0.26.0 尚未實機驗證。
+- M23 交付包已建立並逐檔核對 174 個檔案：`LocalDocSearch-M23-0.26.0.zip`；SHA-256 為 `5195f205ceaa9b9ecc0be4fba8fd654da2b46d0d6fe1dcfa24fb10c79e90c2fd`。Windows 仍需使用者在公司電腦完成實機驗收。
+- 0.21.0 自動測試共 136 項：135 通過、0 失敗、1 項 Windows cmd 專屬測試在 macOS 略過。M18 測試封鎖舊 `candidates()` 整庫載入，覆蓋片語、多詞、篩選、片段與 context passages。
+- 0.22.0 自動測試共 138 項：137 通過、0 失敗、1 項 Windows cmd 專屬測試在 macOS 略過。新增 M19 大型 Unicode 原文與長命中截短回歸。
+- M19 交付包為 `LocalDocSearch-M19-0.22.0.zip`，SHA-256 為 `e6523104bd193ef65104be33ff67304dd7f7a72ea8a51e101e3e09a4d29defa5`；Windows 0.22.0 尚未實機驗證。
+- 0.20.0 自動測試共 135 項：134 通過、0 失敗、1 項 Windows cmd 專屬測試在 macOS 略過。新增案例涵蓋未知副檔名、無副檔名、不讀正文、任意類型篩選、open dry-run、增量修改／刪除及排除／連結。
+- 使用 `/Users/hermes/Downloads/測試用資料` 唯讀實測：找到並登錄 471 份一般檔案，151 次內容解析；結果為 indexed 139、no_text 11、unsupported 320、encrypted 1、error 0，首次 5.11 秒。第二次增量 471 份全數未變更、解析器呼叫 0、21.6 ms。
+- 真實資料已用 `.mov` 的 `IMG_8805.MOV` 與 `.zip` 的 `開發手冊.zip` 驗證檔名搜尋及 `--type` 篩選，兩者均清楚顯示 unsupported／僅檔名命中。
+- 若索引資料庫位於掃描根目錄內，會排除自身 SQLite、WAL、SHM、journal 與 writer 協調檔，避免索引輸出回饋成來源。
+- 交付包為 `LocalDocSearch-M17-0.20.0.zip`；打包程序逐檔核對 156 個檔案，全新解壓後 `npm ci` 無弱點警告並重跑相同 135 項測試結果。
+- `search`／`context` 新增 `--all-terms`；全部空白分隔詞可分散在同一文件的檔名、標題與不同內容區塊，既有預設仍為精確片語。
+- 代表片段依詞涵蓋數、標題優先與原始順序選擇；context passages 優先補足尚未顯示的關鍵字，預覽後以同模式重新驗證。
+- context JSON schemaVersion 4 新增 `matchMode`，Markdown 同樣標示搜尋模式。
+- macOS／Node.js 26.7.0 與 22.17.0：131 項，130 通過、0 失敗、1 Windows cmd 略過。
+- 0.19.0 交付包全新解壓、`npm ci` 後以 Node.js 22.17.0 重跑，結果相同；Windows M15 剪貼簿與 M16 多詞功能依使用者時間延後實測。
+- 0.19.0 交付包為 `LocalDocSearch-M16-0.19.0.zip`，並附同名 `.sha256` 檔供下載或複製後核對檔案完整性。
+- `context --clipboard` 在完整預覽及 `yes` 後將 Markdown（或明確指定的 JSON）送入本機剪貼簿；與 `--out` 二選一，不連線外部服務。
+- 剪貼簿資料只經子程序 stdin 傳遞；Windows 固定 PowerShell UTF-8 `Set-Clipboard`，macOS 使用 `/usr/bin/pbcopy`。自動測試不改動真實剪貼簿。
+- macOS／Node.js 26.7.0 與 22.17.0：127 項，126 通過、0 失敗、1 Windows cmd 略過。
+- context 內可用 `s <查詢>` 保留選取並搜尋下一批候選；`b` 查看跨查詢清單，`r <編號>` 移除。
+- JSON schemaVersion 4 與 Markdown 都標示搜尋模式、總查詢及每份文件／passage 的查詢來源；同一文件去重，跨查詢總上限 20。
+- 匯出前後依各文件自己的查詢重新驗證索引與來源；取消、無結果與無效操作不破壞已選狀態或建立部分檔案。
+- macOS 真實 TTY 已完成「規格查詢→選取→BU 聊天查詢→選取→預覽→yes→Markdown」流程。
+- 公司 Windows／Node.js 22.17.0 執行 0.17.0 `npm test`：M13 寫入鎖競爭測試超過 10 秒，M9 cmd 啟動測試受引號解析影響；其餘回報未顯示失敗。這次是已執行但未通過，不能標示 Windows 驗收完成。
+- 0.17.1 將 SQLite 零等待設定與取鎖拆開，補上競爭耗時斷言及子程序期限；cmd 測試改以環境變數和 `call` 傳遞含空白的絕對路徑，失敗診斷不再解碼 OEM 錯誤內容。
+- macOS／Node.js 26.7.0 與 22.17.0：123 項，122 通過、0 失敗、1 Windows cmd 略過；M13 整組分別約 1.57 秒與 1.41 秒。
+- 0.17.1 交付包為 `LocalDocSearch-M14-0.17.1.zip`，144 個檔案逐檔核對；全新解壓後 `npm ci` 並以 Node.js 22.17.0 重跑，122 通過、1 Windows 專屬略過。最終雜湊記錄在同名 `.sha256` 檔。
+- 使用者於 2026-09-18 回報公司 Windows 的 0.17.1 驗證通過；M13 鎖競爭與 M9 cmd launcher 修正完成驗證。此回報證明自動測試通過，不擴張為所有公司真實文件、open／reveal 或長期日常使用皆已驗收。
 
-## 已完成
+## 後續與限制
 
-- 已在 `work/localdocsearch` 建立獨立 Node.js 與 TypeScript 專案。
-- 已加入嚴格 TypeScript 設定與 Node.js 內建測試執行器。
-- 已加入初始 CLI 入口與基本冒煙測試。
-- 已加入產品規格與跨對話交接文件。
-- 已將所有專案文件統一改為繁體中文。
+- 已用 `/Users/hermes/Downloads/測試用資料` 完成第一輪儲存／搜尋後端對照。12 組完整命中集合均與 0.20.0 相同；現況 17.70 MiB，64 KiB Brotli 4.46 MiB，Brotli＋Bloom 6.02 MiB，Brotli＋FTS5 12.16 MiB。詳見 `STORAGE-BACKEND-COMPARISON-2026-09-19.md` 與原始 JSON。
+- 現有 SQLite 只改逐列串流，原型峰值 RSS 由 477.6 MiB 降至 104.7 MiB。下一里程碑建議先修正式搜尋的整庫載入，再做版本化 Brotli 分塊；Bloom 候選排在壓縮之後，FTS5 暫不採用。
+- M18 對「測試用資料」重跑 12 組完整命中集合，結果與 M17 相同；正式搜尋已不載入所有 blocks。長時間連續查詢 worker 的峰值仍為 433.5 MiB，原因是 `makeSnippet()` 對命中的超大區塊建立整段 Unicode 對照表，不是 SQLite 整庫載入。下一步先將片段定位改成有界記憶體；在那之前不宣稱 M18 已達到 104.7 MiB 的正式 CLI 峰值。
+- M19 在同一資料夾、Node.js 26.7.0 的 12 組查詢重跑，完整命中集合不變；正式 worker 峰值 RSS 為 405.8 MiB，最慢 p95 為 185.2 ms。片段的整段位置陣列已移除，但全文正規化與逐一核對仍是主要記憶體成本；不得把這個小幅下降宣稱為壓縮後端的成果。原始量測為 `storage-backend-comparison-m19.json`。
+- M20 的第一個每 block Brotli 實作已由真實資料否決：115,618 個 payload 使資料庫達 19.31 MiB，高於 M17 的 17.70 MiB。命中與資料完整性均正確，但空間目標未達成；正在改為每文件合併小 block 的 payload 設計，尚不可封裝或宣稱 M20 完成。
+- M20 改為每文件合併小 block 的 64 KiB Brotli payload 後，真實資料的 payload 數降為 285，資料庫為 12,259,328 bytes（11.69 MiB），較 M17 的 17.70 MiB 減少 34.0%。`管理系統` 搜尋命中、位置與原始片段正確。140 項自動測試為 139 通過、0 失敗、1 Windows 專屬略過；Windows 0.23.0 尚未實機驗證。
+- M21 將主搜尋改為逐 payload、逐 block 產生，並修正 payload 寫入必須依 block ordinal 排序。141 項自動測試為 140 通過、0 失敗、1 Windows 專屬略過。真實 12 查詢結果集合不變；獨立程序連續量測峰值 RSS 394,512 KiB（約 385 MiB）。仍需解壓與正規化全部 payload，下一步候選過濾才可能有量級改善。
+- M22 新增 1 KiB 文件級正規化 trigram Bloom；三字以上長查詢可跳過確定不命中的文件，一、二字及缺摘要資料安全回退。142 項測試為 141 通過、0 失敗、1 Windows 專屬略過。真實 12 查詢結果不變，峰值 RSS 389,280 KiB（約 380 MiB）；長片語／無結果較快，但常見詞候選多，下一步需 payload 級候選。
 
-## 下一個進行中里程碑
+- 2026-09-19 使用使用者指定的本機開發手冊作唯讀原型：20 份支援文件、239 個文字區塊。Brotli 將 152,742 bytes 文字壓至 78,538 bytes，但加上精簡 contentless trigram 後合計 335,872 bytes，高於現有 249,856 bytes 索引；五組三字以上查詢未漏候選，一／二字搜尋仍未解。詳見 `SEARCH-BACKEND-EXPERIMENT-2026-09-19.md`。
+- 第三方 `@oxdev03/node-tantivy-binding@0.3.3` 可載入預編譯套件，但實際 API 缺少型別宣告中的 n-gram tokenizer 建構方法；不加入產品依賴。Tantivy 若續評估，需以官方 Rust crate 建立受控 sidecar 原型。
+- 使用者已授權以目前 Mac 持續逐版做到完整目標，不逐版要求確認。M16 已補上多詞分散命中；後續繼續以本機自動測試推進，並依實際搜尋失敗案例調整查詢、格式支援或本機整合，不預設連接外部帳號。
+- 專用聊天平台匯入、AI／IDE 直接接入與查詢改寫仍未實作；M14 只處理本機索引中的 TXT／MD／MSG 等既有來源。
+- 不混用舊版寫入索引、不刪除執行中的協調檔；索引放本機磁碟。搜尋不是整批同步的固定快照。
+- 保留大量既有未提交工作，不重置或覆蓋舊版交付包。
 
-M1——CLI 基礎與 Markdown／純文字索引垂直切片。
+## M13 目標證據盤點與效能複測
 
-M1 預定範圍：
+- 2026-09-17 已逐項整理 GOAL-AUDIT.md，區分本機已證明、Windows 缺證據與後續選配。
+- Node.js 22.17.0 的 0.16.0 固定 1000 份六格式合成小文件：初次索引中位數 4087.98 ms、未變更 217.99 ms、搜尋 p95 216.63 ms；所有結果及增量異動斷言通過。
+- 原始報告 benchmark-m13-node22.json 與 M13-PERFORMANCE.md 為本次補充；舊 M5 數據與已交付 0.16.0 壓縮檔未覆寫，程式碼沒有變更。
+- 缺口仍是公司 Windows 新版實際使用證據；AI／IDE 自動接入、專用聊天匯入與 GUI 按鈕並未實作，依路線圖為未啟動選配。不把 CLI 匯出冒稱已連接 AI。
 
-1. 解析 `index <root>` 參數並驗證根目錄。
-2. 遞迴找出 `.md` 與 `.txt` 文件。
-3. 將文件轉成統一資料模型。
-4. 使用 `node:sqlite` 保存文件與內容區塊。
-5. 實作檔名／內容精確搜尋與命中片段。
-6. 加入自動測試及 Windows 驗收步驟。
+## 開發目標調整
 
-這個垂直切片完整運作前，不開始 Office 或 PDF 解析器；這些格式仍屬於可用 MVP，並未從範圍移除。
+2026-09-17 使用者明確取消公司 Windows 逐版驗收門檻，要求先在目前 macOS 電腦持續迭代到完整目標。Windows 相容與未驗證事實仍保留，但不再視為 active blocker。
 
-## 等待使用者決定
-
-- 確認索引資料預設放在 `%LOCALAPPDATA%\\LocalDocSearch`（建議），或放在可攜式程式旁。
-- 確認 `docsearch search` 是否自動執行快速增量同步，或要求使用者另外執行 `index`。
-- 確認暫定的單檔 100 MB 大小限制。
-
-## 驗證結果
-
-- `npm install`：通過；安裝 3 個開發套件，回報 0 個弱點。
-- `npm test`：於 2026-09-03 通過；2 項測試成功、0 項失敗。
-- TypeScript 嚴格模式編譯：通過。
-- 受控本機 shell 使用 Node.js 22.13.1，因此針對目標版本 22.17.0 顯示版本警告；這不取代目標電腦測試。
-- 公司 Windows 驗收：尚未執行。
-
-## 建議 commit 訊息
-
-`docs: 統一使用繁體中文專案文件`
+M14 先讓同一個 context 工作階段能跨多次查詢累積選取，將規格、程式文件與 BU 聊天等不同關鍵字來源放入同一份精準上下文。仍需逐項預覽與 yes，不自動傳送到 AI。

@@ -7,9 +7,9 @@ test("help text names the product and planned index command", () => {
   const help = buildHelpText();
 
   assert.match(help, /LocalDocSearch/);
-  assert.match(help, /docsearch index <root>/);
+  assert.match(help, /docsearch index \[root\]/);
 });
 
-test("unknown commands return a usage error code", () => {
-  assert.equal(main(["unknown"]), 2);
+test("unknown commands return a usage error code", async () => {
+  assert.equal(await main(["unknown"]), 2);
 });

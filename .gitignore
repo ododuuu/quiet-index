@@ -7,3 +7,9 @@ coverage/
 *.db-wal
 .localdocsearch/
 .DS_Store
+LocalDocSearch-*.zip
+
+LocalDocSearch-*.zip.sha256
+
+# 舊版打包解壓留下的巢狀副本，不屬於目前根目錄專案
+LocalDocSearch/

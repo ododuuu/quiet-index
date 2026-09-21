@@ -1,8 +1,8 @@
 {
   "name": "localdocsearch",
-  "version": "0.0.0",
+  "version": "0.26.0",
   "private": true,
-  "description": "Offline local document search CLI for Windows",
+  "description": "Offline local document search and context selection CLI",
   "type": "module",
   "bin": {
     "docsearch": "dist/src/cli.js"
@@ -13,11 +13,27 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "start": "node dist/src/cli.js",
-    "test": "npm run build && node --test dist/test/smoke.test.js",
-    "check": "npm run test"
+    "test": "npm run build && node --test dist/test/*.test.js",
+    "check": "npm run test",
+    "benchmark": "npm run build && node scripts/benchmark.mjs",
+    "package": "npm run build && node scripts/package.mjs",
+    "demo:msg": "npm run build && node scripts/demo-msg.mjs"
   },
   "devDependencies": {
     "@types/node": "22.17.0",
     "typescript": "5.9.3"
+  },
+  "dependencies": {
+    "@kenjiuno/decompressrtf": "0.1.4",
+    "@kenjiuno/msgreader": "1.28.0",
+    "fast-xml-parser": "5.11.1",
+    "fflate": "0.8.3",
+    "htmlparser2": "12.0.0",
+    "iconv-lite": "0.6.3",
+    "pdfjs-dist": "6.3.289",
+    "postal-mime": "3.0.0",
+    "rtf-stream-parser": "3.8.1",
+    "word-extractor": "1.0.4",
+    "xlsx": "file:vendor/xlsx-0.20.3.tgz"
   }
 }

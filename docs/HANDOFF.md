@@ -27,3 +27,143 @@
 5. 現有程式碼與測試。
 
 應修正發生衝突的文件，不可只依賴聊天記憶。
+
+## M5 驗收交接
+
+M4 已由使用者於 2026-09-16 回報驗收完成。M5 本機實作與驗證見 `docs/M5-VALIDATION.md`；下一步依 `docs/M5-WINDOWS-ACCEPTANCE.md` 收集公司 Windows 結果。未收到回報前不得將 M5 標示為全部完成。
+
+
+## M6-A 交接
+
+使用者收到盤點分析後明確要求規劃並執行，當時 active milestone 轉為 M6-A；不必再詢問是否允許舊版 DOC／XLS。0.6.0 新增格式與後續 MSG／VSD 計畫見 SPEC 第 16 節。42 項本機測試通過，Windows 步驟見 `docs/M6A-VALIDATION.md`。不要把 M5 歷史基準當作本版新格式效能，也不要宣稱 M5 或 M6-A 已完成公司 Windows 驗收。原有工作目錄有未提交檔案，勿重置。
+
+
+## M6-B 交接
+
+使用者已於 2026-09-16 要求接續下一版，當時進入 M6-B（0.7.0）。MSG 規格見 SPEC 16.4；53 項測試已於 macOS 的 Node.js 26.7.0 及 22.17.0 通過，驗收文件為 `docs/M6B-VALIDATION.md`。新格式重新 index 即可納入，不要求清除索引。S/MIME 以 MSG_SMIME_UNSUPPORTED 保留檔名，不冒稱成功擷取或單憑類別判定加密。附件／PST／OST 未納入，當時 VSD 尚未實作；最新狀態見下節。保留 M5／M6-A 尚待回報的 Windows 驗收紀錄。
+
+## M6-C 交接
+
+目前為 M6-C 0.9.0：已實作 VSD v11 的直接 UTF-16 圖形文字，含指標表、LZSS 壓縮及頁面／圖形 ID。SPEC 16.6 取代 16.5 的檔名限定，D018 記錄 MPL-2.0 來源與範圍。unsupported VSD 每次 index 都重試，因此 0.8.0 索引可直接升級；indexed／no_text 未變更則略過。
+
+63 項本機測試在 macOS Node.js 26.7.0／22.17.0 通過；公司 Windows 驗收仍待回報，見 M6C-VALIDATION.md。尚未支援 v1～6、master 繼承、動態欄位、頁名、超連結與 OCR；不要把直接文字擷取描述為全部可見文字。後續優先依公司實際檔案的版本與失敗代碼修正。發佈包必須保留 vsd-binary.ts 原始碼、vendor/libvisio-MPL-2.0.txt 與 vendor/README.md 來源說明。
+
+使用者於本回合補充完整產品方向，見 ROADMAP.md。VSD 本批完成後不無限追格式；下一階段先規格化搜尋結果開啟／顯示資料夾，接著多根目錄。目標仍需 Windows 日常驗收，不因本批通過而標記整體完成。
+
+## M7 交接
+
+目前為 M7 0.10.0，本機已完成搜尋結果固定文件代碼、open／reveal、dry-run 與來源核對。SPEC 17、D020 與 M7-VALIDATION.md 定義行為及 Windows 驗收。71 項測試在 macOS Node.js 26.7.0／22.17.0 通過；不代表公司 Windows 的 PowerShell／Explorer／預設程式已驗證。下一階段規格化 M8 多根目錄，保持人選上下文與 AI 為後續選配。
+
+## M8 交接
+
+最新為 0.11.0；使用者已明確要求不要逐版停下請他確認，持續開發並保留集中驗收。SPEC 18、D021 定義多根目錄；index 新路徑保留其他根，index 不帶路徑更新全部，rebuild [root] 與 roots remove 只處理明確歸屬，search --root 可篩選。父子重疊拒絕，別名沿用既有位置。資料庫升級保留原 ID 與文字，不應再用舊版程式操作此索引。
+
+78 項測試在 macOS Node.js 26.7.0／22.17.0 通過，Windows 實際開啟、權限與格式驗收仍保留。整合清單在 INTEGRATED-ACCEPTANCE.md。不要把等待公司驗收當成持續開發的阻礙；下一步規格化降低 CLI 摩擦／可選人選上下文，不能預設整庫或公司內容外傳。
+
+
+## M9 交接（0.12.0，2026-09-17 Grok Bot 收尾）
+
+### 給下一任 GPT 的冷啟動
+
+> 請接手 LocalDocSearch。路徑：`/Users/hermes/Documents/Codex/2026-09-01/ai-localdocsearch-rag-rag-mcp-windows/work/localdocsearch`（使用者 Mac，machineId 若可用請指定）。先讀 AGENTS.md，再 SPEC／STATUS／DECISIONS／HANDOFF／ROADMAP。**目前 active：M9 本機已完成 0.12.0**；無新 milestone 時不要開新功能。公司 Windows 用 INTEGRATED-ACCEPTANCE.md 集中驗收。不要探索上層教材網站；不要 OCR／GUI／自動 RAG。工作目錄有大量未提交檔，勿 reset。
+
+### 本版做了什麼
+
+- `src/context.ts` + CLI `context`：關鍵字搜尋 → 分頁勾選 → 預覽 → `yes` → 新檔 JSON（片段非全文）。
+- `docsearch.cmd`；SPEC §19；D022；`docs/M9-VALIDATION.md`；package 版本 0.12.0。
+- 測試：`test/m9.test.ts`；整包 `npm test` 在 Node 26.7.0：**88 pass / 1 skip**。
+
+### 刻意不做
+
+- 不接模型、不改寫查詢、不自動同意、不覆寫輸出、不外傳。
+- 不宣稱 Windows／cmd 互動已驗收。
+
+### 已知缺口
+
+- 集中 Windows 驗收未做（僅 M4 曾回報）。
+- Git 無 remote、歷史停在早期 commit；打包 zip 請確認 `npm run package` 是否已產 `LocalDocSearch-M9-0.12.0.zip`。
+- 背景 executor 若無 machineId 路由，會跑在錯誤機器上——父代理須自行用 machineId 操作使用者 Mac。
+
+### 使用者產品方向（摘要）
+
+自己用得順；無管理員；內文搜尋；可選人選上下文（模式 A 搜完拉入／模式 B 按鈕搜完再選——本版 CLI 先落地「搜＋選＋匯出」）；在職碩作品集加值；不追星數。
+
+## M10 交接（0.13.0）
+
+使用者要求持續**開發**，不要用驗收流程打發。M10 完成：`matchingPassages`、`context --format md|json --passages`、schemaVersion 2。測試 `test/m10.test.ts`。下一任先讀 STATUS；無新 milestone 時先問使用者下一功能，或依 ROADMAP 討論後再寫 SPEC。
+
+## M11 交接（0.14.0）
+
+使用者選擇監看自動增量 index。本機完成：`src/watch.ts`、`docsearch watch`、D024、SPEC §21、`test/m11.test.ts`、zip `LocalDocSearch-M11-0.14.0.zip`。下一任先讀 STATUS；無新 milestone 時先問使用者下一功能。持續開發優先於驗收儀式；勿 reset 大量未提交工作樹。
+
+## M11 可靠性修正交接（0.14.1）
+
+目前狀態以 STATUS 為準，取代上方「無新里程碑先問」的舊指示；使用者已授權持續開發。修正 watch 初次同步空窗、停止與 SQLite 寫入競態、失效監看器及 CLI 訊號清理；D025／SPEC 21。Node.js 22.17.0 本機 101 通過、1 Windows cmd 略過。下一批先規格化事件遺漏校正／離線恢復，不自行擴充 AI／格式。Windows 仍待集中驗收。
+
+## M12 交接（0.15.0）
+
+SPEC 22／D026 定義定期增量校正與監看恢復。預設 --rescan 300000，0 保留 M11 全部失效退出行為；啟用時失效改為定期掃描並重試。定期 timer 於同步完成後重排，事件仍可防抖觸發；停止等待進行中任務。M11 舊模式測試明確設 rescanMs: 0。M12 測試涵蓋失效／離線／修改刪除／排程合併。
+
+Node.js 22.17.0 全套 109 通過、1 Windows cmd 略過；全新解壓 npm ci 與測試相同通過。Windows 仍待集中驗收。下一批先規格化跨程序寫入協調，避免 watch 與另一終端 index／roots remove 交錯；不要拿單根不並行的測試宣稱跨程序已安全。
+
+## M13 交接（0.16.0）
+
+SPEC 23／D027／M13-VALIDATION 定義跨程序寫入協調。src/write-lock.ts 對主索引 realpath 旁的 .writer.sqlite 持有 BEGIN IMMEDIATE；檔案保留，釋放／程序結束解除交易。sync 封裝整次操作，removeRoot 同樣持鎖。根目錄失敗報告移至 sync 的鎖內；CLI／watch 不在忙碌時覆寫報告。watch 防抖重試，requireRegistered 在鎖內防止移除後復活。
+
+Node.js 22.17.0 macOS 全套 116 通過、1 Windows cmd 略過；乾淨安裝／測試相同通過，打包 138 檔。不要把子程序被終止的 macOS 測試當作 Windows 已驗收。下一步依產品目標查驗使用證據／缺陷，不為持續開發而無限新增功能；公司 Windows 集中驗收尚缺，不得標記整體目標完成。
+
+### M13 後續盤點
+
+GOAL-AUDIT.md 列目標與證據缺口；M13-PERFORMANCE.md 及 benchmark-m13-node22.json 是 0.16.0 新量測，六格式 1000 小文件搜尋 p95 216.63 ms、結果及增量斷言均通過。這批僅補驗證文件與報告，未變更程式或覆寫交付包。整體目標尚缺新版公司 Windows 日常回報，不能以本機功能清單宣布完成。
+
+### 外部驗證等待狀態
+
+本機主線與交付已完成，現等待 0.16.0 在公司 Windows 的集中驗收或可重現錯誤，目標未標記完成。不要重跑既有綠燈測試或新增無需求功能來替代外部證據；使用者回報後，依 STATUS 與 GOAL-AUDIT 恢復處理。
+
+## M14 交接（0.17.0，本機完成）
+
+使用者最新決定取代上方等待狀態：先不做公司 Windows 驗收，以目前 macOS 電腦持續逐版做到完整目標。M14 已完成跨查詢 context：ContextSessionSelection 以文件代碼去重，保留首次選取的查詢；`s` 換查詢、`b` 列清單、`r` 移除。bundle 依每份文件的查詢重搜，JSON schema 3 與 Markdown 標記 query。真實 Mac TTY 已跑完規格＋BU 聊天匯出；Node 22.17.0 全套 122 通過、1 Windows cmd 略過，乾淨安裝相同。Windows 未驗證仍需如實標示，但不得再停止開發等待使用者逐版確認。
+
+### M14 Windows 相容修正（0.17.1）
+
+2026-09-18 使用者在公司 Windows 回報 0.17.0 兩項失敗：M13 寫入鎖競爭測試逾時，M9 cmd launcher 的完整路徑遭 cmd 引號解析失敗並出現 code page 亂碼。0.17.1 依 D029 拆開 SQLite 零等待設定與 BEGIN IMMEDIATE，加入耗時／子程序期限；cmd 測試改以環境變數加 `call`。Mac Node 22.17.0／26.7.0 全套仍為 122 通過、1 Windows 專屬略過。Windows 0.17.1 尚待重跑，必須記錄為待複驗，不能把本次 0.17.0 執行寫成通過。
+
+使用者其後於 2026-09-18 回報 0.17.1 驗證通過。M15 依 SPEC §25／D030 開始實作 `context --clipboard`；保持人選、完整預覽、yes 與純本機邊界，不自動連接任何討論服務。
+
+下一版可沿最終目標降低上下文帶入討論的摩擦，例如在本機明確確認後交付到可控的本地目的地；不能自動上傳、整庫灌入或假定任何聊天平台已獲授權。
+
+## M15／M16 交接（0.18.0／0.19.0）
+
+M15 已完成 `context --clipboard`，以 stdin 傳給 macOS pbcopy 或 Windows 固定 PowerShell Set-Clipboard；仍需完整預覽與 yes。使用者明確表示無空測試並要求繼續，因此 M16 新增 `search`／`context --all-terms`。全部詞可跨同一文件的欄位／區塊，預設片語搜尋不變。context schemaVersion 4 新增 matchMode。測試在目前 Mac 不碰真實剪貼簿；Windows M15／M16 功能未實機驗證，不阻擋後續主線。
+
+## M17 交接（0.20.0，本機完成）
+
+使用者要求先修正檔案清冊缺口，再繼續索引瘦身實驗。SPEC §27／D032 已完成：掃描所有未排除的一般檔案；解析器未支援的副檔名與無副檔名檔案只保存 metadata，狀態 unsupported、不讀正文，仍可依檔名／類型搜尋並 open／reveal。排除與連結政策不變。135 項測試為 134 通過、0 失敗、1 Windows 專屬略過；`測試用資料` 實測登錄 471 份，其中 320 份 metadata-only，首次 5.11 秒，無變更增量 21.6 ms／0 次解析。下一步回到索引瘦身方案比較；不要把 metadata-only 說成已搜尋內容，也不要用這批 5.4 GB 原始檔大小直接推估文字索引比例。
+
+### M17 後端方案比較
+
+`STORAGE-BACKEND-COMPARISON-2026-09-19.md`／`storage-backend-comparison.json` 已用同一資料比較五條路徑。12 組完整結果相同。現況 17.70 MiB；64 KiB Brotli 4.46 MiB；Brotli＋Bloom 6.02 MiB；Brotli＋FTS5 12.16 MiB。現有資料表只改逐列搜尋，原型 RSS 由 477.6 MiB 降至 104.7 MiB。D033 建議 M18 先正式串流化、M19 再做版本化 Brotli 分塊，Bloom 最後評估；FTS 暫不採。原型沒有片段／排序與遷移生命週期，不能直接併入產品或把數字外推 300 GB。
+
+## M18 交接（0.21.0，本機完成）
+
+SPEC §28／D034 已將 `search` 改為 `streamCandidates()`，逐份文件讀 SQLite blocks；命中排序後才回讀前 N 筆的片段來源。`matchingPassages()` 改用 `candidateByPath()`，不再為指定文件載入全部 blocks。136 項測試為 135 通過、0 失敗、1 Windows 專屬略過；12 組真實資料完整命中集合不變。連續正式搜尋 RSS 仍約 433.5 MiB，主因已定位為 `makeSnippet()` 對超大命中區塊建立完整 Unicode 範圍陣列。下一版先修這個片段熱點；尚未開始 Brotli schema 遷移。
+
+## M19 交接（0.22.0，本機完成）
+
+SPEC §29／D035 已完成片段記憶體修正：大文字以 code point 區段核對完整正規化，常見文字逐點定位，組合字／語境大小寫才在小區段使用 grapheme 對照；前後文採有限收集，避免 `Array.from()` 或整段 `Intl.Segmenter` 展開。138 項測試為 137 通過、0 失敗、1 Windows 專屬略過；真實 12 查詢完整命中集合不變，RSS 405.8 MiB（M18 為 433.5 MiB）。交付包 `LocalDocSearch-M19-0.22.0.zip` 的 SHA-256 為 `e6523104bd193ef65104be33ff67304dd7f7a72ea8a51e101e3e09a4d29defa5`。下降有限，因搜尋仍逐一正規化全文；下一版開始版本化 Brotli 分塊遷移，不得把 M19 當成最終 RAM 解法。
+
+## M20 交接（0.23.0，本機完成）
+
+SPEC §30／D036 將正文改存每文件、約 64 KiB 的 Brotli JSON payload；block 保留標題、位置與 payload 內的內容 ID。舊庫在單一 transaction 寫入新 payload 後才清除正文。最初每 block 一 blob 在真實資料膨脹至 19.31 MiB，已改為 285 個批次 payload，最終為 11.69 MiB，較 M17 17.70 MiB 小 34.0%。140 項測試為 139 通過、0 失敗、1 Windows 專屬略過；實測命中與片段正確。下一步讓搜尋對 payload 逐段解壓核對，避免每次先重組全部 block，並重新量 RSS；不可宣稱 M20 已解決搜尋 RAM。
+
+## M21 交接（0.24.0，本機完成）
+
+SPEC §31／D037 讓 `streamCandidates()` 從 Brotli document payload 逐 block yield；跨 payload 的同一 block 暫存到完成，不串接不同 block。`blockSource()` 也改只走到目標 block。payload 依 ordinal 寫入，避免代表片段排序回歸。141 項測試為 140 通過、0 失敗、1 Windows 專屬略過；真實 12 查詢結果不變，連續搜尋峰值約 385 MiB。仍需解壓／正規化全部 payload；下一版應先做保守候選索引，不得犧牲一、二字中文或精確命中。
+
+## M22 交接（0.25.0，本機完成）
+
+SPEC §32／D038 建立 1 KiB 文件級 trigram Bloom，僅排除不可能長查詢文件；Bloom 命中仍全文核對，短詞與缺摘要安全回退。142 項測試為 141 通過、0 失敗、1 Windows 專屬略過；真實 12 查詢結果一致，RSS 約 380 MiB。候選粒度仍是文件，常見詞效益有限；下一版評估 payload 級摘要，但必須處理同 block 跨 payload 邊界以避免漏搜。
+
+## M23 交接（0.26.0，本機完成）
+
+SPEC §33／D039 在文件級 Bloom 後加入 payload／block mapping 與 1 KiB payload 級 Bloom。三字以上詞以任一可能 trigram 選出 payload，再讀完整所屬 block 作原有精確核對；不把跨 block 文字串接。payload 邊界、短詞、舊或不完整摘要一律回退，避免漏搜。片段回讀只解壓目標 block。M20～M23 共 6 項相關測試通過。全套測試在此受限 sandbox 出現 M11 native watcher 15 秒逾時；M15 CLI 的 4/3 不符已定位為預設索引位置唯讀，需在可寫入的標準環境重跑。Windows 0.26.0 尚未實機驗證。

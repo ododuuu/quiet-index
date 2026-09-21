@@ -1,0 +1,144 @@
+import { acquireWriteLock } from "./write-lock.js";
+import { IgnoreConfigurationError } from "./ignore.js";
+import path from "node:path";
+import { realpath, stat } from "node:fs/promises";
+import { parseDocument } from "./parser.js";
+import { scan, validateRoot, RootError } from "./scanner.js";
+import { emptyStatusCounts, supportedExtensions, type Diagnostic, type DocumentRecord, type SyncSummary } from "./model.js";
+import type { IndexStore } from "./store.js";
+
+export interface SyncReport extends SyncSummary {
+  root: string;
+  errors: string[];
+  notices: string[];
+  diagnostics: Diagnostic[];
+  ignoreFile: string | null;
+  ignorePatterns: string[];
+  complete: boolean;
+}
+
+export interface SyncOptions {
+  rebuild?: boolean;
+  requireRegistered?: boolean;
+  // 注入相同契約以測試零解析及讀檔失敗，不改變 CLI 行為。
+  parse?: typeof parseDocument;
+  scan?: typeof scan;
+}
+
+export async function sync(rootInput: string, store: IndexStore, options: SyncOptions = {}): Promise<SyncReport> {
+  const release = acquireWriteLock(store.databasePath);
+  try {
+    if ((options.requireRegistered || options.rebuild) && !store.roots().includes(path.resolve(rootInput))) {
+      throw new RootError("根目錄已移除或尚未登錄，請重新選擇位置。");
+    }
+    return await syncLocked(rootInput, store, options);
+  } catch (error) {
+    if (error instanceof RootError || error instanceof IgnoreConfigurationError) {
+      const registered = store.roots().find(root => root === path.resolve(rootInput));
+      if (registered) store.recordSync(registered, false, [error.message], [], undefined,
+        [{ stage: "scan", path: registered, code: "ROOT_SYNC_FAILED", message: "根目錄無法同步，保留既有索引" }]);
+    }
+    throw error;
+  } finally { release(); }
+}
+
+async function syncLocked(rootInput: string, store: IndexStore, options: SyncOptions): Promise<SyncReport> {
+  const started = performance.now();
+  let root = await validateRoot(rootInput);
+  const actual = await realpath(root);
+  const normalizePath = (value: string) => process.platform === "win32" ? value.toLowerCase() : value;
+  for (const existing of store.roots()) {
+    let canonical: string;
+    try { canonical = await realpath(existing); } catch { canonical = path.resolve(existing); }
+    if (normalizePath(canonical) === normalizePath(actual)) { root = existing; continue; }
+    const within = (a: string, b: string) => {
+      const relative = path.relative(normalizePath(a), normalizePath(b));
+      return relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
+    };
+    if (within(canonical, actual) || within(actual, canonical)) throw new RootError(`根目錄與已登錄位置重疊：${existing}；請選擇不重疊的位置。`);
+  }
+  const found = await (options.scan ?? scan)(root);
+  // 使用者可能把索引資料目錄放在被掃描根目錄內；LocalDocSearch 自己的資料庫
+  // 與 WAL／協調檔不是來源文件，納入會造成每次同步都修改自己的輸入。
+  const databasePath = path.resolve(store.databasePath);
+  const internalPaths = new Set([
+    databasePath, `${databasePath}-wal`, `${databasePath}-shm`, `${databasePath}-journal`,
+    `${databasePath}.writer.sqlite`, `${databasePath}.writer.sqlite-wal`, `${databasePath}.writer.sqlite-shm`, `${databasePath}.writer.sqlite-journal`,
+  ]);
+  const sourcePaths = found.paths.filter(filePath => !internalPaths.has(path.resolve(filePath)));
+  found.skipped.builtin += found.paths.length - sourcePaths.length;
+  found.paths = sourcePaths;
+  const report: SyncReport = { root, found: found.paths.length, updated: 0, added: 0, reprocessed: 0,
+    unchanged: 0, removed: 0, parserCalls: 0, statuses: emptyStatusCounts(), skipped: found.skipped,
+    readErrors: found.diagnostics.length, elapsedMs: 0, diagnostics: [...found.diagnostics],
+    ignoreFile: found.ignoreFile, ignorePatterns: found.ignorePatterns,
+    errors: [...found.errors], notices: [], complete: found.errors.length === 0 };
+  store.registerRoot(root);
+  if (options.rebuild && found.errors.length === 0) store.clearDocuments(root);
+  const knownPaths = new Set(found.paths);
+  for (const filePath of found.paths) {
+    let stage: Diagnostic["stage"] = "read";
+    try {
+      const info = await stat(filePath);
+      const previous = store.getDocument(filePath);
+      const extension = path.extname(filePath).toLowerCase();
+      const retryUnsupported = previous?.status === "unsupported" && supportedExtensions.has(extension);
+      if (!options.rebuild && previous && previous.status !== "error" && !retryUnsupported && previous.size_bytes === info.size && previous.modified_at_ms === info.mtimeMs) {
+        report.unchanged++;
+        continue;
+      }
+      let document: DocumentRecord;
+      if (supportedExtensions.has(extension)) {
+        report.parserCalls++;
+        document = await (options.parse ?? parseDocument)(filePath);
+      } else {
+        document = {
+          path: filePath,
+          filename: path.basename(filePath),
+          extension,
+          sizeBytes: info.size,
+          modifiedAtMs: info.mtimeMs,
+          status: "unsupported",
+          errorCode: null,
+          errorMessage: null,
+          blocks: [],
+        };
+      }
+      stage = "store";
+      store.upsert(document, root);
+      report.updated++;
+      if (previous || options.rebuild) report.reprocessed++;
+      else report.added++;
+      report.statuses[document.status]++;
+      if (document.status === "unsupported" && document.errorMessage) report.notices.push(`${filePath}: ${document.errorMessage}`);
+      if (document.status === "error" || document.status === "encrypted") {
+        const diagnostic: Diagnostic = { stage: "parse", path: filePath,
+          code: document.errorCode ?? "PARSE_ERROR",
+          message: document.status === "encrypted" ? "文件已加密，僅可搜尋檔名" : "無法解析文件，僅可搜尋檔名" };
+        // readFile 的系統錯誤與格式解析失敗分開處理，避免讀取不完整時移除既有文件。
+        if (["EACCES", "EPERM", "ENOENT", "EIO", "EBUSY", "EISDIR", "EMFILE", "ENFILE"].includes(diagnostic.code)) {
+          diagnostic.stage = "read";
+          report.readErrors++;
+          report.complete = false;
+        }
+        report.diagnostics.push(diagnostic);
+        report.errors.push(`${filePath}: ${diagnostic.message}`);
+      }
+      if (document.status === "no_text" && document.extension === ".vsd") report.notices.push(`${filePath}: VSD 沒有可擷取的直接文字（未展開 master、動態欄位或 OCR）`);
+      if (document.status === "no_text" && document.extension === ".pdf") report.notices.push(`${filePath}: PDF 沒有可擷取的文字層（掃描影像不支援 OCR）`);
+    } catch {
+      const diagnostic: Diagnostic = { stage, path: filePath,
+        code: stage === "store" ? "INDEX_WRITE_FAILED" : "FILE_READ_FAILED",
+        message: stage === "store" ? "無法更新文件索引" : "無法讀取文件" };
+      report.diagnostics.push(diagnostic);
+      report.errors.push(`${filePath}: ${diagnostic.message}`);
+      if (stage === "read") report.readErrors++;
+      report.complete = false;
+    }
+  }
+  if (report.complete) report.removed = store.removeMissing(knownPaths, root);
+  report.elapsedMs = Math.round((performance.now() - started) * 100) / 100;
+  const { root: _root, errors, notices, complete, diagnostics, ignoreFile: _ignoreFile, ignorePatterns: _ignorePatterns, ...summary } = report;
+  store.recordSync(root, complete, errors, notices, summary, diagnostics);
+  return report;
+}

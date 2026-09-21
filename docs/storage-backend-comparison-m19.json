@@ -1,0 +1,731 @@
+{
+  "generatedAt": "2026-09-19T14:14:28.498Z",
+  "root": "/Users/hermes/Downloads/測試用資料",
+  "platform": "darwin",
+  "arch": "arm64",
+  "node": "v26.7.0",
+  "cpu": "Apple M2",
+  "ramBytes": 17179869184,
+  "queryCount": 12,
+  "method": "同一份 0.20.0 解析結果；每個搜尋 worker 暖機 1 次、量測 5 次。所有方案逐查詢比對完整命中集合；候選方案最後仍解壓原文核對。",
+  "baseline": {
+    "bytes": 18558976,
+    "buildWallMs": 5425.391250000001,
+    "buildMaxRssKiB": 766080,
+    "searchMaxRssKiB": 415536,
+    "search": [
+      {
+        "label": "一字中文",
+        "query": "的",
+        "mode": "phrase",
+        "candidateCount": 471,
+        "p50Ms": 106.156375,
+        "p95Ms": 106.65229200000005,
+        "matchCount": 123
+      },
+      {
+        "label": "二字中文-資料",
+        "query": "資料",
+        "mode": "phrase",
+        "candidateCount": 471,
+        "p50Ms": 165.536291,
+        "p95Ms": 168.21325000000002,
+        "matchCount": 50
+      },
+      {
+        "label": "二字中文-系統",
+        "query": "系統",
+        "mode": "phrase",
+        "candidateCount": 471,
+        "p50Ms": 163.98916700000018,
+        "p95Ms": 164.06312499999967,
+        "matchCount": 42
+      },
+      {
+        "label": "三字中文",
+        "query": "使用者",
+        "mode": "phrase",
+        "candidateCount": 471,
+        "p50Ms": 164.18137500000012,
+        "p95Ms": 165.176958,
+        "matchCount": 18
+      },
+      {
+        "label": "英文縮寫",
+        "query": "API",
+        "mode": "phrase",
+        "candidateCount": 471,
+        "p50Ms": 164.3932079999995,
+        "p95Ms": 164.6274169999997,
+        "matchCount": 14
+      },
+      {
+        "label": "較長片語",
+        "query": "管理系統",
+        "mode": "phrase",
+        "candidateCount": 471,
+        "p50Ms": 163.09604200000012,
+        "p95Ms": 164.0721249999997,
+        "matchCount": 1
+      },
+      {
+        "label": "二字中文-流程",
+        "query": "流程",
+        "mode": "phrase",
+        "candidateCount": 471,
+        "p50Ms": 163.98162500000035,
+        "p95Ms": 185.2026249999999,
+        "matchCount": 37
+      },
+      {
+        "label": "無結果",
+        "query": "不存在關鍵字-ZZ-20260919",
+        "mode": "phrase",
+        "candidateCount": 471,
+        "p50Ms": 166.33500000000004,
+        "p95Ms": 166.6880000000001,
+        "matchCount": 0
+      },
+      {
+        "label": "多詞-資料系統",
+        "query": "資料 系統",
+        "mode": "all-terms",
+        "candidateCount": 471,
+        "p50Ms": 173.74174999999923,
+        "p95Ms": 184.4702499999985,
+        "matchCount": 27
+      },
+      {
+        "label": "多詞-使用者權限",
+        "query": "使用者 權限",
+        "mode": "all-terms",
+        "candidateCount": 471,
+        "p50Ms": 174.7411659999998,
+        "p95Ms": 174.94408300000032,
+        "matchCount": 6
+      },
+      {
+        "label": "多詞-文件設定",
+        "query": "文件 設定",
+        "mode": "all-terms",
+        "candidateCount": 471,
+        "p50Ms": 174.77358399999866,
+        "p95Ms": 182.81454200000007,
+        "matchCount": 14
+      },
+      {
+        "label": "多詞-API系統",
+        "query": "API 系統",
+        "mode": "all-terms",
+        "candidateCount": 471,
+        "p50Ms": 175.64374999999927,
+        "p95Ms": 176.03737499999988,
+        "matchCount": 7
+      }
+    ],
+    "rawStreaming": {
+      "searchMaxRssKiB": 105504,
+      "search": [
+        {
+          "label": "一字中文",
+          "query": "的",
+          "mode": "phrase",
+          "candidateCount": 471,
+          "p50Ms": 12.553790999999997,
+          "p95Ms": 12.604667000000006,
+          "matchCount": 123
+        },
+        {
+          "label": "二字中文-資料",
+          "query": "資料",
+          "mode": "phrase",
+          "candidateCount": 471,
+          "p50Ms": 52.143958,
+          "p95Ms": 52.92854200000002,
+          "matchCount": 50
+        },
+        {
+          "label": "二字中文-系統",
+          "query": "系統",
+          "mode": "phrase",
+          "candidateCount": 471,
+          "p50Ms": 94.96062500000005,
+          "p95Ms": 95.33533299999999,
+          "matchCount": 42
+        },
+        {
+          "label": "三字中文",
+          "query": "使用者",
+          "mode": "phrase",
+          "candidateCount": 471,
+          "p50Ms": 108.43387499999994,
+          "p95Ms": 108.86179200000015,
+          "matchCount": 18
+        },
+        {
+          "label": "英文縮寫",
+          "query": "API",
+          "mode": "phrase",
+          "candidateCount": 471,
+          "p50Ms": 109.7840839999999,
+          "p95Ms": 112.20824999999991,
+          "matchCount": 14
+        },
+        {
+          "label": "較長片語",
+          "query": "管理系統",
+          "mode": "phrase",
+          "candidateCount": 471,
+          "p50Ms": 138.28758400000015,
+          "p95Ms": 138.35787500000015,
+          "matchCount": 1
+        },
+        {
+          "label": "二字中文-流程",
+          "query": "流程",
+          "mode": "phrase",
+          "candidateCount": 471,
+          "p50Ms": 80.37066700000014,
+          "p95Ms": 85.50637499999993,
+          "matchCount": 37
+        },
+        {
+          "label": "無結果",
+          "query": "不存在關鍵字-ZZ-20260919",
+          "mode": "phrase",
+          "candidateCount": 471,
+          "p50Ms": 141.5402920000006,
+          "p95Ms": 142.52975000000015,
+          "matchCount": 0
+        },
+        {
+          "label": "多詞-資料系統",
+          "query": "資料 系統",
+          "mode": "all-terms",
+          "candidateCount": 471,
+          "p50Ms": 98.6737919999996,
+          "p95Ms": 99.26454199999989,
+          "matchCount": 27
+        },
+        {
+          "label": "多詞-使用者權限",
+          "query": "使用者 權限",
+          "mode": "all-terms",
+          "candidateCount": 471,
+          "p50Ms": 126.16062499999953,
+          "p95Ms": 127.37758300000041,
+          "matchCount": 6
+        },
+        {
+          "label": "多詞-文件設定",
+          "query": "文件 設定",
+          "mode": "all-terms",
+          "candidateCount": 471,
+          "p50Ms": 137.67091700000037,
+          "p95Ms": 138.5843329999998,
+          "matchCount": 14
+        },
+        {
+          "label": "多詞-API系統",
+          "query": "API 系統",
+          "mode": "all-terms",
+          "candidateCount": 471,
+          "p50Ms": 126.35241700000006,
+          "p95Ms": 126.8266249999997,
+          "matchCount": 7
+        }
+      ]
+    }
+  },
+  "schemes": [
+    {
+      "scheme": "brotli-doc",
+      "bytes": 3989504,
+      "buildMs": 411.01991699999996,
+      "buildWallMs": 446.61783300000025,
+      "buildMaxRssKiB": 234576,
+      "extractedTextBytes": 9596713,
+      "compressedPayloadBytes": 3791185,
+      "chunkCount": 139,
+      "searchMaxRssKiB": 266944,
+      "search": [
+        {
+          "label": "一字中文",
+          "query": "的",
+          "mode": "phrase",
+          "candidateCount": 471,
+          "p50Ms": 47.95462499999999,
+          "p95Ms": 50.506583000000006,
+          "matchCount": 123
+        },
+        {
+          "label": "二字中文-資料",
+          "query": "資料",
+          "mode": "phrase",
+          "candidateCount": 471,
+          "p50Ms": 79.333166,
+          "p95Ms": 81.60895800000003,
+          "matchCount": 50
+        },
+        {
+          "label": "二字中文-系統",
+          "query": "系統",
+          "mode": "phrase",
+          "candidateCount": 471,
+          "p50Ms": 89.419083,
+          "p95Ms": 90.14270800000008,
+          "matchCount": 42
+        },
+        {
+          "label": "三字中文",
+          "query": "使用者",
+          "mode": "phrase",
+          "candidateCount": 471,
+          "p50Ms": 91.83183300000019,
+          "p95Ms": 91.907375,
+          "matchCount": 18
+        },
+        {
+          "label": "英文縮寫",
+          "query": "API",
+          "mode": "phrase",
+          "candidateCount": 471,
+          "p50Ms": 91.93745799999988,
+          "p95Ms": 92.91129199999978,
+          "matchCount": 14
+        },
+        {
+          "label": "較長片語",
+          "query": "管理系統",
+          "mode": "phrase",
+          "candidateCount": 471,
+          "p50Ms": 99.96849999999995,
+          "p95Ms": 104.740542,
+          "matchCount": 1
+        },
+        {
+          "label": "二字中文-流程",
+          "query": "流程",
+          "mode": "phrase",
+          "candidateCount": 471,
+          "p50Ms": 85.25962500000014,
+          "p95Ms": 85.5046669999997,
+          "matchCount": 37
+        },
+        {
+          "label": "無結果",
+          "query": "不存在關鍵字-ZZ-20260919",
+          "mode": "phrase",
+          "candidateCount": 471,
+          "p50Ms": 105.36704199999986,
+          "p95Ms": 108.79420800000025,
+          "matchCount": 0
+        },
+        {
+          "label": "多詞-資料系統",
+          "query": "資料 系統",
+          "mode": "all-terms",
+          "candidateCount": 471,
+          "p50Ms": 91.63829100000021,
+          "p95Ms": 97.17604200000005,
+          "matchCount": 27
+        },
+        {
+          "label": "多詞-使用者權限",
+          "query": "使用者 權限",
+          "mode": "all-terms",
+          "candidateCount": 471,
+          "p50Ms": 100.19316700000036,
+          "p95Ms": 102.85379100000046,
+          "matchCount": 6
+        },
+        {
+          "label": "多詞-文件設定",
+          "query": "文件 設定",
+          "mode": "all-terms",
+          "candidateCount": 471,
+          "p50Ms": 102.38758300000063,
+          "p95Ms": 107.34779100000014,
+          "matchCount": 14
+        },
+        {
+          "label": "多詞-API系統",
+          "query": "API 系統",
+          "mode": "all-terms",
+          "candidateCount": 471,
+          "p50Ms": 102.08537500000057,
+          "p95Ms": 104.70491599999968,
+          "matchCount": 7
+        }
+      ]
+    },
+    {
+      "scheme": "brotli-chunks",
+      "bytes": 4677632,
+      "buildMs": 456.265084,
+      "buildWallMs": 491.7016250000015,
+      "buildMaxRssKiB": 194032,
+      "extractedTextBytes": 9596713,
+      "compressedPayloadBytes": 4273379,
+      "chunkCount": 334,
+      "searchMaxRssKiB": 218080,
+      "search": [
+        {
+          "label": "一字中文",
+          "query": "的",
+          "mode": "phrase",
+          "candidateCount": 471,
+          "p50Ms": 21.043625000000006,
+          "p95Ms": 21.792917000000003,
+          "matchCount": 123
+        },
+        {
+          "label": "二字中文-資料",
+          "query": "資料",
+          "mode": "phrase",
+          "candidateCount": 471,
+          "p50Ms": 49.41399999999999,
+          "p95Ms": 50.34612500000003,
+          "matchCount": 50
+        },
+        {
+          "label": "二字中文-系統",
+          "query": "系統",
+          "mode": "phrase",
+          "candidateCount": 471,
+          "p50Ms": 79.22083299999997,
+          "p95Ms": 81.05845799999997,
+          "matchCount": 42
+        },
+        {
+          "label": "三字中文",
+          "query": "使用者",
+          "mode": "phrase",
+          "candidateCount": 471,
+          "p50Ms": 84.5637499999998,
+          "p95Ms": 85.81020899999999,
+          "matchCount": 18
+        },
+        {
+          "label": "英文縮寫",
+          "query": "API",
+          "mode": "phrase",
+          "candidateCount": 471,
+          "p50Ms": 84.21970800000008,
+          "p95Ms": 86.70566699999995,
+          "matchCount": 14
+        },
+        {
+          "label": "較長片語",
+          "query": "管理系統",
+          "mode": "phrase",
+          "candidateCount": 471,
+          "p50Ms": 105.41095799999994,
+          "p95Ms": 106.22662499999979,
+          "matchCount": 1
+        },
+        {
+          "label": "二字中文-流程",
+          "query": "流程",
+          "mode": "phrase",
+          "candidateCount": 471,
+          "p50Ms": 65.221,
+          "p95Ms": 70.3120829999998,
+          "matchCount": 37
+        },
+        {
+          "label": "無結果",
+          "query": "不存在關鍵字-ZZ-20260919",
+          "mode": "phrase",
+          "candidateCount": 471,
+          "p50Ms": 109.41474999999991,
+          "p95Ms": 111.93783299999996,
+          "matchCount": 0
+        },
+        {
+          "label": "多詞-資料系統",
+          "query": "資料 系統",
+          "mode": "all-terms",
+          "candidateCount": 471,
+          "p50Ms": 82.50033299999996,
+          "p95Ms": 83.06475,
+          "matchCount": 27
+        },
+        {
+          "label": "多詞-使用者權限",
+          "query": "使用者 權限",
+          "mode": "all-terms",
+          "candidateCount": 471,
+          "p50Ms": 97.92120800000066,
+          "p95Ms": 99.08279200000015,
+          "matchCount": 6
+        },
+        {
+          "label": "多詞-文件設定",
+          "query": "文件 設定",
+          "mode": "all-terms",
+          "candidateCount": 471,
+          "p50Ms": 107.50258399999984,
+          "p95Ms": 107.64066700000058,
+          "matchCount": 14
+        },
+        {
+          "label": "多詞-API系統",
+          "query": "API 系統",
+          "mode": "all-terms",
+          "candidateCount": 471,
+          "p50Ms": 99.37370800000008,
+          "p95Ms": 99.65633399999933,
+          "matchCount": 7
+        }
+      ]
+    },
+    {
+      "scheme": "fts-trigram",
+      "bytes": 12746752,
+      "buildMs": 1439.171916,
+      "buildWallMs": 1476.1989170000015,
+      "buildMaxRssKiB": 310976,
+      "extractedTextBytes": 9596713,
+      "compressedPayloadBytes": 4273379,
+      "chunkCount": 334,
+      "searchMaxRssKiB": 184416,
+      "search": [
+        {
+          "label": "一字中文",
+          "query": "的",
+          "mode": "phrase",
+          "candidateCount": 471,
+          "p50Ms": 20.94475,
+          "p95Ms": 21.362125000000006,
+          "matchCount": 123
+        },
+        {
+          "label": "二字中文-資料",
+          "query": "資料",
+          "mode": "phrase",
+          "candidateCount": 471,
+          "p50Ms": 49.05112500000001,
+          "p95Ms": 51.46754199999998,
+          "matchCount": 50
+        },
+        {
+          "label": "二字中文-系統",
+          "query": "系統",
+          "mode": "phrase",
+          "candidateCount": 471,
+          "p50Ms": 79.31370900000002,
+          "p95Ms": 79.75645799999995,
+          "matchCount": 42
+        },
+        {
+          "label": "三字中文",
+          "query": "使用者",
+          "mode": "phrase",
+          "candidateCount": 18,
+          "p50Ms": 10.250999999999976,
+          "p95Ms": 10.420166999999992,
+          "matchCount": 18
+        },
+        {
+          "label": "英文縮寫",
+          "query": "API",
+          "mode": "phrase",
+          "candidateCount": 14,
+          "p50Ms": 27.493791999999985,
+          "p95Ms": 28.552834000000075,
+          "matchCount": 14
+        },
+        {
+          "label": "較長片語",
+          "query": "管理系統",
+          "mode": "phrase",
+          "candidateCount": 1,
+          "p50Ms": 0.45287499999994907,
+          "p95Ms": 0.4809170000000904,
+          "matchCount": 1
+        },
+        {
+          "label": "二字中文-流程",
+          "query": "流程",
+          "mode": "phrase",
+          "candidateCount": 471,
+          "p50Ms": 65.88679100000013,
+          "p95Ms": 66.45762500000001,
+          "matchCount": 37
+        },
+        {
+          "label": "無結果",
+          "query": "不存在關鍵字-ZZ-20260919",
+          "mode": "phrase",
+          "candidateCount": 0,
+          "p50Ms": 0.17204100000003564,
+          "p95Ms": 0.18212500000004184,
+          "matchCount": 0
+        },
+        {
+          "label": "多詞-資料系統",
+          "query": "資料 系統",
+          "mode": "all-terms",
+          "candidateCount": 471,
+          "p50Ms": 81.81612499999983,
+          "p95Ms": 83.72220900000002,
+          "matchCount": 27
+        },
+        {
+          "label": "多詞-使用者權限",
+          "query": "使用者 權限",
+          "mode": "all-terms",
+          "candidateCount": 18,
+          "p50Ms": 22.62912499999993,
+          "p95Ms": 23.047207999999955,
+          "matchCount": 6
+        },
+        {
+          "label": "多詞-文件設定",
+          "query": "文件 設定",
+          "mode": "all-terms",
+          "candidateCount": 471,
+          "p50Ms": 107.16029200000003,
+          "p95Ms": 107.66229199999998,
+          "matchCount": 14
+        },
+        {
+          "label": "多詞-API系統",
+          "query": "API 系統",
+          "mode": "all-terms",
+          "candidateCount": 14,
+          "p50Ms": 42.04933399999982,
+          "p95Ms": 44.096124999999574,
+          "matchCount": 7
+        }
+      ]
+    },
+    {
+      "scheme": "bloom-trigram",
+      "bytes": 6311936,
+      "buildMs": 1469.413791,
+      "buildWallMs": 1508.4684169999964,
+      "buildMaxRssKiB": 313936,
+      "extractedTextBytes": 9596713,
+      "compressedPayloadBytes": 4273379,
+      "chunkCount": 334,
+      "searchMaxRssKiB": 185984,
+      "search": [
+        {
+          "label": "一字中文",
+          "query": "的",
+          "mode": "phrase",
+          "candidateCount": 471,
+          "p50Ms": 21.405582999999993,
+          "p95Ms": 22.055,
+          "matchCount": 123
+        },
+        {
+          "label": "二字中文-資料",
+          "query": "資料",
+          "mode": "phrase",
+          "candidateCount": 471,
+          "p50Ms": 50.007125,
+          "p95Ms": 50.684000000000026,
+          "matchCount": 50
+        },
+        {
+          "label": "二字中文-系統",
+          "query": "系統",
+          "mode": "phrase",
+          "candidateCount": 471,
+          "p50Ms": 82.14920799999993,
+          "p95Ms": 82.97008300000005,
+          "matchCount": 42
+        },
+        {
+          "label": "三字中文",
+          "query": "使用者",
+          "mode": "phrase",
+          "candidateCount": 20,
+          "p50Ms": 11.620333999999957,
+          "p95Ms": 11.914582999999993,
+          "matchCount": 18
+        },
+        {
+          "label": "英文縮寫",
+          "query": "API",
+          "mode": "phrase",
+          "candidateCount": 15,
+          "p50Ms": 28.807584000000134,
+          "p95Ms": 29.4045000000001,
+          "matchCount": 14
+        },
+        {
+          "label": "較長片語",
+          "query": "管理系統",
+          "mode": "phrase",
+          "candidateCount": 1,
+          "p50Ms": 1.2419589999999516,
+          "p95Ms": 1.2935829999998987,
+          "matchCount": 1
+        },
+        {
+          "label": "二字中文-流程",
+          "query": "流程",
+          "mode": "phrase",
+          "candidateCount": 471,
+          "p50Ms": 68.09170799999993,
+          "p95Ms": 68.46745800000008,
+          "matchCount": 37
+        },
+        {
+          "label": "無結果",
+          "query": "不存在關鍵字-ZZ-20260919",
+          "mode": "phrase",
+          "candidateCount": 0,
+          "p50Ms": 0.9243330000001606,
+          "p95Ms": 0.928333000000066,
+          "matchCount": 0
+        },
+        {
+          "label": "多詞-資料系統",
+          "query": "資料 系統",
+          "mode": "all-terms",
+          "candidateCount": 471,
+          "p50Ms": 85.15208400000006,
+          "p95Ms": 86.11766699999998,
+          "matchCount": 27
+        },
+        {
+          "label": "多詞-使用者權限",
+          "query": "使用者 權限",
+          "mode": "all-terms",
+          "candidateCount": 20,
+          "p50Ms": 24.82745799999975,
+          "p95Ms": 25.10741700000017,
+          "matchCount": 6
+        },
+        {
+          "label": "多詞-文件設定",
+          "query": "文件 設定",
+          "mode": "all-terms",
+          "candidateCount": 471,
+          "p50Ms": 109.95041600000013,
+          "p95Ms": 110.74370799999997,
+          "matchCount": 14
+        },
+        {
+          "label": "多詞-API系統",
+          "query": "API 系統",
+          "mode": "all-terms",
+          "candidateCount": 15,
+          "p50Ms": 43.50645900000018,
+          "p95Ms": 44.19354199999998,
+          "matchCount": 7
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "目前測試資料只有 151 份可解析文件，不能直接外推 300 GB。",
+    "原型搜尋回傳完整命中集合但不產生片段與最終排序；產品採用前仍需整合測試。",
+    "一、二字查詢沒有 trigram，候選方案會退回逐文件核對。"
+  ]
+}
