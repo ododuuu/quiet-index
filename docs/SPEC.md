@@ -1,6 +1,6 @@
 # LocalDocSearch 產品規格
 
-- 規格基線：0.26.1（M23 修正版）
+- 規格基線：0.26.2（M23 Windows 複驗修正）
 - 日期：2026-09-21
 - 狀態：第 34 節已在目前 Mac 實作與合成驗證；公司 Windows 修正版尚未實機驗證
 
@@ -648,3 +648,10 @@ M5 維持 Node.js／TypeScript、SQLite、純本機、單根目錄及六種格�
 4. 用獨立程序在真正升級／寫入交易期間呼叫 `status`，而非只持有協調鎖；在受控本機測試五秒期限內取得狀態或明確的忙碌／待回復錯誤，不能只有 ExperimentalWarning。另驗證唯讀命令不寫入 schema／metadata／payload、不觸發遷移。
 5. 以子程序中斷寫入產生待回復交易，確認唯讀診斷能區別 776，寫入流程能正常回復；測試不得接觸公司原索引。測試進度節流、非 TTY、慢階段持續提示及 Ctrl+C 接續。
 6. 記錄 Node.js 22.17.0、平台、合成資料分布與量測結果；效能改善須附相同資料的前後比較，不在量測前承諾總完成秒數。本機通過後仍須使用者在公司 Windows 複驗，才能宣稱公司驗收通過。
+
+### 34.6 Windows 開庫與原始碼安裝修正（0.26.2）
+
+- Node.js 22.17.0 已支援在 `DatabaseSync` 建構時指定 busy timeout。主索引的唯讀／寫入連線與 writer 協調資料庫必須在開庫時即指定零等待，不可只在開庫後以 PRAGMA 補設；鎖競爭仍須立即轉為 `INDEX_BUSY`，hot journal 的唯讀檢查仍須轉為 `INDEX_RECOVERY_REQUIRED`。
+- 開庫後保留明確的 `PRAGMA busy_timeout=0` 作防禦性設定；不得以延長測試或產品 timeout 掩蓋 Windows 的鎖等待。
+- 從 GitHub 原始碼下載的目錄沒有預先編譯的 `dist` 時，標準 `npm ci` 必須完成 TypeScript 編譯，使 README 所列 CLI 命令可直接執行。
+- Windows cmd launcher 測試若專案絕對路徑含空白或括號，應避免把該路徑同時交給 Node argv 與 `cmd.exe /c` 做兩層字串解析；仍須從不同工作目錄實際呼叫 `docsearch.cmd`。

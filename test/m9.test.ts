@@ -156,12 +156,19 @@ test("M9 CLI validates options and refuses piped consent", () => fixture(async (
   await absent(output);
 }));
 
-test("M9 Windows cmd launcher runs help without changing working directory", { skip: process.platform !== "win32" }, () => {
+test("M9 Windows cmd launcher runs help without changing working directory", { skip: process.platform !== "win32" }, async () => {
   const command = path.resolve("docsearch.cmd");
   const env = { ...process.env, LOCALDOCSEARCH_CMD_TEST: command };
-  const result = spawnSync(process.env.ComSpec ?? "cmd.exe", ["/d", "/c", "call \"%LOCALDOCSEARCH_CMD_TEST%\" --help"],
-    { encoding: "utf8", cwd: os.tmpdir(), env, timeout: 5000 });
-  assert.equal(result.error, undefined, `cmd 啟動不應失敗或逾時：${result.error?.message ?? ""}`);
-  assert.equal(result.status, 0, `cmd launcher status=${result.status ?? "null"}, signal=${result.signal ?? "none"}`);
-  assert.match(result.stdout, /LocalDocSearch/);
+  const temp = await mkdtemp(path.join(os.tmpdir(), "lds-cmd-"));
+  const wrapper = path.join(temp, "run.cmd");
+  try {
+    // 將 call 放入批次檔，避免 Node 將含空白／括號的絕對路徑再經
+    // cmd.exe /c 的外層命令列解析一次；產品 launcher 本身仍由任意 cwd 執行。
+    await writeFile(wrapper, "@echo off\r\ncall \"%LOCALDOCSEARCH_CMD_TEST%\" --help\r\nexit /b %errorlevel%\r\n");
+    const result = spawnSync(process.env.ComSpec ?? "cmd.exe", ["/d", "/c", wrapper],
+      { encoding: "utf8", cwd: os.tmpdir(), env, timeout: 5000 });
+    assert.equal(result.error, undefined, `cmd 啟動不應失敗或逾時：${result.error?.message ?? ""}`);
+    assert.equal(result.status, 0, `cmd launcher status=${result.status ?? "null"}, signal=${result.signal ?? "none"}`);
+    assert.match(result.stdout, /LocalDocSearch/);
+  } finally { await rm(temp, { recursive: true, force: true }); }
 });

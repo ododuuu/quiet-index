@@ -2,7 +2,7 @@
 
 ## 最新交接：M23 修正版規格（2026-09-21）
 
-使用者其後要求依 SPEC 施工；0.26.1 已實作唯讀開庫、待回復錯誤、受鎖保護的逐文件接續升級、保留原 payload、線性查找與即時進度。公司 Windows 0.26.0 啟動阻塞診斷為 610 文件／219,518 區塊且缺 payload_bloom_version。相同規模合成資料在目前 Mac 約一秒完成且 payload bytes 不變；聚焦回歸全數通過，完整套件只剩既有 M11 native watcher 逾時。交付包 SHA-256 為 `6164546db0fd62f83b1bce7cf17bd71f84ed9ca901feb3e8932394ab7904d9e3`，複驗見 `M23-FIX-WINDOWS-ACCEPTANCE.md`；不得宣稱 Windows 已通過，也不得要求刪除原索引或 journal。
+0.26.1 公司 Windows 全套結果為 142 通過、4 失敗、2 略過：三項 SQLite CLI 案例耗盡五秒，cmd launcher 在含空白與括號的下載路徑失敗。0.26.2 已把 Node.js 22.17.0 支援的 `DatabaseSync timeout: 0` 提前至主索引與 writer 協調資料庫開庫階段，保留後續 PRAGMA；M9 改以暫存 wrapper 測真正的 launcher；`npm ci` 透過 prepare 自動產生 `dist`。Mac 聚焦回歸通過，完整套件只有既有 M11 native watcher 取消及 Windows cmd 略過；交付包雜湊見同名 `.sha256`。必須等公司 Windows 重跑才能宣稱修正通過；不得刪除原索引或 journal。
 
 聊天紀錄不是專案的唯一依據；專案儲存庫內的文件與 Git 紀錄才是。
 

@@ -142,6 +142,13 @@ export interface UpgradeOptions {
   onProgress?: (update: ProgressUpdate) => void;
 }
 
+// Node.js 22.16.0 起支援建構時設定 timeout，但目前鎖定的 @types/node
+// 尚未宣告此欄位。必須在 sqlite3_open_v2() 後、任何查詢前就安裝
+// 零等待 busy handler，不能只依賴稍後執行的 PRAGMA。
+function databaseOptions(options: { readOnly?: boolean } = {}): ConstructorParameters<typeof DatabaseSync>[1] {
+  return { ...options, timeout: 0 } as ConstructorParameters<typeof DatabaseSync>[1];
+}
+
 export class IndexStore {
   private readonly db: DatabaseSync;
   private readonly readOnly: boolean;
@@ -151,15 +158,16 @@ export class IndexStore {
     this.databasePath = databasePath;
     this.readOnly = options.readOnly ?? false;
     if (this.readOnly) {
-      this.db = new DatabaseSync(databasePath, { readOnly: true });
-      this.db.exec("PRAGMA query_only = ON; PRAGMA busy_timeout = 0;");
+      this.db = new DatabaseSync(databasePath, databaseOptions({ readOnly: true }));
+      this.db.exec("PRAGMA query_only = ON");
+      this.db.exec("PRAGMA busy_timeout = 0");
       return;
     }
     mkdirSync(path.dirname(databasePath), { recursive: true });
     const fresh = !existsSync(databasePath);
     const release = acquireWriteLock(databasePath);
     try {
-      this.db = new DatabaseSync(databasePath);
+      this.db = new DatabaseSync(databasePath, databaseOptions());
       this.db.exec("PRAGMA busy_timeout = 0");
       this.initializeSchema();
       if (fresh) {

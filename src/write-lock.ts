@@ -18,7 +18,11 @@ export function acquireWriteLock(databasePath: string): () => void {
     try { return realpathSync(databasePath); }
     catch { return path.join(realpathSync(directory), path.basename(databasePath)); }
   })();
-  const lock = new DatabaseSync(`${canonical}.writer.sqlite`);
+  // Node.js 22.16.0 起可在開庫時安裝 busy timeout；目標 22.17.0 已支援，
+  // 但目前 @types/node 尚未包含該欄位。開庫即設為 0，避免 Windows 在
+  // 第一個 BEGIN IMMEDIATE 前沿用非零等待狀態。
+  const options = { timeout: 0 } as ConstructorParameters<typeof DatabaseSync>[1];
+  const lock = new DatabaseSync(`${canonical}.writer.sqlite`, options);
   try {
     // 必須分開執行：先安裝零等待 busy handler，再嘗試取得交易鎖。
     // Windows 上若合併交給 sqlite3_exec，競爭程序可能沿用非零等待設定。

@@ -1,14 +1,14 @@
-# M23 修正版 0.26.1 公司 Windows 複驗
+# M23 修正版 0.26.2 公司 Windows 複驗
 
 此複驗針對 0.26.0 的啟動阻塞。不得刪除 `%LOCALAPPDATA%\LocalDocSearch` 內的資料庫、journal、WAL 或 writer 檔；來源文件不會被修改。
 
 ## 1. 核對與解壓
 
 ```cmd
-certutil -hashfile LocalDocSearch-M23-0.26.1.zip SHA256
+certutil -hashfile LocalDocSearch-M23-0.26.2.zip SHA256
 ```
 
-將輸出與交付的 `LocalDocSearch-M23-0.26.1.zip.sha256` 內容比對，兩者必須相同。
+將輸出與交付的 `LocalDocSearch-M23-0.26.2.zip.sha256` 內容比對，兩者必須相同。
 
 解壓至新的使用者可寫入目錄，在該目錄開啟 CMD：
 
@@ -18,7 +18,9 @@ node -p "require('./package.json').version"
 node dist/src/cli.js status
 ```
 
-預期 Node.js 為 `v22.17.0`、版本為 `0.26.1`。`status` 必須先印出索引位置與「讀取索引狀態」，不得進行全庫升級或長時間空白。
+若使用 GitHub 的 Source code 壓縮檔而不是正式交付包，先執行一次 `npm ci`；0.26.2 會在安裝後自動建立 `dist`。
+
+預期 Node.js 為 `v22.17.0`、版本為 `0.26.2`。`status` 必須先印出索引位置與「讀取索引狀態」，不得進行全庫升級或長時間空白。
 
 - 若顯示「需要升級」，記錄已完成／總文件數後繼續第 2 節。
 - 若回報 `INDEX_RECOVERY_REQUIRED`，這是先前中斷留下的待回復交易；直接繼續第 2 節，不刪除 journal。
