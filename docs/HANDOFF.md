@@ -1,5 +1,9 @@
 # 跨對話交接方式
 
+## 最新交接：M23 修正版規格（2026-09-21）
+
+使用者其後要求依 SPEC 施工；0.26.1 已實作唯讀開庫、待回復錯誤、受鎖保護的逐文件接續升級、保留原 payload、線性查找與即時進度。公司 Windows 0.26.0 啟動阻塞診斷為 610 文件／219,518 區塊且缺 payload_bloom_version。相同規模合成資料在目前 Mac 約一秒完成且 payload bytes 不變；聚焦回歸全數通過，完整套件只剩既有 M11 native watcher 逾時。交付包 SHA-256 為 `6164546db0fd62f83b1bce7cf17bd71f84ed9ca901feb3e8932394ab7904d9e3`，複驗見 `M23-FIX-WINDOWS-ACCEPTANCE.md`；不得宣稱 Windows 已通過，也不得要求刪除原索引或 journal。
+
 聊天紀錄不是專案的唯一依據；專案儲存庫內的文件與 Git 紀錄才是。
 
 ## 開始新對話

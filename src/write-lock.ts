@@ -1,5 +1,6 @@
-import { realpathSync } from "node:fs";
+import { mkdirSync, realpathSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
+import path from "node:path";
 
 export class IndexBusyError extends Error {
   readonly code = "INDEX_BUSY";
@@ -11,7 +12,13 @@ export class IndexBusyError extends Error {
 
 // 留在本機的協調資料庫，不保存文件文字，也不以檔案是否存在判斷忙碌。
 export function acquireWriteLock(databasePath: string): () => void {
-  const lock = new DatabaseSync(`${realpathSync(databasePath)}.writer.sqlite`);
+  const directory = path.dirname(path.resolve(databasePath));
+  mkdirSync(directory, { recursive: true });
+  const canonical = (() => {
+    try { return realpathSync(databasePath); }
+    catch { return path.join(realpathSync(directory), path.basename(databasePath)); }
+  })();
+  const lock = new DatabaseSync(`${canonical}.writer.sqlite`);
   try {
     // 必須分開執行：先安裝零等待 busy handler，再嘗試取得交易鎖。
     // Windows 上若合併交給 sqlite3_exec，競爭程序可能沿用非零等待設定。

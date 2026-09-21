@@ -3,7 +3,7 @@ import { IndexBusyError } from "./write-lock.js";
 import { interactiveContext, ContextError } from "./context.js";
 import { runWatch, WatchError, resolveWatchDebounce, resolveWatchRescan } from "./watch.js";
 import { actOnDocument, DocumentActionError } from "./open-document.js";
-import { IndexStore } from "./store.js";
+import { defaultDatabasePath, IndexStore } from "./store.js";
 import { parseTypes, search } from "./search.js";
 import { RootError } from "./scanner.js";
 import path from "node:path";
@@ -12,6 +12,37 @@ import { IgnoreConfigurationError } from "./ignore.js";
 import type { SyncSummary } from "./model.js";
 import { supportedExtensions } from "./model.js";
 import { ClipboardError } from "./clipboard.js";
+import { existsSync } from "node:fs";
+import { OperationCancelledError, type ProgressUpdate } from "./progress.js";
+
+function safeProgressText(value: string): string {
+  return value.replace(/[\u0000-\u001f\u007f]/g, "?");
+}
+
+function progressReporter(): { update(update: ProgressUpdate): void; close(): void } {
+  let latest: ProgressUpdate | undefined;
+  let lastStage: ProgressUpdate["stage"] | undefined;
+  let lastWritten = 0;
+  const render = (update: ProgressUpdate) => {
+    const count = update.current === undefined ? "" : update.total === undefined ? ` ${update.current}` : ` ${update.current}/${update.total}`;
+    const location = update.path ? `；${safeProgressText(update.path)}` : "";
+    console.error(`[${update.stage}] ${update.message}${count}${location}`);
+    lastWritten = Date.now(); lastStage = update.stage;
+  };
+  const timer = setInterval(() => { if (latest && Date.now() - lastWritten >= 1000) render(latest); }, 1000);
+  timer.unref();
+  return {
+    update(update) {
+      latest = update;
+      if (lastStage !== update.stage || Date.now() - lastWritten >= 1000 || update.stage === "complete") render(update);
+    },
+    close() { clearInterval(timer); },
+  };
+}
+
+function sqliteExtendedCode(error: unknown): number | undefined {
+  return error instanceof Error && "errcode" in error ? (error as Error & { errcode?: number }).errcode : undefined;
+}
 
 export function buildHelpText(): string {
   return [
@@ -157,8 +188,26 @@ export async function main(args: readonly string[]): Promise<number> {
     return 2;
   }
   let store: IndexStore | undefined;
+  let reporter: ReturnType<typeof progressReporter> | undefined;
+  let abortController: AbortController | undefined;
+  let cancel: (() => void) | undefined;
   try {
-    store = new IndexStore();
+    const databasePath = defaultDatabasePath();
+    const writes = command === "index" || command === "rebuild" || command === "watch" || (command === "roots" && args[1] === "remove");
+    if (command === "status") console.log(`索引位置：${databasePath}\n讀取索引狀態…`);
+    if (!writes && !existsSync(databasePath)) { console.error("索引尚未建立；請先執行 docsearch index <root>。"); return 3; }
+    if (writes) {
+      reporter = progressReporter();
+      reporter.update({ stage: "recover", message: "開啟並檢查本機索引" });
+      abortController = new AbortController();
+      cancel = () => abortController!.abort();
+      process.once("SIGINT", cancel);
+      process.once("SIGTERM", cancel);
+    }
+    store = new IndexStore(databasePath, { readOnly: !writes });
+    if (writes && !(command === "roots" && args[1] === "remove")) {
+      await store.upgrade({ ...(abortController ? { signal: abortController.signal } : {}), onProgress: update => reporter?.update(update) });
+    }
 
     if (command === "watch") {
       const registered = store.roots();
@@ -182,7 +231,7 @@ export async function main(args: readonly string[]): Promise<number> {
         return await runWatch(store, targets, {
           ...(watchDebounce !== undefined ? { debounceMs: watchDebounce } : {}),
           ...(watchRescan !== undefined ? { rescanMs: watchRescan } : {}),
-          verbose,
+          verbose, onProgress: update => reporter?.update(update),
         }, {
           write: text => console.log(text),
           waitForStop: () => stop,
@@ -206,7 +255,8 @@ export async function main(args: readonly string[]): Promise<number> {
       const { sync } = await import("./sync.js");
       for (const target of targets) {
         try {
-          const report = await sync(target, store, { rebuild: command === "rebuild", requireRegistered: !rootInput || command === "rebuild" });
+          const report = await sync(target, store, { rebuild: command === "rebuild", requireRegistered: !rootInput || command === "rebuild",
+            ...(abortController ? { signal: abortController.signal } : {}), onProgress: update => reporter?.update(update) });
           console.log(`根目錄：${report.root}`);
           if (command === "rebuild") console.log(report.complete ? "重建完成。" : "重建未完整完成。");
           printSummary(report);
@@ -271,7 +321,10 @@ export async function main(args: readonly string[]): Promise<number> {
       return 0;
     }
     if (command === "status") {
-      console.log(`索引位置：${store.databasePath}`);
+      const format = store.formatStatus();
+      console.log(`索引格式：文字儲存 ${format.contentStorageVersion ?? "舊版"}；payload Bloom ${format.payloadBloomVersion ?? "未完成"}`);
+      if (format.needsUpgrade) console.log(`索引升級：需要升級（已完成 ${format.completedDocuments}/${format.totalDocuments} 份文件）；請執行 index 接續。`);
+      else console.log("索引升級：已完成。");
       for (const root of roots) {
         const syncReport = store.getLastSyncReport(root);
         console.log(`根目錄：${root}`);
@@ -314,6 +367,10 @@ export async function main(args: readonly string[]): Promise<number> {
     }
     return 0;
   } catch (error) {
+    if (error instanceof OperationCancelledError) { console.error(`${error.code}：${error.message}`); return 130; }
+    const sqliteCode = sqliteExtendedCode(error);
+    if (sqliteCode === 776) { console.error("INDEX_RECOVERY_REQUIRED：索引有未完成交易，需要由下一次 index 安全回復；請勿刪除 journal 或 WAL。"); return 3; }
+    if (sqliteCode !== undefined && ((sqliteCode & 0xff) === 5 || (sqliteCode & 0xff) === 6)) { console.error("INDEX_BUSY：索引目前由另一個程序使用，請稍後重試。"); return 3; }
     if (error instanceof IndexBusyError || error instanceof ContextError || error instanceof WatchError || error instanceof ClipboardError) { console.error(`${error.code}：${error.message}`); return 3; }
     if (error instanceof DocumentActionError) { console.error(`${error.code}：${error.message}`); return 3; }
     if (error instanceof RootError || error instanceof IgnoreConfigurationError) { console.error(error.message); return 3; }
@@ -321,6 +378,8 @@ export async function main(args: readonly string[]): Promise<number> {
     if (verbose) console.error(`診斷：${error instanceof Error ? error.name : "UnknownError"}`);
     return 4;
   } finally {
+    reporter?.close();
+    if (cancel) { process.off("SIGINT", cancel); process.off("SIGTERM", cancel); }
     store?.close();
   }
 }

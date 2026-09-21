@@ -1,10 +1,11 @@
 import { acquireWriteLock } from "./write-lock.js";
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { brotliCompressSync, brotliDecompressSync, constants as zlibConstants } from "node:zlib";
 import { documentStatuses, type Diagnostic, type SyncSummary, type DocumentRecord, type DocumentStatus, type TextBlock } from "./model.js";
+import { throwIfAborted, yieldToEvents, type ProgressUpdate } from "./progress.js";
 
 export function defaultDatabasePath(): string {
   const base = process.env.LOCALDOCSEARCH_DATA_DIR
@@ -123,14 +124,52 @@ export interface LastSyncReport {
   diagnostics: Diagnostic[];
 }
 
+export interface IndexStoreOptions {
+  readOnly?: boolean;
+}
+
+export interface IndexFormatStatus {
+  contentStorageVersion: string | null;
+  payloadBloomVersion: string | null;
+  needsUpgrade: boolean;
+  completedDocuments: number;
+  totalDocuments: number;
+}
+
+export interface UpgradeOptions {
+  lockHeld?: boolean;
+  signal?: AbortSignal;
+  onProgress?: (update: ProgressUpdate) => void;
+}
+
 export class IndexStore {
   private readonly db: DatabaseSync;
+  private readonly readOnly: boolean;
   readonly databasePath: string;
 
-  constructor(databasePath = defaultDatabasePath()) {
+  constructor(databasePath = defaultDatabasePath(), options: IndexStoreOptions = {}) {
     this.databasePath = databasePath;
+    this.readOnly = options.readOnly ?? false;
+    if (this.readOnly) {
+      this.db = new DatabaseSync(databasePath, { readOnly: true });
+      this.db.exec("PRAGMA query_only = ON; PRAGMA busy_timeout = 0;");
+      return;
+    }
     mkdirSync(path.dirname(databasePath), { recursive: true });
-    this.db = new DatabaseSync(databasePath);
+    const fresh = !existsSync(databasePath);
+    const release = acquireWriteLock(databasePath);
+    try {
+      this.db = new DatabaseSync(databasePath);
+      this.db.exec("PRAGMA busy_timeout = 0");
+      this.initializeSchema();
+      if (fresh) {
+        this.db.exec(`INSERT OR REPLACE INTO metadata(key, value) VALUES
+          ('content_storage_version', '2'), ('payload_bloom_version', '1'), ('multi_root_version', '1')`);
+      }
+    } finally { release(); }
+  }
+
+  private initializeSchema(): void {
     this.db.exec(`
       PRAGMA foreign_keys = ON;
       CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -171,16 +210,47 @@ export class IndexStore {
         payload_ordinal INTEGER NOT NULL, bloom BLOB NOT NULL,
         PRIMARY KEY(document_id, payload_ordinal)
       );
+      CREATE TABLE IF NOT EXISTS index_migration_documents (
+        version TEXT NOT NULL,
+        document_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+        PRIMARY KEY(version, document_id)
+      );
       CREATE TABLE IF NOT EXISTS roots (path TEXT PRIMARY KEY, report TEXT);
       CREATE TABLE IF NOT EXISTS document_roots (
         document_id INTEGER PRIMARY KEY REFERENCES documents(id) ON DELETE CASCADE,
         root_path TEXT NOT NULL REFERENCES roots(path) ON DELETE CASCADE
       );
       CREATE INDEX IF NOT EXISTS document_roots_path ON document_roots(root_path);
-
     `);
-    this.migratePayloads();
-    this.migratePayloadBlooms();
+  }
+
+  formatStatus(): IndexFormatStatus {
+    const contentStorageVersion = this.metadata("content_storage_version");
+    const payloadBloomVersion = this.metadata("payload_bloom_version");
+    const totalDocuments = this.hasTable("documents")
+      ? Number((this.db.prepare("SELECT count(*) AS count FROM documents").get() as { count: number }).count) : 0;
+    const completedDocuments = this.hasTable("index_migration_documents")
+      ? Number((this.db.prepare("SELECT count(*) AS count FROM index_migration_documents WHERE version = 'payload_bloom_1'").get() as { count: number }).count) : 0;
+    return { contentStorageVersion, payloadBloomVersion,
+      needsUpgrade: contentStorageVersion !== "2" || payloadBloomVersion !== "1" || this.metadata("multi_root_version") !== "1",
+      completedDocuments, totalDocuments };
+  }
+
+  async upgrade(options: UpgradeOptions = {}): Promise<void> {
+    if (this.readOnly) throw new Error("唯讀索引不能執行升級。");
+    const release = options.lockHeld ? undefined : acquireWriteLock(this.databasePath);
+    try {
+      throwIfAborted(options.signal);
+      if (this.metadata("content_storage_version") !== "2") {
+        options.onProgress?.({ stage: "upgrade", message: "升級舊索引文字儲存格式" });
+        this.migratePayloads();
+      }
+      if (this.metadata("multi_root_version") !== "1") this.migrateMultiRoot();
+      if (this.metadata("payload_bloom_version") !== "1") await this.migratePayloadBlooms(options);
+    } finally { release?.(); }
+  }
+
+  private migrateMultiRoot(): void {
     if (this.metadata("multi_root_version") !== "1") {
       this.db.exec("BEGIN IMMEDIATE");
       try {
@@ -193,6 +263,10 @@ export class IndexStore {
         this.db.exec("COMMIT");
       } catch (error) { this.db.exec("ROLLBACK"); throw error; }
     }
+  }
+
+  private hasTable(name: string): boolean {
+    return Boolean(this.db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(name));
   }
 
   roots(): string[] {
@@ -471,26 +545,59 @@ export class IndexStore {
     } catch (error) { this.db.exec("ROLLBACK"); throw error; }
   }
 
-  private migratePayloadBlooms(): void {
+  private async migratePayloadBlooms(options: UpgradeOptions): Promise<void> {
     if (this.metadata("payload_bloom_version") === "1") return;
-    const documents = this.db.prepare("SELECT id FROM documents").all() as { id: number }[];
-    this.db.exec("BEGIN IMMEDIATE");
-    try {
-      this.db.exec("DELETE FROM document_payload_blocks; DELETE FROM document_payload_blooms;");
-      const blocks = this.db.prepare("SELECT id, ordinal FROM blocks WHERE document_id = ? ORDER BY ordinal");
-      for (const document of documents) {
-        const rows = blocks.all(document.id) as { id: number; ordinal: number }[];
-        const content = new Map<number, string>();
-        for (const row of this.streamBlocksFor(document.id)) {
-          const block = rows.find(item => item.ordinal === row.ordinal);
-          if (block) content.set(block.id, row.content);
+    const documents = this.db.prepare(`SELECT d.id, d.path FROM documents d
+      WHERE NOT EXISTS (SELECT 1 FROM index_migration_documents m
+        WHERE m.version = 'payload_bloom_1' AND m.document_id = d.id)
+      ORDER BY d.id`).all() as { id: number; path: string }[];
+    const total = Number((this.db.prepare("SELECT count(*) AS count FROM documents").get() as { count: number }).count);
+    let completed = total - documents.length;
+    options.onProgress?.({ stage: "upgrade", message: "建立 payload 搜尋摘要", current: completed, total });
+    const blocksQuery = this.db.prepare("SELECT id, heading FROM blocks WHERE document_id = ? ORDER BY ordinal");
+    const payloadsQuery = this.db.prepare("SELECT ordinal, payload FROM document_payloads WHERE document_id = ? ORDER BY ordinal");
+    for (const document of documents) {
+      throwIfAborted(options.signal);
+      options.onProgress?.({ stage: "upgrade", message: "建立 payload 搜尋摘要", current: completed, total, path: document.path });
+      const blocks = blocksQuery.all(document.id) as { id: number; heading: string | null }[];
+      const metadata = new Map(blocks.map(block => [block.id, block]));
+      const payloads = payloadsQuery.all(document.id) as { ordinal: number; payload: Uint8Array }[];
+      this.db.exec("BEGIN IMMEDIATE");
+      try {
+        this.db.prepare("DELETE FROM document_payload_blocks WHERE document_id = ?").run(document.id);
+        this.db.prepare("DELETE FROM document_payload_blooms WHERE document_id = ?").run(document.id);
+        const insertBlock = this.db.prepare("INSERT INTO document_payload_blocks(document_id, payload_ordinal, block_id) VALUES (?, ?, ?)");
+        const insertBloom = this.db.prepare("INSERT INTO document_payload_blooms(document_id, payload_ordinal, bloom) VALUES (?, ?, ?)");
+        let payloadIndex = 0;
+        for (const payload of payloads) {
+          throwIfAborted(options.signal);
+          const values = JSON.parse(brotliDecompressSync(payload.payload).toString("utf8")) as [number, string][];
+          const content = new Map<number, string>();
+          for (const [blockId, fragment] of values) {
+            if (!metadata.has(blockId)) throw new Error("索引 payload 指向未知區塊，無法安全升級。");
+            content.set(blockId, (content.get(blockId) ?? "") + fragment);
+          }
+          for (const blockId of content.keys()) insertBlock.run(document.id, payload.ordinal, blockId);
+          insertBloom.run(document.id, payload.ordinal, buildBloom([...content].map(([blockId, value], ordinal) => ({
+            ordinal, heading: metadata.get(blockId)?.heading ?? null, content: value, locationKind: "line" as const, locationValue: "",
+          }))));
+          payloadIndex++;
+          if (payloadIndex % 16 === 0) {
+            options.onProgress?.({ stage: "upgrade", message: `建立 payload 搜尋摘要（payload ${payloadIndex}/${payloads.length}）`,
+              current: completed, total, path: document.path });
+            await yieldToEvents();
+          }
         }
-        this.db.prepare("DELETE FROM document_payloads WHERE document_id = ?").run(document.id);
-        this.writeDocumentPayloads(document.id, rows.map(row => ({ ...row, content: content.get(row.id) ?? "" })));
-      }
-      this.db.prepare("INSERT OR REPLACE INTO metadata(key, value) VALUES ('payload_bloom_version', '1')").run();
-      this.db.exec("COMMIT");
-    } catch (error) { this.db.exec("ROLLBACK"); throw error; }
+        this.db.prepare("INSERT OR REPLACE INTO index_migration_documents(version, document_id) VALUES ('payload_bloom_1', ?)").run(document.id);
+        this.db.exec("COMMIT");
+      } catch (error) { this.db.exec("ROLLBACK"); throw error; }
+      completed++;
+      options.onProgress?.({ stage: "upgrade", message: "建立 payload 搜尋摘要", current: completed, total, path: document.path });
+      await yieldToEvents();
+    }
+    throwIfAborted(options.signal);
+    this.db.prepare("INSERT OR REPLACE INTO metadata(key, value) VALUES ('payload_bloom_version', '1')").run();
+    options.onProgress?.({ stage: "upgrade", message: "payload 搜尋摘要升級完成", current: total, total });
   }
 
   counts(): Record<string, number> {

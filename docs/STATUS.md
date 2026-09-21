@@ -1,10 +1,17 @@
 # 專案狀態
 
-最後更新：2026-09-21（M23 payload 級保守 Bloom 候選在目前 Mac 完成）
+最後更新：2026-09-21（M23 修正版 0.26.1 在目前 Mac 完成，待公司 Windows 複驗）
 
 ## 目前狀態
 
-- 里程碑：M23——payload 級 Bloom 排除無關文字區塊，全文核對維持不變。
+- 里程碑：M23 修正版 0.26.1——索引升級、唯讀 status 與即時進度；規格見 SPEC §34。程式與回歸測試已完成，交付包與公司 Windows 複驗尚未完成。
+- 公司 Windows／Node.js 22.17.0／0.26.0 已回報 index 超過五分鐘無進度、status 無輸出，未通過本次驗收。診斷副本回復後可讀：610 文件、219,518 區塊，content_storage_version=2、multi_root_version=1，缺少 payload_bloom_version=1；主庫 84,459,520 bytes、journal 12,965,512 bytes。唯讀診斷曾得到 776（待回復交易），不得當作原始延遲主因或資料毀損證據。
+- 已移除共用開庫的自動遷移：status／search 等讀取命令以唯讀連線開庫；status 在任何資料庫查詢前顯示索引位置，列出格式與升級進度。776 會回報 INDEX_RECOVERY_REQUIRED，busy／locked 立即回報 INDEX_BUSY。
+- Bloom 升級受 writer lock 保護，直接逐 payload 建立對應與摘要，不重壓縮或改寫 payload；以 Map 線性查找、逐文件交易及完成標記接續。Ctrl+C 在文件／payload 安全點停止並回傳 130；index、rebuild 與 watch 的同步預設輸出節流進度。
+- 新增 M23 修正版 4 項回歸：唯讀檢查零遷移、中斷後接續且 payload bytes 不變、主資料庫真實寫入交易期間 status 五秒內讀取，以及 hot journal 明確回報並由下一個 writer 回復。M8／M20 舊遷移測試改為明確寫入升級。
+- 610 文件／219,518 區塊合成舊索引量測：Node 26.7.0 為 877.44 ms、峰值 RSS 113,295,360 bytes；Node 22.13.1 為 985.25 ms、峰值 RSS 103,006,208 bytes。兩者 610 個 payload 的數量與 bytes 前後完全相同，建立 219,518 個 mapping、610 個 Bloom／完成標記。這是目前 Mac 合成資料，不取代公司 Node 22.17.0 真實索引複驗。
+- 0.26.1 全套共 148 項：146 通過、0 失敗、1 項既有 M11 原生 watcher 在目前環境 15 秒逾時而取消、1 項 Windows cmd 專屬略過。重跑另抓到 M8 舊測試需改用明確升級，已修正；M8／M13／M20～M24 聚焦測試全數通過。以下 0.26.0 記錄為缺陷回報前的歷史證據。
+- 0.26.1 交付包已逐檔核對 181 個檔案：`LocalDocSearch-M23-0.26.1.zip`；SHA-256 為 `6164546db0fd62f83b1bce7cf17bd71f84ed9ca901feb3e8932394ab7904d9e3`。公司複驗步驟見 `M23-FIX-WINDOWS-ACCEPTANCE.md`。
 - 0.26.0 M23 新增 payload／block 對應與 1 KiB payload 級 trigram Bloom；文件 Bloom 先排除不可能文件，再只解壓含可能 trigram 的完整文字區塊。跨 payload 片語、短詞、舊索引或無 payload 候選均安全回退，搜尋結果語意未變。M20～M23 相關自動測試 6 項通過；完整全套在此受限 sandbox 仍有 M11 原生監看逾時，且 M15 CLI 因預設索引位置唯讀而得到 4（預期 3），待可寫入的標準環境重跑。Windows 0.26.0 尚未實機驗證。
 - M23 交付包已建立並逐檔核對 174 個檔案：`LocalDocSearch-M23-0.26.0.zip`；SHA-256 為 `5195f205ceaa9b9ecc0be4fba8fd654da2b46d0d6fe1dcfa24fb10c79e90c2fd`。Windows 仍需使用者在公司電腦完成實機驗收。
 - 0.21.0 自動測試共 136 項：135 通過、0 失敗、1 項 Windows cmd 專屬測試在 macOS 略過。M18 測試封鎖舊 `candidates()` 整庫載入，覆蓋片語、多詞、篩選、片段與 context passages。

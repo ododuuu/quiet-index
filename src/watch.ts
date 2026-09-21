@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { sync, type SyncOptions, type SyncReport } from "./sync.js";
 import type { IndexStore } from "./store.js";
+import type { ProgressUpdate } from "./progress.js";
 
 export class WatchError extends Error {
   constructor(public readonly code: string, message: string) { super(message); this.name = "WatchError"; }
@@ -23,6 +24,7 @@ export interface WatchOptions {
   now?: () => number;
   setTimer?: (fn: () => void, ms: number) => ReturnType<typeof setTimeout>;
   clearTimer?: (id: ReturnType<typeof setTimeout>) => void;
+  onProgress?: (update: ProgressUpdate) => void;
 }
 
 const IGNORED_SEGMENT = /(?:^|[\\/])(?:\.git|node_modules|\.localdocsearch)(?:[\\/]|$)/i;
@@ -76,7 +78,7 @@ export async function runWatch(
   const now = options.now ?? Date.now;
   const setTimer = options.setTimer ?? setTimeout;
   const clearTimer = options.clearTimer ?? clearTimeout;
-  const syncOptions: SyncOptions = { requireRegistered: true };
+  const syncOptions: SyncOptions = { requireRegistered: true, ...(options.onProgress ? { onProgress: options.onProgress } : {}) };
   const states = new Map<string, RootState>();
   const active = new Set<Promise<void>>();
   let stopping = false;

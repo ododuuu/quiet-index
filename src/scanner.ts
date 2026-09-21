@@ -2,6 +2,7 @@ import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import { loadIgnoreRules } from "./ignore.js";
 import type { Diagnostic, SkippedCounts } from "./model.js";
+import { throwIfAborted, type ProgressUpdate } from "./progress.js";
 
 const ignoredDirectories = new Set([".git", "node_modules", ".localdocsearch"]);
 
@@ -14,14 +15,16 @@ export interface ScanResult {
   ignorePatterns: string[];
 }
 
-export async function scan(root: string): Promise<ScanResult> {
+export async function scan(root: string, options: { signal?: AbortSignal; onProgress?: (update: ProgressUpdate) => void } = {}): Promise<ScanResult> {
   const ignoreRules = await loadIgnoreRules(root);
   const result: ScanResult = { paths: [], errors: [], diagnostics: [],
     skipped: { builtin: 0, user: 0, unsupported: 0, link: 0 },
     ignoreFile: ignoreRules.sourcePath, ignorePatterns: ignoreRules.patterns };
   const pending = [root];
   while (pending.length > 0) {
+    throwIfAborted(options.signal);
     const directory = pending.pop()!;
+    options.onProgress?.({ stage: "scan", message: `掃描目錄；已找到 ${result.paths.length} 份檔案`, current: result.paths.length, path: directory });
     let entries;
     try {
       entries = await readdir(directory, { withFileTypes: true });

@@ -6,6 +6,7 @@ import { parseDocument } from "./parser.js";
 import { scan, validateRoot, RootError } from "./scanner.js";
 import { emptyStatusCounts, supportedExtensions, type Diagnostic, type DocumentRecord, type SyncSummary } from "./model.js";
 import type { IndexStore } from "./store.js";
+import { throwIfAborted, yieldToEvents, type ProgressUpdate } from "./progress.js";
 
 export interface SyncReport extends SyncSummary {
   root: string;
@@ -23,11 +24,17 @@ export interface SyncOptions {
   // 注入相同契約以測試零解析及讀檔失敗，不改變 CLI 行為。
   parse?: typeof parseDocument;
   scan?: typeof scan;
+  signal?: AbortSignal;
+  onProgress?: (update: ProgressUpdate) => void;
 }
 
 export async function sync(rootInput: string, store: IndexStore, options: SyncOptions = {}): Promise<SyncReport> {
   const release = acquireWriteLock(store.databasePath);
   try {
+    options.onProgress?.({ stage: "upgrade", message: "檢查索引格式" });
+    await store.upgrade({ lockHeld: true, ...(options.signal ? { signal: options.signal } : {}),
+      ...(options.onProgress ? { onProgress: options.onProgress } : {}) });
+    throwIfAborted(options.signal);
     if ((options.requireRegistered || options.rebuild) && !store.roots().includes(path.resolve(rootInput))) {
       throw new RootError("根目錄已移除或尚未登錄，請重新選擇位置。");
     }
@@ -44,6 +51,7 @@ export async function sync(rootInput: string, store: IndexStore, options: SyncOp
 
 async function syncLocked(rootInput: string, store: IndexStore, options: SyncOptions): Promise<SyncReport> {
   const started = performance.now();
+  options.onProgress?.({ stage: "scan", message: "開始掃描根目錄", path: rootInput });
   let root = await validateRoot(rootInput);
   const actual = await realpath(root);
   const normalizePath = (value: string) => process.platform === "win32" ? value.toLowerCase() : value;
@@ -57,7 +65,9 @@ async function syncLocked(rootInput: string, store: IndexStore, options: SyncOpt
     };
     if (within(canonical, actual) || within(actual, canonical)) throw new RootError(`根目錄與已登錄位置重疊：${existing}；請選擇不重疊的位置。`);
   }
-  const found = await (options.scan ?? scan)(root);
+  const found = options.scan
+    ? await options.scan(root, { ...(options.signal ? { signal: options.signal } : {}), ...(options.onProgress ? { onProgress: options.onProgress } : {}) })
+    : await scan(root, { ...(options.signal ? { signal: options.signal } : {}), ...(options.onProgress ? { onProgress: options.onProgress } : {}) });
   // 使用者可能把索引資料目錄放在被掃描根目錄內；LocalDocSearch 自己的資料庫
   // 與 WAL／協調檔不是來源文件，納入會造成每次同步都修改自己的輸入。
   const databasePath = path.resolve(store.databasePath);
@@ -76,7 +86,10 @@ async function syncLocked(rootInput: string, store: IndexStore, options: SyncOpt
   store.registerRoot(root);
   if (options.rebuild && found.errors.length === 0) store.clearDocuments(root);
   const knownPaths = new Set(found.paths);
+  let processed = 0;
   for (const filePath of found.paths) {
+    throwIfAborted(options.signal);
+    options.onProgress?.({ stage: "read", message: "處理索引文件", current: processed, total: found.paths.length, path: filePath });
     let stage: Diagnostic["stage"] = "read";
     try {
       const info = await stat(filePath);
@@ -90,6 +103,7 @@ async function syncLocked(rootInput: string, store: IndexStore, options: SyncOpt
       let document: DocumentRecord;
       if (supportedExtensions.has(extension)) {
         report.parserCalls++;
+        options.onProgress?.({ stage: "parse", message: "解析文件內容", current: processed, total: found.paths.length, path: filePath });
         document = await (options.parse ?? parseDocument)(filePath);
       } else {
         document = {
@@ -105,6 +119,7 @@ async function syncLocked(rootInput: string, store: IndexStore, options: SyncOpt
         };
       }
       stage = "store";
+      options.onProgress?.({ stage: "write", message: "寫入文件索引", current: processed, total: found.paths.length, path: filePath });
       store.upsert(document, root);
       report.updated++;
       if (previous || options.rebuild) report.reprocessed++;
@@ -135,10 +150,13 @@ async function syncLocked(rootInput: string, store: IndexStore, options: SyncOpt
       if (stage === "read") report.readErrors++;
       report.complete = false;
     }
+    processed++;
+    if (processed % 100 === 0) await yieldToEvents();
   }
   if (report.complete) report.removed = store.removeMissing(knownPaths, root);
   report.elapsedMs = Math.round((performance.now() - started) * 100) / 100;
   const { root: _root, errors, notices, complete, diagnostics, ignoreFile: _ignoreFile, ignorePatterns: _ignorePatterns, ...summary } = report;
   store.recordSync(root, complete, errors, notices, summary, diagnostics);
+  options.onProgress?.({ stage: "complete", message: "索引同步完成", current: found.paths.length, total: found.paths.length, path: root });
   return report;
 }

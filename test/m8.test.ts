@@ -98,6 +98,7 @@ test("M8 migrates a legacy single-root database without reading source or changi
   await rename(a, a + " offline");
   store = new IndexStore(database);
   try {
+    await store.upgrade();
     assert.deepEqual(store.roots(), [a]);
     assert.equal(search(store, "遷移內容", 20, undefined, a)[0]?.reference, ref);
     assert.equal(store.getLastSyncReport(a).successfulAt, time);

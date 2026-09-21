@@ -46,6 +46,7 @@ test("M20 migrates a legacy text block atomically and preserves its search resul
   legacy.close();
   const store = new IndexStore(database);
   try {
+    await store.upgrade();
     assert.equal(search(store, "完整文字").length, 1);
     store.close();
     const db = new DatabaseSync(database, { readOnly: true });
