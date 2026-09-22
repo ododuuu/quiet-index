@@ -1,14 +1,29 @@
 # 跨對話交接方式
 
+## 交接給 Grok：實作 0.31.0 背景自動更新（2026-09-22）
+
+0.31.0 的權威規格是 SPEC §39，設計理由見 D047，目前僅完成文件、尚未實作。本版起不再新增 M 編號；package、tag、驗證文件與交付包統一使用 0.31.0。
+
+給 Grok 的實作提示：
+
+> 請實作 LocalDocSearch 0.31.0。先讀 AGENTS.md，docs/SPEC.md，docs/STATUS.md，docs/DECISIONS.md 與 docs/HANDOFF.md；只實作 SPEC §39，不開新 M 編號。先把精確檔案／子樹局部更新抽成共用服務，再讓前景 watch 與 `autoupdate start|status|stop` 共用它；不得以每個事件全根 sync 冒充完成。實作可驗證的本機單例控制、啟動握手、健康 status、安全 stop、事件佇列、6 小時完整校正、動態 roots、降級復原與有界日誌。不安裝 Windows Service，不做開機／登入自啟，不更改 0.30.0 嚴格 UTF-8 失敗才 Big5 的編碼政策，不要加統計偵測或目錄編碼設定。每個行為變更補自動測試，最後更新 STATUS／DECISIONS／HANDOFF 與 0.31.0 驗證文件；不得把本機測試寫成公司 Windows 已驗收。
+
+實作順序與收斂條件：
+
+1. 局部更新 API 與安全刪除／離線保留，共用既有 parser、ignore、歸屬、transaction、payload／Bloom 與 writer lock。
+2. 持續更新管理器：單一寫入佇列、防抖去重、溢位改完整校正、動態 roots、watcher 降級與復原。
+3. 本機控制與 CLI：detached spawn 後必須握手才回報成功；status 必須詢問活體實例；stop 不以 PID 批次殺 Node。
+4. 執行 SPEC §39.7 的事件、多程序、特殊路徑、故障復原、效能與舊版回歸測試。只有程序、測試、版本與交付物一致時才可標記 0.31.0 本機實作完成。
+
 ## 已交付：M27／0.30.0 原始碼、Big5 與索引觀測（2026-09-22）
 
 依 SPEC §38／D046 實作。共用嚴格文字解碼套用 java／sql／js／txt／md／adoc／xml；BOM 與 XML 宣告失敗不回退；無訊號時嚴格 UTF-8 成功即停，失敗才 Big5。`.class` 僅檔名。逐文件 `parse_version` 讓舊 indexed／no_text 文字與舊 unsupported 原始碼一次普通 index 升級，中斷後接續；too_large 未變更不讀取；error 仍每次重試。修正未變更 `continue` 未增加 processed 的進度停滯，TTY／非 TTY 節流，結尾按階段／錯誤碼彙總。`status` 預設容量與問題彙總，`--issues`／`--types` 可併用。
 
 Linux 沙盒 197 項：194 通過、1 失敗（既有 M7 平台）、2 略過。效能見 `docs/benchmark-m27.json` 與 `docs/M27-VALIDATION.md`。交付包 `LocalDocSearch-M27-0.30.0.zip`，SHA-256 `4390a048913f76dec7a3b0ebc8bb199e85b8e6b595961af863c7b5bd48df822e`。公司 Windows 請對現有索引執行普通 `index`（不必 rebuild、不可清空），再核對中文命中、行號、XML 錯誤碼、無變更重跑、搜尋延遲與新容量。
 
-### 保留的獨立待辦
+### 已轉為 0.31.0 規格
 
-先前討論的自動更新管理仍待規劃／實作，未在 0.30.0 交付：以既有 watch／sync 為基礎，提供普通使用者背景程序的 start／status／stop、單例、健康回應、根目錄動態更新、Windows 終端關閉後存續及有界日誌；重開機後如實顯示已停止，登入啟動另行明確啟用。
+先前保留的自動更新管理已完成規格化，不再是尚未規劃的待辦；實作狀態以本文件首節及 STATUS 為準。
 
 以下保留歷史交接；驗收現況以本節及 STATUS 為準。
 
