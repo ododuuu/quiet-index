@@ -6,6 +6,12 @@ import type { Diagnostic, SkippedCounts } from "./model.js";
 import { throwIfAborted, type ProgressUpdate } from "./progress.js";
 
 const ignoredDirectories = new Set([".git", "node_modules", ".localdocsearch"]);
+export const SYSTEM_HINT_DIRECTORIES = new Set(["$recycle.bin", "system volume information"]);
+export const SYSTEM_DIRECTORY_HINT = "遇到資源回收筒或系統目錄；可自行在 .localdocsearchignore 加入 /$RECYCLE.BIN/ 與 /System Volume Information/，本程式不會自動寫入排除規則。";
+
+export function isSystemHintDirectory(name: string): boolean {
+  return SYSTEM_HINT_DIRECTORIES.has(name.toLowerCase());
+}
 
 export interface ScanResult {
   paths: string[];
@@ -15,6 +21,7 @@ export interface ScanResult {
   ignoreFile: string | null;
   ignorePatterns: string[];
   extraIgnoreFiles: string[];
+  hints: string[];
 }
 
 export interface ScanOptions {
@@ -37,8 +44,9 @@ export async function scan(root: string, options: ScanOptions = {}): Promise<Sca
   const result: ScanResult = { paths: [], errors: [], diagnostics: [],
     skipped: { builtin: 0, user: 0, unsupported: 0, link: 0 },
     ignoreFile: ignoreRules.sourcePath, ignorePatterns: [...ignoreRules.patterns, ...extraRules.flatMap(item => item.rules.patterns)],
-    extraIgnoreFiles };
+    extraIgnoreFiles, hints: [] };
   const pending = [start];
+  let hintedSystemDirectory = false;
   while (pending.length > 0) {
     throwIfAborted(options.signal);
     const directory = pending.pop()!;
@@ -56,6 +64,10 @@ export async function scan(root: string, options: ScanOptions = {}): Promise<Sca
       const fullPath = path.join(directory, entry.name);
       const relativePath = path.relative(root, fullPath);
       const ignoredByExtra = extraRules.some(item => coversPath(item.base, fullPath) && item.rules.matches(path.relative(item.base, fullPath), entry.isDirectory()));
+      if (entry.isDirectory() && isSystemHintDirectory(entry.name) && !hintedSystemDirectory) {
+        result.hints.push(SYSTEM_DIRECTORY_HINT);
+        hintedSystemDirectory = true;
+      }
       if ((entry.isDirectory() && ignoredDirectories.has(entry.name.toLowerCase())) || (entry.isFile() && entry.name.startsWith("~$"))) {
         result.skipped.builtin++;
       } else if (ignoreRules.matches(relativePath, entry.isDirectory()) || ignoredByExtra) {

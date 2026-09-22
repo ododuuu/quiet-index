@@ -1,10 +1,11 @@
 import type { TextBlock } from "../model.js";
 import type { DocumentParser } from "./contract.js";
+import { decodeSharedText, splitSourceLines } from "./text-decode.js";
 
 export const markdownParser: DocumentParser = {
   extension: ".md",
   parse(data: Uint8Array): TextBlock[] {
-    const content = new TextDecoder("utf-8").decode(data);
+    const content = decodeSharedText(data, "text").text;
     const blocks: TextBlock[] = [];
     let heading: string | null = null;
     let section: string[] = [];
@@ -14,7 +15,7 @@ export const markdownParser: DocumentParser = {
       if (text) blocks.push({ ordinal: blocks.length, heading, content: text, locationKind: "section", locationValue: `第 ${start} 行` });
       section = [];
     };
-    content.split(/\r?\n/).forEach((line, index) => {
+    splitSourceLines(content).forEach((line, index) => {
       const match = /^#{1,6}\s+(.+)$/.exec(line);
       if (match) {
         flush();

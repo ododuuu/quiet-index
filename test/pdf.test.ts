@@ -102,7 +102,8 @@ test("CLI reports no-text PDFs and shows PDF page numbers", async () => {
     await mkdir(root);
     await copyFile(path.join(fixtures, "text-layer.pdf"), path.join(root, "text-layer.pdf"));
     await copyFile(path.join(fixtures, "no-text.pdf"), path.join(root, "no-text.pdf"));
-    const indexed = await execFileAsync(process.execPath, [cli, "index", root], { env });
+    const indexed = await execFileAsync(process.execPath, [cli, "index", root, "--verbose"], { env });
+    assert.match(indexed.stdout, /本次 no_text：1/);
     assert.match(indexed.stdout, /PDF 沒有可擷取的文字層/);
     const found = await execFileAsync(process.execPath, [cli, "search", "中文測試"], { env });
     assert.match(found.stdout, /第 2 頁/);

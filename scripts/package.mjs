@@ -18,7 +18,7 @@ for (const file of ['README.md', 'docsearch.cmd', 'AGENTS.md', 'package.json', '
   entries[`LocalDocSearch/${file}`] = await readFile(path.join(project, file));
 }
 const metadata = JSON.parse(await readFile(path.join(project, "package.json"), "utf8"));
-const destination = path.join(project, `LocalDocSearch-M26-${metadata.version}.zip`);
+const destination = path.join(project, `LocalDocSearch-M27-${metadata.version}.zip`);
 const archive = zipSync(entries, { level: 6 });
 const unpacked = unzipSync(archive);
 for (const [name, contents] of Object.entries(entries)) {

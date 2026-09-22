@@ -1,0 +1,165 @@
+{
+  "node": "v22.23.2",
+  "platform": "linux",
+  "files": 160,
+  "sourceBytes": 188800,
+  "decodeUtf": {
+    "label": "decode-utf8",
+    "repeats": 3,
+    "medianElapsedMs": 0.19512900000000855,
+    "medianRss": 103002112,
+    "samples": [
+      {
+        "elapsedMs": 0.4748439999999903,
+        "rss": 103002112,
+        "heapUsed": 16522464,
+        "rssDelta": 192512
+      },
+      {
+        "elapsedMs": 0.19512900000000855,
+        "rss": 103002112,
+        "heapUsed": 16628008,
+        "rssDelta": 0
+      },
+      {
+        "elapsedMs": 0.14902000000000726,
+        "rss": 103002112,
+        "heapUsed": 16728616,
+        "rssDelta": 0
+      }
+    ]
+  },
+  "decodeBig5": {
+    "label": "decode-utf8-then-big5",
+    "repeats": 3,
+    "medianElapsedMs": 0.32853099999999813,
+    "medianRss": 103186432,
+    "samples": [
+      {
+        "elapsedMs": 0.524405999999999,
+        "rss": 103186432,
+        "heapUsed": 16877472,
+        "rssDelta": 184320
+      },
+      {
+        "elapsedMs": 0.32853099999999813,
+        "rss": 103186432,
+        "heapUsed": 17012888,
+        "rssDelta": 0
+      },
+      {
+        "elapsedMs": 0.31872300000000564,
+        "rss": 103186432,
+        "heapUsed": 17148904,
+        "rssDelta": 0
+      }
+    ]
+  },
+  "indexUtf": {
+    "label": "index-utf8",
+    "repeats": 3,
+    "medianElapsedMs": 194.99308700000006,
+    "medianRss": 120279040,
+    "samples": [
+      {
+        "elapsedMs": 216.976872,
+        "rss": 119230464,
+        "heapUsed": 16466280,
+        "rssDelta": 16044032
+      },
+      {
+        "elapsedMs": 192.39177700000005,
+        "rss": 120279040,
+        "heapUsed": 17626120,
+        "rssDelta": 1048576
+      },
+      {
+        "elapsedMs": 194.99308700000006,
+        "rss": 120279040,
+        "heapUsed": 18543224,
+        "rssDelta": 0
+      }
+    ]
+  },
+  "indexBig5": {
+    "label": "index-big5",
+    "repeats": 3,
+    "medianElapsedMs": 195.09457999999995,
+    "medianRss": 120778752,
+    "samples": [
+      {
+        "elapsedMs": 192.76389000000006,
+        "rss": 120516608,
+        "heapUsed": 17126928,
+        "rssDelta": 237568
+      },
+      {
+        "elapsedMs": 197.52344399999993,
+        "rss": 120778752,
+        "heapUsed": 19576256,
+        "rssDelta": 262144
+      },
+      {
+        "elapsedMs": 195.09457999999995,
+        "rss": 121171968,
+        "heapUsed": 22032816,
+        "rssDelta": 393216
+      }
+    ]
+  },
+  "unchangedUtf": {
+    "label": "unchanged-utf8",
+    "repeats": 3,
+    "medianElapsedMs": 11.650066999999808,
+    "medianRss": 122613760,
+    "samples": [
+      {
+        "elapsedMs": 11.650066999999808,
+        "rss": 122220544,
+        "heapUsed": 16286768,
+        "rssDelta": 1048576
+      },
+      {
+        "elapsedMs": 11.895972000000029,
+        "rss": 122613760,
+        "heapUsed": 16853008,
+        "rssDelta": 393216
+      },
+      {
+        "elapsedMs": 8.356015999999954,
+        "rss": 122613760,
+        "heapUsed": 17380336,
+        "rssDelta": 0
+      }
+    ]
+  },
+  "errorRetry": {
+    "label": "error-retry",
+    "repeats": 3,
+    "medianElapsedMs": 10.451553999999987,
+    "medianRss": 130674688,
+    "samples": [
+      {
+        "elapsedMs": 77.261481,
+        "rss": 130543616,
+        "heapUsed": 26150120,
+        "rssDelta": 7929856
+      },
+      {
+        "elapsedMs": 10.451553999999987,
+        "rss": 130674688,
+        "heapUsed": 26812936,
+        "rssDelta": 131072
+      },
+      {
+        "elapsedMs": 10.347024000000147,
+        "rss": 131461120,
+        "heapUsed": 27499008,
+        "rssDelta": 786432
+      }
+    ]
+  },
+  "indexBytesUtf8": 516096,
+  "indexBytesBig5": 516096,
+  "note": "Big5 路徑含嚴格 UTF-8 失敗後回退；新增原始碼正文成本與編碼回退成本分開列出。不得外推為固定加倍或零成本。"
+}

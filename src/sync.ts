@@ -5,7 +5,7 @@ import { realpath, stat } from "node:fs/promises";
 import { parseDocument } from "./parser.js";
 import { scan, validateRoot, RootError } from "./scanner.js";
 import { canonicalizeRootInput, planRootOperation, resolveUserRootPath, runtimePathPlatform, type RootOperationKind } from "./root-plan.js";
-import { emptyStatusCounts, supportedExtensions, type Diagnostic, type DocumentRecord, type SyncSummary } from "./model.js";
+import { emptyStatusCounts, needsTextParseUpgrade, supportedExtensions, type Diagnostic, type DocumentRecord, type SyncSummary } from "./model.js";
 import type { IndexStore } from "./store.js";
 import { throwIfAborted, yieldToEvents, type ProgressUpdate } from "./progress.js";
 
@@ -113,6 +113,7 @@ async function syncLocked(rootInput: string, store: IndexStore, options: SyncOpt
     notices.push(`已包含於上層索引：${plan.subtree} 屬於 ${root}；僅同步指定子樹，不新增重疊登錄。`);
   }
   for (const file of found.extraIgnoreFiles ?? []) notices.push(`沿用排除作用域：${file}`);
+  for (const hint of found.hints ?? []) notices.push(hint);
   const report: SyncReport = { root, found: found.paths.length, updated: 0, added: 0, reprocessed: 0,
     unchanged: 0, removed: 0, parserCalls: 0, statuses: emptyStatusCounts(), skipped: found.skipped,
     readErrors: found.diagnostics.length, elapsedMs: 0, diagnostics: [...found.diagnostics],
@@ -126,58 +127,59 @@ async function syncLocked(rootInput: string, store: IndexStore, options: SyncOpt
   let processed = 0;
   for (const filePath of found.paths) {
     throwIfAborted(options.signal);
-    options.onProgress?.({ stage: "read", message: "處理索引文件", current: processed, total: found.paths.length, path: filePath });
     let stage: Diagnostic["stage"] = "read";
     try {
       const info = await stat(filePath);
       const previous = store.getDocument(filePath);
       const extension = path.extname(filePath).toLowerCase();
       const retryUnsupported = previous?.status === "unsupported" && supportedExtensions.has(extension);
-      if (!options.rebuild && previous && previous.status !== "error" && !retryUnsupported && previous.size_bytes === info.size && previous.modified_at_ms === info.mtimeMs) {
+      const upgradeText = previous ? needsTextParseUpgrade(previous, extension) : false;
+      if (!options.rebuild && previous && previous.status !== "error" && !retryUnsupported && !upgradeText
+        && previous.size_bytes === info.size && previous.modified_at_ms === info.mtimeMs) {
         report.unchanged++;
-        continue;
-      }
-      let document: DocumentRecord;
-      if (supportedExtensions.has(extension)) {
-        report.parserCalls++;
-        options.onProgress?.({ stage: "parse", message: "解析文件內容", current: processed, total: found.paths.length, path: filePath });
-        document = await (options.parse ?? parseDocument)(filePath);
       } else {
-        document = {
-          path: filePath,
-          filename: path.basename(filePath),
-          extension,
-          sizeBytes: info.size,
-          modifiedAtMs: info.mtimeMs,
-          status: "unsupported",
-          errorCode: null,
-          errorMessage: null,
-          blocks: [],
-        };
-      }
-      stage = "store";
-      options.onProgress?.({ stage: "write", message: "寫入文件索引", current: processed, total: found.paths.length, path: filePath });
-      store.upsert(document, root);
-      report.updated++;
-      if (previous || options.rebuild) report.reprocessed++;
-      else report.added++;
-      report.statuses[document.status]++;
-      if (document.status === "unsupported" && document.errorMessage) report.notices.push(`${filePath}: ${document.errorMessage}`);
-      if (document.status === "error" || document.status === "encrypted") {
-        const diagnostic: Diagnostic = { stage: "parse", path: filePath,
-          code: document.errorCode ?? "PARSE_ERROR",
-          message: document.status === "encrypted" ? "文件已加密，僅可搜尋檔名" : "無法解析文件，僅可搜尋檔名" };
-        // readFile 的系統錯誤與格式解析失敗分開處理，避免讀取不完整時移除既有文件。
-        if (["EACCES", "EPERM", "ENOENT", "EIO", "EBUSY", "EISDIR", "EMFILE", "ENFILE"].includes(diagnostic.code)) {
-          diagnostic.stage = "read";
-          report.readErrors++;
-          report.complete = false;
+        let document: DocumentRecord;
+        if (supportedExtensions.has(extension)) {
+          report.parserCalls++;
+          options.onProgress?.({ stage: "parse", message: "解析文件內容", current: processed, total: found.paths.length, path: filePath });
+          document = await (options.parse ?? parseDocument)(filePath);
+        } else {
+          document = {
+            path: filePath,
+            filename: path.basename(filePath),
+            extension,
+            sizeBytes: info.size,
+            modifiedAtMs: info.mtimeMs,
+            status: "unsupported",
+            errorCode: null,
+            errorMessage: null,
+            blocks: [],
+          };
         }
-        report.diagnostics.push(diagnostic);
-        report.errors.push(`${filePath}: ${diagnostic.message}`);
+        stage = "store";
+        options.onProgress?.({ stage: "write", message: "寫入文件索引", current: processed, total: found.paths.length, path: filePath });
+        store.upsert(document, root);
+        report.updated++;
+        if (previous || options.rebuild) report.reprocessed++;
+        else report.added++;
+        report.statuses[document.status]++;
+        if (document.status === "unsupported" && document.errorMessage) report.notices.push(`${filePath}: ${document.errorMessage}`);
+        if (document.status === "error" || document.status === "encrypted") {
+          const diagnostic: Diagnostic = { stage: "parse", path: filePath,
+            code: document.errorCode ?? "PARSE_ERROR",
+            message: document.status === "encrypted" ? "文件已加密，僅可搜尋檔名" : "無法解析文件，僅可搜尋檔名" };
+          // readFile 的系統錯誤與格式解析失敗分開處理，避免讀取不完整時移除既有文件。
+          if (["EACCES", "EPERM", "ENOENT", "EIO", "EBUSY", "EISDIR", "EMFILE", "ENFILE"].includes(diagnostic.code)) {
+            diagnostic.stage = "read";
+            report.readErrors++;
+            report.complete = false;
+          }
+          report.diagnostics.push(diagnostic);
+          report.errors.push(`${filePath}: ${diagnostic.message}`);
+        }
+        if (document.status === "no_text" && document.extension === ".vsd") report.notices.push(`${filePath}: VSD 沒有可擷取的直接文字（未展開 master、動態欄位或 OCR）`);
+        if (document.status === "no_text" && document.extension === ".pdf") report.notices.push(`${filePath}: PDF 沒有可擷取的文字層（掃描影像不支援 OCR）`);
       }
-      if (document.status === "no_text" && document.extension === ".vsd") report.notices.push(`${filePath}: VSD 沒有可擷取的直接文字（未展開 master、動態欄位或 OCR）`);
-      if (document.status === "no_text" && document.extension === ".pdf") report.notices.push(`${filePath}: PDF 沒有可擷取的文字層（掃描影像不支援 OCR）`);
     } catch {
       const diagnostic: Diagnostic = { stage, path: filePath,
         code: stage === "store" ? "INDEX_WRITE_FAILED" : "FILE_READ_FAILED",
@@ -188,6 +190,7 @@ async function syncLocked(rootInput: string, store: IndexStore, options: SyncOpt
       report.complete = false;
     }
     processed++;
+    options.onProgress?.({ stage: "read", message: "處理索引文件", current: processed, total: found.paths.length, path: filePath });
     if (processed % 100 === 0) await yieldToEvents();
   }
   if (report.complete) {

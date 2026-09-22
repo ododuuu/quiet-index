@@ -139,7 +139,7 @@ test("M8 CLI batches offline roots, preserves search and supports removal", () =
   assert.equal(run("index").status, 3);
   assert.match(run("search", "更新後內文").stdout, /乙.txt/);
   assert.match(run("search", "共同內文").stdout, /甲.txt/);
-  assert.match(run("status").stdout, /ROOT_SYNC_FAILED/);
+  assert.match(run("status", "--issues").stdout, /ROOT_SYNC_FAILED/);
   assert.equal(run("rebuild").status, 3);
   assert.match(run("search", "共同內文").stdout, /甲.txt/);
   assert.equal(run("roots", "remove", a).status, 0);

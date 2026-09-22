@@ -3,7 +3,7 @@ import { IndexBusyError } from "./write-lock.js";
 import { interactiveContext, ContextError } from "./context.js";
 import { runWatch, WatchError, resolveWatchDebounce, resolveWatchRescan } from "./watch.js";
 import { actOnDocument, DocumentActionError } from "./open-document.js";
-import { defaultDatabasePath, IndexStore } from "./store.js";
+import { defaultDatabasePath, formatMib, IndexStore, type ExtensionStats, type StorageFootprint } from "./store.js";
 import { parseTypes, type SearchResult } from "./search.js";
 import { runSearchSession, SearchSession, SearchIndexChangedError } from "./search-session.js";
 import { resolveUserRootPath } from "./root-plan.js";
@@ -11,37 +11,59 @@ import { RootError } from "./scanner.js";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { IgnoreConfigurationError } from "./ignore.js";
-import type { SyncSummary } from "./model.js";
+import type { Diagnostic, SyncSummary } from "./model.js";
 import { supportedExtensions } from "./model.js";
 import { ClipboardError } from "./clipboard.js";
 import { existsSync } from "node:fs";
-import { OperationCancelledError, type ProgressUpdate } from "./progress.js";
+import { createProgressReporter, OperationCancelledError } from "./progress.js";
 import { createInterface } from "node:readline/promises";
 
-function safeProgressText(value: string): string {
-  return value.replace(/[\u0000-\u001f\u007f]/g, "?");
+function formatCountMap(counts: Record<string, number>): string {
+  const entries = Object.entries(counts).filter(([, count]) => count > 0).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
+  return entries.length ? entries.map(([key, count]) => `${key}=${count}`).join("、") : "無";
 }
 
-function progressReporter(): { update(update: ProgressUpdate): void; close(): void } {
-  let latest: ProgressUpdate | undefined;
-  let lastStage: ProgressUpdate["stage"] | undefined;
-  let lastWritten = 0;
-  const render = (update: ProgressUpdate) => {
-    const count = update.current === undefined ? "" : update.total === undefined ? ` ${update.current}` : ` ${update.current}/${update.total}`;
-    const location = update.path ? `；${safeProgressText(update.path)}` : "";
-    console.error(`[${update.stage}] ${update.message}${count}${location}`);
-    lastWritten = Date.now(); lastStage = update.stage;
-  };
-  const timer = setInterval(() => { if (latest && Date.now() - lastWritten >= 1000) render(latest); }, 1000);
-  timer.unref();
-  return {
-    update(update) {
-      latest = update;
-      if (lastStage !== update.stage || Date.now() - lastWritten >= 1000 || update.stage === "complete") render(update);
-    },
-    close() { clearInterval(timer); },
-  };
+function printDiagnosticAggregates(diagnostics: readonly Diagnostic[], noText: number, readErrors: number): void {
+  const byStage: Record<string, number> = {};
+  const byCode: Record<string, number> = {};
+  let parseErrors = 0;
+  for (const item of diagnostics) {
+    byStage[item.stage] = (byStage[item.stage] ?? 0) + 1;
+    byCode[item.code] = (byCode[item.code] ?? 0) + 1;
+    if (item.stage === "parse") parseErrors++;
+  }
+  console.log(`本次 no_text：${noText}；讀取／掃描錯誤：${readErrors}；解析錯誤：${parseErrors}`);
+  console.log(`診斷彙總（階段）：${formatCountMap(byStage)}`);
+  console.log(`診斷彙總（錯誤碼）：${formatCountMap(byCode)}`);
 }
+
+function printStorage(footprint: StorageFootprint): void {
+  console.log("索引容量（檔案長度，非檔案系統配置空間）：");
+  for (const file of footprint.files) {
+    if (file.missing) continue;
+    if (file.unknown) console.log(`  ${file.label}：未知（讀取失敗）`);
+    else console.log(`  ${file.label}：${file.bytes} bytes（${formatMib(file.bytes!)}）`);
+  }
+  if (footprint.incomplete) console.log("  合計：不完整（部分附屬檔讀取失敗，未以 0 計入）");
+  else console.log(`  合計：${footprint.totalBytes} bytes（${formatMib(footprint.totalBytes ?? 0)}）`);
+  if (footprint.approximate) console.log("  註：偵測到 WAL／journal 等附屬檔，以上為即時近似值。");
+}
+
+function printExtensionStats(stats: readonly ExtensionStats[]): void {
+  console.log("已索引格式統計（metadata，未重新掃描來源）：");
+  if (!stats.length) {
+    console.log("  （無文件）");
+    return;
+  }
+  for (const item of stats) {
+    const label = item.extension || "（無副檔名）";
+    const statuses = Object.entries(item.statuses).filter(([, count]) => count > 0)
+      .map(([status, count]) => `${status}=${count}`).join("、");
+    console.log(`  ${label}：${item.documents} 份，來源 ${item.sourceBytes} bytes（${formatMib(item.sourceBytes)}）；${statuses || "無狀態"}`);
+  }
+}
+
+const OPERATIONAL_NOTICE = /^(合併根目錄範圍：|合併：|已包含於上層索引：|已將根目錄 |沿用排除作用域：|遇到資源回收筒)/;
 
 function sqliteExtendedCode(error: unknown): number | undefined {
   return error instanceof Error && "errcode" in error ? (error as Error & { errcode?: number }).errcode : undefined;
@@ -57,7 +79,7 @@ export function buildHelpText(): string {
     "  docsearch open <文件代碼> [--dry-run]",
     "  docsearch reveal <文件代碼> [--dry-run]",
     "  docsearch roots [remove <root>]",
-    "  docsearch status",
+    "  docsearch status [--issues] [--types]",
     "  docsearch rebuild [root] [--verbose]",
     "  docsearch watch [root] [--debounce <毫秒>] [--rescan <毫秒>] [--verbose]",
     "",
@@ -65,10 +87,12 @@ export function buildHelpText(): string {
     "index 可將涵蓋的既有子根合併為上層登錄；已包含於上層的子目錄只同步該子樹。--root 可為已登錄根目錄或其下子樹／已合併原子根。",
     "Windows 磁碟根目錄請用 D:/ ；加引號時請寫 D:/，不要讓路徑以反斜線結尾。",
     "context 預設 100、最高 500。--type 例如 pdf,docx,xml（可有前導點、忽略大小寫）。",
-    `目前支援 ${[...supportedExtensions].join("、")}（PDF 只擷取文字層）；搜尋前請先執行 index。`,
+    `目前支援 ${[...supportedExtensions].join("、")}（PDF 只擷取文字層）；.class 僅檔名。搜尋前請先執行 index。`,
     "VSD v11 擷取直接儲存的圖形文字；不展開 master／動態欄位，舊版或不支援結構仍可搜尋檔名。",
+    "文字與原始碼採嚴格 UTF-8，失敗才回退 Big5；XML 明確編碼宣告失敗不回退。",
     "查詢預設為整段子字串；--all-terms 要求空白分隔詞全部出現在同一文件。AND、*、? 不作進階查詢語法。",
     "context 內可用 s <查詢> 跨查詢累積選取，b 查看已選清單，r <編號> 移除。",
+    "status 預設顯示容量與問題彙總；--issues 列出文件問題與各根同步診斷，--types 依副檔名統計。",
   ].join("\n");
 }
 
@@ -125,6 +149,8 @@ export async function main(args: readonly string[]): Promise<number> {
   let searchPageSizeSpecified = false;
   let verbose = false;
   let types: string[] | undefined;
+  let statusIssues = false;
+  let statusTypes = false;
   try {
     if (command === "watch") {
       const values: string[] = [];
@@ -163,7 +189,14 @@ export async function main(args: readonly string[]): Promise<number> {
       if (!args[1] || !/^[1-9]\d*-[0-9a-f]{16}$/.test(args[1]) || !Number.isSafeInteger(Number(args[1].split("-")[0])) || args.length > 3 || (args[2] !== undefined && args[2] !== "--dry-run")) throw new Error(`用法：docsearch ${command} <文件代碼> [--dry-run]`);
       dryRun = args[2] === "--dry-run";
     } else if (command === "status") {
-      if (args.length !== 1) throw new Error("用法：docsearch status");
+      const seen = new Set<string>();
+      for (const option of args.slice(1)) {
+        if (option !== "--issues" && option !== "--types") throw new Error("用法：docsearch status [--issues] [--types]");
+        if (seen.has(option)) throw new Error(`不可重複指定 ${option}。`);
+        seen.add(option);
+      }
+      statusIssues = seen.has("--issues");
+      statusTypes = seen.has("--types");
     } else {
       if (command !== "context" && !args[1]?.trim()) throw new Error("搜尋文字不可為空白。");
       const seen = new Set<string>();
@@ -224,7 +257,7 @@ export async function main(args: readonly string[]): Promise<number> {
     return 2;
   }
   let store: IndexStore | undefined;
-  let reporter: ReturnType<typeof progressReporter> | undefined;
+  let reporter: ReturnType<typeof createProgressReporter> | undefined;
   let abortController: AbortController | undefined;
   let cancel: (() => void) | undefined;
   try {
@@ -233,7 +266,7 @@ export async function main(args: readonly string[]): Promise<number> {
     if (command === "status") console.log(`索引位置：${databasePath}\n讀取索引狀態…`);
     if (!writes && !existsSync(databasePath)) { console.error("索引尚未建立；請先執行 docsearch index <root>。"); return 3; }
     if (writes) {
-      reporter = progressReporter();
+      reporter = createProgressReporter({ isTTY: Boolean(process.stderr.isTTY), verbose });
       reporter.update({ stage: "recover", message: "開啟並檢查本機索引" });
       abortController = new AbortController();
       cancel = () => abortController!.abort();
@@ -304,22 +337,23 @@ export async function main(args: readonly string[]): Promise<number> {
           const report = await sync(target, store, { rebuild: command === "rebuild", requireRegistered: !rootInput || command === "rebuild",
             ...(abortController ? { signal: abortController.signal } : {}), onProgress: update => reporter?.update(update) });
           console.log(`根目錄：${report.root}`);
-          for (const notice of report.notices.filter(item => item.startsWith("合併根目錄範圍：") || item.startsWith("合併：") || item.startsWith("已包含於上層索引："))) {
+          for (const notice of report.notices.filter(item => OPERATIONAL_NOTICE.test(item))) {
             console.log(`提示：${notice}`);
           }
           if (command === "rebuild") console.log(report.complete ? "重建完成。" : "重建未完整完成。");
           printSummary(report);
-          console.log(`同步完整：${report.complete ? "是" : "否"}（文件解析狀態另列）`);
-          if (report.found === 0) console.log("沒有找到支援的文件。");
+          printDiagnosticAggregates(report.diagnostics, report.statuses.no_text, report.readErrors);
+          console.log(`同步完整：${report.complete ? "是" : "否"}（與處理百分比分開；文件解析狀態另列）`);
+          if (report.found === 0) console.log("沒有找到文件。");
           if (!report.complete) exitCode = 3;
           if (!report.complete) console.log(command === "rebuild"
-            ? "提示：本次重建不完整；部分內容可能尚未更新，請查看問題清單。"
+            ? "提示：本次重建不完整；部分內容可能尚未更新，請查看 status --issues。"
             : "提示：本次同步不完整；為避免誤刪，保留無法確認的既有索引資料。");
-          for (const notice of report.notices.filter(item => !item.startsWith("合併根目錄範圍：") && !item.startsWith("合併：") && !item.startsWith("已包含於上層索引："))) {
-            console.log(`提示：${notice}`);
-          }
-          for (const error of report.errors) console.error(`文件問題：${error}`);
           if (verbose) {
+            for (const notice of report.notices.filter(item => !OPERATIONAL_NOTICE.test(item))) {
+              console.log(`提示：${notice}`);
+            }
+            for (const error of report.errors) console.error(`文件問題：${error}`);
             console.log("內建排除：.git/、node_modules/、.localdocsearch/、~$ 暫存項目；不追蹤符號連結／junction。");
             console.log(`排除檔：${report.ignoreFile ?? "未設定"}`);
             for (const rule of report.ignorePatterns) console.log(`  規則：${rule}`);
@@ -384,22 +418,37 @@ export async function main(args: readonly string[]): Promise<number> {
       console.log(`索引格式：文字儲存 ${format.contentStorageVersion ?? "舊版"}；payload Bloom ${format.payloadBloomVersion ?? "未完成"}`);
       if (format.needsUpgrade) console.log(`索引升級：需要升級（已完成 ${format.completedDocuments}/${format.totalDocuments} 份文件）；請執行 index 接續。`);
       else console.log("索引升級：已完成。");
+      printStorage(store.storageFootprint());
       for (const root of roots) {
         const syncReport = store.getLastSyncReport(root);
         console.log(`根目錄：${root}`);
         console.log(`最後嘗試同步：${syncReport.attemptedAt ?? "尚未同步"}`);
         console.log(`最後完整同步：${syncReport.successfulAt ?? "尚未完成"}`);
         if (syncReport.complete !== null) console.log(`最近同步完整：${syncReport.complete ? "是" : "否"}`);
-        if (syncReport.summary) { console.log("最近同步摘要（歷史紀錄，非即時磁碟清單）："); printSummary(syncReport.summary); }
-        console.log(`最近同步錯誤：${syncReport.errors.length}`);
-        for (const issue of syncReport.diagnostics) console.log(`  [${issue.stage}/${issue.code}] ${issue.path}：${issue.message}`);
+        if (syncReport.summary) { console.log("最近同步摘要（歷史紀錄，非目前索引累計狀態）："); printSummary(syncReport.summary); }
+        console.log(`最近同步診斷：${syncReport.diagnostics.length}（詳見 status --issues）`);
       }
-      console.log("全部根目錄文件狀態：");
+      console.log("目前索引累計狀態：");
       for (const [status, count] of Object.entries(store.counts())) console.log(`${status}：${count}`);
       const issues = store.documentIssues();
-      console.log(`文件問題：${issues.length}`);
-      // 不直接輸出解析器的原始錯誤文字，避免 XML 等解析例外帶出文件內容。
-      for (const issue of issues) console.log(`  ${issue.path} [${issue.status}/${issue.errorCode ?? "UNKNOWN"}]`);
+      console.log(`目前索引文件問題：${issues.length}（與上方歷史同步摘要分開；詳細請用 status --issues）`);
+      if (statusTypes) printExtensionStats(store.extensionStats());
+      if (statusIssues) {
+        console.log("目前索引文件問題：");
+        if (!issues.length) console.log("  （無）");
+        for (const issue of issues) console.log(`  ${issue.path} [${issue.status}/${issue.errorCode ?? "UNKNOWN"}]`);
+        console.log("各根最近同步診斷：");
+        let anyDiagnostic = false;
+        for (const root of roots) {
+          const syncReport = store.getLastSyncReport(root);
+          for (const issue of syncReport.diagnostics) {
+            anyDiagnostic = true;
+            console.log(`  ${root} [${issue.stage}/${issue.code}] ${issue.path}：${issue.message}`);
+          }
+        }
+        if (!anyDiagnostic) console.log("  （無）");
+        console.log("以上兩組可能重疊，請勿相加當成獨立失敗文件數。");
+      }
       return 0;
     }
     const session = new SearchSession(store, args[1]!, types, selectedRoot, allTerms ? "all-terms" : "phrase", selectedSubtree);
@@ -459,7 +508,11 @@ export async function main(args: readonly string[]): Promise<number> {
       readline.close();
     }
   } catch (error) {
-    if (error instanceof OperationCancelledError) { console.error(`${error.code}：${error.message}`); return 130; }
+    if (error instanceof OperationCancelledError) {
+      reporter?.update({ stage: "cancelled", message: "操作已取消" });
+      console.error(`${error.code}：${error.message}`);
+      return 130;
+    }
     const sqliteCode = sqliteExtendedCode(error);
     if (sqliteCode === 776) { console.error("INDEX_RECOVERY_REQUIRED：索引有未完成交易，需要由下一次 index 安全回復；請勿刪除 journal 或 WAL。"); return 3; }
     if (sqliteCode !== undefined && ((sqliteCode & 0xff) === 5 || (sqliteCode & 0xff) === 6)) { console.error("INDEX_BUSY：索引目前由另一個程序使用，請稍後重試。"); return 3; }

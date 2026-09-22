@@ -21,7 +21,23 @@ export interface DocumentRecord {
   blocks: TextBlock[];
 }
 
-export const supportedExtensions = new Set([".md", ".txt", ".xml", ".docx", ".pptx", ".xlsx", ".pdf", ".doc", ".xls", ".mht", ".mhtml", ".html", ".htm", ".xhtml", ".adoc", ".msg", ".vsd"]);
+export const supportedExtensions = new Set([
+  ".md", ".txt", ".xml", ".java", ".sql", ".js",
+  ".docx", ".pptx", ".xlsx", ".pdf", ".doc", ".xls",
+  ".mht", ".mhtml", ".html", ".htm", ".xhtml", ".adoc", ".msg", ".vsd",
+]);
+
+export const TEXT_PARSE_VERSION = 1;
+export const textParseExtensions = new Set([".txt", ".md", ".adoc", ".xml", ".java", ".sql", ".js"]);
+
+export function needsTextParseUpgrade(
+  previous: { status: DocumentStatus; parse_version?: number | null },
+  extension: string,
+): boolean {
+  if (!textParseExtensions.has(extension)) return false;
+  if (previous.status === "too_large") return false;
+  return (previous.parse_version ?? 0) < TEXT_PARSE_VERSION;
+}
 
 export interface Diagnostic {
   stage: "scan" | "read" | "parse" | "store";

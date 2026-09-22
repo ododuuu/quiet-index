@@ -1,22 +1,14 @@
 # 跨對話交接方式
 
-## 本次交接給 Grok：M27／0.30.0（規格完成，待實作）
+## 已交付：M27／0.30.0 原始碼、Big5 與索引觀測（2026-09-22）
 
-請從 GitHub 最新 main 接手，先讀 AGENTS.md，再依序讀 SPEC／STATUS／DECISIONS／HANDOFF。基線為 0.29.1，保留已完成的 M25／M26；本次 Codex 只更新文件，實作範圍以 SPEC §38、D046 為準。
+依 SPEC §38／D046 實作。共用嚴格文字解碼套用 java／sql／js／txt／md／adoc／xml；BOM 與 XML 宣告失敗不回退；無訊號時嚴格 UTF-8 成功即停，失敗才 Big5。`.class` 僅檔名。逐文件 `parse_version` 讓舊 indexed／no_text 文字與舊 unsupported 原始碼一次普通 index 升級，中斷後接續；too_large 未變更不讀取；error 仍每次重試。修正未變更 `continue` 未增加 processed 的進度停滯，TTY／非 TTY 節流，結尾按階段／錯誤碼彙總。`status` 預設容量與問題彙總，`--issues`／`--types` 可併用。
 
-依序實作：共用嚴格文字解碼及 java／sql／js → 逐文件解析版本與增量更新 → 進度計數／節流與診斷彙總 → status 容量與 --issues／--types → 自動測試、效能比較及 Windows 驗收說明。規格包含編碼優先序、錯誤契約、相容性與測試門檻，不需重新詢問是否新增三格式或 Big5。
-
-特別注意：0.29.1 未變更分支在 processed++ 前 continue，階段變動又繞過日誌節流，須一併修正；舊 TXT／MD／AsciiDoc 可能以寬鬆 UTF-8 保存亂碼，不能只重試 unsupported／error。XML 宣告編碼失敗不得靜默回退 Big5。不要更動來源文件或要求清空索引。
-
-使用者已提供 0.29.1 公司 D 槽人工成功與容量資料，數據見 STATUS；同步不完整及 66 項解析錯誤仍須誠實呈現。原測試有平台限制，不能照抄為全套通過。實作完成後再更新 package 至 0.30.0、驗證及打包；本次文件提交不改版本。
-
-可直接交給 Grok 的指令：
-
-> 請拉取 quiet-index 最新 main，依 AGENTS.md 與 SPEC §38／D046 實作 STATUS 指定的 M27／0.30.0。完成三種原始碼與 Big5、逐文件增量升級、百分比進度／錯誤彙總、索引容量與格式統計，補齊測試及交付文件。保留 0.29.1 的結果內搜尋與根目錄合併，所有文件處理留在本機。完成後回報測試、效能與仍需公司 Windows 驗收的項目。
+Linux 沙盒 197 項：194 通過、1 失敗（既有 M7 平台）、2 略過。效能見 `docs/benchmark-m27.json` 與 `docs/M27-VALIDATION.md`。交付包 `LocalDocSearch-M27-0.30.0.zip`，SHA-256 `4390a048913f76dec7a3b0ebc8bb199e85b8e6b595961af863c7b5bd48df822e`。公司 Windows 請對現有索引執行普通 `index`（不必 rebuild、不可清空），再核對中文命中、行號、XML 錯誤碼、無變更重跑、搜尋延遲與新容量。
 
 ### 保留的獨立待辦
 
-先前討論的自動更新管理仍待規劃／實作，未在 0.29.1 交付：以既有 watch／sync 為基礎，提供普通使用者背景程序的 start／status／stop、單例、健康回應、根目錄動態更新、Windows 終端關閉後存續及有界日誌；重開機後如實顯示已停止，登入啟動另行明確啟用。M27 先完成本次確認的格式與觀測工作，不把此待辦標記完成。
+先前討論的自動更新管理仍待規劃／實作，未在 0.30.0 交付：以既有 watch／sync 為基礎，提供普通使用者背景程序的 start／status／stop、單例、健康回應、根目錄動態更新、Windows 終端關閉後存續及有界日誌；重開機後如實顯示已停止，登入啟動另行明確啟用。
 
 以下保留歷史交接；驗收現況以本節及 STATUS 為準。
 

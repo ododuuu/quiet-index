@@ -124,8 +124,10 @@ test("CLI rebuild and status expose rebuild results and document errors", async 
     await execFileAsync(process.execPath, [cli, "index", root], { env });
     const status = await execFileAsync(process.execPath, [cli, "status"], { env });
     assert.match(status.stdout, /最近同步完整：是/);
-    assert.match(status.stdout, /文件問題：1/);
-    assert.match(status.stdout, /PDF_CORRUPT/);
+    assert.match(status.stdout, /目前索引文件問題：1/);
+    assert.doesNotMatch(status.stdout, /PDF_CORRUPT/);
+    const issues = await execFileAsync(process.execPath, [cli, "status", "--issues"], { env });
+    assert.match(issues.stdout, /PDF_CORRUPT/);
     const rebuilt = await execFileAsync(process.execPath, [cli, "rebuild"], { env });
     assert.match(rebuilt.stdout, /重建完成/);
     assert.match(rebuilt.stdout, /更新 2、未變更 0/);

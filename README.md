@@ -1,6 +1,6 @@
 # LocalDocSearch
 
-目前版本為 **0.29.1**：已登錄子根後，可再 `index` 上層目錄做範圍合併，文件代碼與排除規則會保留。Windows 磁碟根目錄請用 `D:/`（不要寫成 `"D:\"`，尾端反斜線會被命令列吃掉）。0.28.0 起互動搜尋可用 `/ 關鍵字` 縮小結果。0.28.0 已由使用者回報驗測成功；0.29.1 公司 Windows 以 `D:\備份` 擴大至 `D:\` 的流程尚待驗收。
+目前版本為 **0.30.0**：新增 `.java`／`.sql`／`.js` 原文搜尋、嚴格 UTF-8 失敗後回退 Big5、舊文字索引一次性升級、百分比進度，以及 `status` 容量／`--issues`／`--types`。已登錄子根後，可再 `index` 上層目錄做範圍合併。Windows 磁碟根目錄請用 `D:/`。0.28.0 起互動搜尋可用 `/ 關鍵字` 縮小結果。0.29.1 公司 D 槽人工執行已回報成功；0.30.0 請用普通 `index` 升級，公司 Windows 驗收尚待回報。
 
 LocalDocSearch 0.26.2 是純本機 CLI，目前以 macOS 作為主要可執行與迭代環境，並保留 Windows 相容方向。它支援原有六種格式，並新增 `.doc`、`.xls`、`.mht`／`.mhtml`、`.html`／`.htm`／`.xhtml`、`.adoc`、`.msg` 與 `.vsd`，搜尋檔名、標題及內容。其他格式與無副檔名檔案會進入本機清冊，可依檔名及副檔名找到。文件留在原位置，索引與搜尋不需要網路或外部 AI。
 
@@ -54,6 +54,7 @@ node dist/src/cli.js context "合約" --out "$env:USERPROFILE\Desktop\context.js
 node dist/src/cli.js context "合約" --clipboard
 node dist/src/cli.js watch
 node dist/src/cli.js status
+node dist/src/cli.js status --issues --types
 node dist/src/cli.js rebuild --verbose
 .\docsearch.cmd search "合約"
 ```
@@ -61,7 +62,8 @@ node dist/src/cli.js rebuild --verbose
 - `index`：新增、重新處理修改文件、重試解析錯誤、略過未變更文件，並移除已確認刪除的索引。可登錄多個根目錄；若新路徑涵蓋既有子根，會合併歸屬而不刪文件。已包含於上層的子目錄只同步該子樹。不帶路徑則更新全部已登錄位置。
 - `search`：只搜尋現有索引。互動終端每頁預設 20 份，可輸入 `n` 下一頁、`p` 上一頁、`/ 關鍵字` 縮小目前全部命中、`back` 撤回、`reset` 重設、`q` 結束；即使只有一頁或零結果也可操作。非互動輸出只顯示指定頁並提示下一頁命令。`--page-size` 為 1～100，`--page` 從 1 起算；舊 `--limit` 保留為單次輸出，不能與分頁參數併用。每次都會顯示總命中數，避免把前 20 筆誤認為全部。`--type` 接受逗號分隔格式，可有前導點且忽略大小寫；例如 `.PDF,DocX,xml`。
 - `.xml`：依來源行保存原文，搜尋包含標籤、屬性和值；支援 UTF-8、UTF-16 BOM／XML 起始位元組，以及目前 Node.js `TextDecoder` 支援且由 XML declaration 宣告的編碼。格式不完整仍可作原文搜尋，不解析 DTD 或展開外部實體。
-- `status`：顯示各文件狀態、最後嘗試／完整同步時間、文件問題及最近同步摘要。摘要是歷史紀錄，不是即時磁碟清單。
+- `status`：顯示索引容量、各文件狀態彙總、最後嘗試／完整同步時間。摘要是歷史紀錄，不是目前索引累計狀態。`--issues` 列出目前文件問題與各根同步診斷；`--types` 依副檔名統計份數、來源 bytes 與狀態。
+- `.java`／`.sql`／`.js`：逐非空白行保存原文（含註解與字串）。`.class` 僅檔名。文字檔採 BOM／XML 宣告優先，否則嚴格 UTF-8，失敗才回退 Big5。舊 TXT／MD／AsciiDoc／XML 執行一次普通 `index` 即升級，不必 rebuild。
 - `rebuild [root]`：重解析指定根目錄，省略時處理全部已登錄位置的文件，不修改或刪除來源文件。重建只影響該根目錄；根目錄無法讀取時保留既有資料並回報問題。
 
 文件變更後再次執行 `index`。解析器更新若影響先前成功的文件（例如 M4 超連結修正），執行 `rebuild`；M4 升級 M5 的搜尋改善不需重建，執行一次 `index` 即可保存新的同步摘要。

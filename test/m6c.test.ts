@@ -125,10 +125,11 @@ test("M6-C CLI searches direct text and explains unsupported version", () => tem
     assert.equal(result.status, 0, result.stderr); return result.stdout;
   };
   assert.match(run("--help"), /VSD v11/);
-  assert.match(run("index", root), /此 VSD 版本或結構尚不支援/);
+  assert.match(run("index", root), /unsupported=1/);
+  assert.match(run("index", root, "--verbose"), /此 VSD 版本或結構尚不支援/);
   assert.match(run("search", "核准採購", "--type", "vsd"), /圖形 ID 7/);
   assert.match(run("search", "舊版本", "--type", "vsd"), /unsupported/);
-  assert.match(run("status"), /VSD_VERSION_UNSUPPORTED/);
+  assert.match(run("status", "--issues"), /VSD_VERSION_UNSUPPORTED/);
 }));
 
 test("M6-C worker deadline does not poison subsequent parsing", async () => {

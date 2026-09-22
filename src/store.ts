@@ -1,10 +1,13 @@
 import { acquireWriteLock } from "./write-lock.js";
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, statSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { brotliCompressSync, brotliDecompressSync, constants as zlibConstants } from "node:zlib";
-import { documentStatuses, type Diagnostic, type SyncSummary, type DocumentRecord, type DocumentStatus, type TextBlock } from "./model.js";
+import {
+  documentStatuses, TEXT_PARSE_VERSION, emptyStatusCounts, textParseExtensions,
+  type Diagnostic, type SyncSummary, type DocumentRecord, type DocumentStatus, type TextBlock,
+} from "./model.js";
 import { throwIfAborted, yieldToEvents, type ProgressUpdate } from "./progress.js";
 import { coversPath, resolveUserRootPath, samePath } from "./root-plan.js";
 import { RootError } from "./scanner.js";
@@ -24,6 +27,7 @@ export interface StoredDocumentRow {
   size_bytes: number;
   modified_at_ms: number;
   status: DocumentStatus;
+  parse_version?: number | null;
 }
 
 export interface StoredBlockRow {
@@ -153,6 +157,67 @@ export interface UpgradeOptions {
   onProgress?: (update: ProgressUpdate) => void;
 }
 
+export const INDEX_STORAGE_FILES = [
+  { suffix: "", label: "主庫" },
+  { suffix: "-wal", label: "主庫 -wal" },
+  { suffix: "-shm", label: "主庫 -shm" },
+  { suffix: "-journal", label: "主庫 -journal" },
+  { suffix: ".writer.sqlite", label: ".writer.sqlite" },
+  { suffix: ".writer.sqlite-wal", label: ".writer.sqlite -wal" },
+  { suffix: ".writer.sqlite-shm", label: ".writer.sqlite -shm" },
+  { suffix: ".writer.sqlite-journal", label: ".writer.sqlite -journal" },
+] as const;
+
+export interface StorageFileEntry {
+  label: string;
+  suffix: string;
+  path: string;
+  bytes: number | null;
+  missing: boolean;
+  unknown: boolean;
+}
+
+export interface StorageFootprint {
+  files: StorageFileEntry[];
+  totalBytes: number | null;
+  incomplete: boolean;
+  approximate: boolean;
+}
+
+export interface ExtensionStats {
+  extension: string;
+  documents: number;
+  sourceBytes: number;
+  statuses: Record<DocumentStatus, number>;
+}
+
+export function formatMib(bytes: number): string {
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MiB`;
+}
+
+export function collectIndexStorage(
+  databasePath: string,
+  statFn: (target: string) => { size: number } = path => statSync(path),
+): StorageFootprint {
+  const files: StorageFileEntry[] = INDEX_STORAGE_FILES.map(item => {
+    const filePath = `${databasePath}${item.suffix}`;
+    try {
+      const info = statFn(filePath);
+      return { label: item.label, suffix: item.suffix, path: filePath, bytes: info.size, missing: false, unknown: false };
+    } catch (error) {
+      const code = error instanceof Error && "code" in error ? String((error as NodeJS.ErrnoException).code) : "";
+      if (code === "ENOENT") return { label: item.label, suffix: item.suffix, path: filePath, bytes: null, missing: true, unknown: false };
+      return { label: item.label, suffix: item.suffix, path: filePath, bytes: null, missing: false, unknown: true };
+    }
+  });
+  const present = files.filter(item => !item.missing);
+  const incomplete = present.some(item => item.unknown);
+  const totalBytes = incomplete ? null : present.reduce((sum, item) => sum + (item.bytes ?? 0), 0);
+  const liveSidecars = new Set(["-wal", "-shm", "-journal", ".writer.sqlite-wal", ".writer.sqlite-shm", ".writer.sqlite-journal"]);
+  const approximate = files.some(item => !item.missing && liveSidecars.has(item.suffix));
+  return { files, totalBytes, incomplete, approximate };
+}
+
 
 // Node.js 22.16.0 起支援建構時設定 timeout，但目前鎖定的 @types/node
 // 尚未宣告此欄位。必須在 sqlite3_open_v2() 後、任何查詢前就安裝
@@ -197,7 +262,7 @@ export class IndexStore {
         id INTEGER PRIMARY KEY, path TEXT NOT NULL UNIQUE, filename TEXT NOT NULL,
         extension TEXT NOT NULL, size_bytes INTEGER NOT NULL, modified_at_ms REAL NOT NULL,
         indexed_at_ms INTEGER NOT NULL, status TEXT NOT NULL,
-        error_code TEXT, error_message TEXT
+        error_code TEXT, error_message TEXT, parse_version INTEGER
       );
       CREATE TABLE IF NOT EXISTS blocks (
         id INTEGER PRIMARY KEY, document_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
@@ -254,6 +319,14 @@ export class IndexStore {
         PRIMARY KEY (parent_path, former_path)
       );
     `);
+    this.ensureColumn("documents", "parse_version", "INTEGER");
+  }
+
+  private ensureColumn(table: string, column: string, sqlType: string): void {
+    const columns = this.db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+    if (!columns.some(item => item.name === column)) {
+      this.db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${sqlType}`);
+    }
   }
 
   formatStatus(): IndexFormatStatus {
@@ -452,25 +525,27 @@ export class IndexStore {
   }
 
   getDocumentById(id: number): StoredDocumentRow | undefined {
-    return this.db.prepare("SELECT id, path, filename, extension, size_bytes, modified_at_ms, status FROM documents WHERE id = ?").get(id) as StoredDocumentRow | undefined;
+    return this.db.prepare("SELECT id, path, filename, extension, size_bytes, modified_at_ms, status, parse_version FROM documents WHERE id = ?").get(id) as StoredDocumentRow | undefined;
   }
 
   getDocument(filePath: string): StoredDocumentRow | undefined {
-    return this.db.prepare("SELECT id, path, filename, extension, size_bytes, modified_at_ms, status FROM documents WHERE path = ?").get(filePath) as StoredDocumentRow | undefined;
+    return this.db.prepare("SELECT id, path, filename, extension, size_bytes, modified_at_ms, status, parse_version FROM documents WHERE path = ?").get(filePath) as StoredDocumentRow | undefined;
   }
 
   upsert(document: DocumentRecord, root?: string): void {
     this.db.exec("BEGIN IMMEDIATE");
     try {
+      const parseVersion = textParseExtensions.has(document.extension) ? TEXT_PARSE_VERSION : null;
       this.db.prepare(`INSERT INTO documents
-        (path, filename, extension, size_bytes, modified_at_ms, indexed_at_ms, status, error_code, error_message)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (path, filename, extension, size_bytes, modified_at_ms, indexed_at_ms, status, error_code, error_message, parse_version)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(path) DO UPDATE SET filename=excluded.filename, extension=excluded.extension,
         size_bytes=excluded.size_bytes, modified_at_ms=excluded.modified_at_ms,
         indexed_at_ms=excluded.indexed_at_ms, status=excluded.status,
-        error_code=excluded.error_code, error_message=excluded.error_message`)
+        error_code=excluded.error_code, error_message=excluded.error_message,
+        parse_version=excluded.parse_version`)
         .run(document.path, document.filename, document.extension, document.sizeBytes,
-          document.modifiedAtMs, Date.now(), document.status, document.errorCode, document.errorMessage);
+          document.modifiedAtMs, Date.now(), document.status, document.errorCode, document.errorMessage, parseVersion);
       const row = this.getDocument(document.path)!;
       if (root) this.db.prepare("INSERT INTO document_roots(document_id, root_path) VALUES (?, ?) ON CONFLICT(document_id) DO UPDATE SET root_path=excluded.root_path").run(row.id, root);
       this.db.prepare("DELETE FROM blocks WHERE document_id = ?").run(row.id);
@@ -794,6 +869,27 @@ export class IndexStore {
   documentIssues(): StoredIssue[] {
     return this.db.prepare(`SELECT path, status, error_code AS errorCode, error_message AS errorMessage
       FROM documents WHERE error_code IS NOT NULL ORDER BY path`).all() as unknown as StoredIssue[];
+  }
+
+  storageFootprint(): StorageFootprint {
+    return collectIndexStorage(this.databasePath);
+  }
+
+  extensionStats(): ExtensionStats[] {
+    const rows = this.db.prepare(`SELECT extension, status, count(*) AS count, sum(size_bytes) AS bytes
+      FROM documents GROUP BY extension, status`).all() as { extension: string; status: DocumentStatus; count: number; bytes: number | null }[];
+    const byExtension = new Map<string, ExtensionStats>();
+    for (const row of rows) {
+      const key = row.extension;
+      const current = byExtension.get(key) ?? {
+        extension: key, documents: 0, sourceBytes: 0, statuses: emptyStatusCounts(),
+      };
+      current.documents += Number(row.count);
+      current.sourceBytes += Number(row.bytes ?? 0);
+      current.statuses[row.status] = Number(row.count);
+      byExtension.set(key, current);
+    }
+    return [...byExtension.values()].sort((a, b) => a.extension < b.extension ? -1 : a.extension > b.extension ? 1 : 0);
   }
 
   private metadata(key: string): string | null {
