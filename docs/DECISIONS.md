@@ -1,5 +1,12 @@
 # 設計決策紀錄
 
+## D048：0.32.0 加入 XLSM／ODT／RTF／CSV 正文解析
+
+- 日期：2026-09-22。使用者確認四種格式若尚未支援，就列為 0.32.0。程式盤點證實 `.xlsm`、`.odt`、`.rtf`、`.csv` 尚未登錄正文 parser；MSG 內部的 RTF 還原不能視為獨立 RTF 檔案支援。
+- XLSM 共用 XLSX 的 OOXML 試算表解析，不執行或索引 VBA／ActiveX／外部連線；公式只採現有 cached display value。ODT 解析 `content.xml` 的可見文字與安全連結，不載入外部資源。獨立 RTF 抽出 MSG 已用的安全核心，排除 object／pict／metadata。CSV 採逗號與 RFC 4180 相容 quoting，不自動猜 delimiter。
+- 四種格式沿用本機處理、100 MiB 上限、增量交易、背景局部更新、嚴格 UTF-8 失敗後 Big5 與檔名備援。舊 unsupported 文件下一次普通 index 或背景完整校正重試，不要求 rebuild。
+- 真實 PDF／PPTX／XLS 問題需要公司檔案才能定位，統一放入 `docs/COMPANY-WINDOWS-DIAGNOSTICS.md`，只允許公司電腦上的 Codex 讀取；原檔與內容不得提交或外傳。
+
 ## D047：0.31.0 背景自動更新與版本命名
 
 - 日期：2026-09-22。使用者將背景自動更新定為下一版重點，規格見 SPEC §39。0.31.0 起以產品版本號作唯一里程碑名稱，不再新增 M 編號；歷史 M 名稱保留，不回溯改名。Grok 已完成本機實作。

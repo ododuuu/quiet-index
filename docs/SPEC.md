@@ -1,8 +1,8 @@
 # LocalDocSearch 產品規格
 
-- 規格基線：0.31.0；背景自動更新見第 39 節
+- 規格基線：0.31.0；下一版 0.32.0 格式擴充規劃見第 40 節
 - 日期：2026-09-22
-- 狀態：0.31.0 已實作 `autoupdate start|status|stop`、局部更新引擎、本機單例控制與 6 小時完整校正。0.30.0 編碼政策不變。公司 Windows 人工驗收尚待回報。
+- 狀態：0.31.0 已實作 `autoupdate start|status|stop`、局部更新引擎、本機單例控制與 6 小時完整校正。0.32.0 已確認加入 XLSM／ODT／RTF／CSV 正文解析，尚未實作。公司 Windows 人工驗收尚待回報。
 
 ## 版本與里程碑命名
 
@@ -877,3 +877,46 @@ docsearch autoupdate stop
 5. 程序測試涵蓋：並行 start 只有一例、spawn 後握手失敗、中文／空白／括號路徑、關閉啟動終端後存活、token 錯誤、殘留 PID／狀態／socket、健康與 unresponsive、同步中 stop、安全逾時、日誌輪替，以及前景 watch 衝突。
 6. 回歸 M25／M26／0.30.0 搜尋、根目錄歸屬、ignore scope、解析版本與 Windows cmd launcher。量測待機 RSS／CPU、單檔事件至可搜尋延遲、1000 檔事件暴增、完整無變更校正，以及搜尋期間背景提交。
 7. 公司 Windows 人工驗收：start → 關閉原 CMD → 新增／修改／改名／刪除文件 → 另一 CMD 搜尋驗證 → 新增及合併根目錄 → status → 手動 index 競爭 → stop；另重開機確認誠實顯示已停止，再 start 補齊停機期間變動。不得以本機測試取代此流程。
+
+## 40. 0.32.0 XLSM／ODT／RTF／CSV 正文解析（已確認規劃，待實作）
+
+### 40.1 目標與共同邊界
+
+- 使用者已確認下一版加入 `.xlsm`、`.odt`、`.rtf`、`.csv` 正文搜尋。四種格式目前只在完整檔案清冊中保存 metadata，可搜尋檔名但不讀正文；MSG 內的壓縮 RTF 還原不等於獨立 `.rtf` 支援。
+- 全部解析留在本機，沿用 100 MiB 單檔上限、統一 `TextBlock`、增量交易、payload／Bloom、背景局部更新及錯誤重試。不得執行巨集、公式、欄位指令、嵌入物件、外部連結或任何文件內程式碼，也不得為解析而連線網路。
+- 既有索引中狀態為 `unsupported` 的四種格式，在升級後下一次普通 `index` 或背景完整校正時必須重新解析；不要求 rebuild。成功且未變更的文件之後維持零解析略過。
+- 本版不順便加入 `.ods`、`.docm`、`.pptm`、舊 `.ppt`、OCR 或壓縮檔遞迴索引；需要時另行規格化。
+
+### 40.2 XLSM
+
+- `.xlsm` 沿用既有 XLSX 的 OOXML 工作簿、工作表、shared strings、常見數字／日期顯示、儲存格位置及超連結解析。搜尋結果位置顯示工作表與儲存格。
+- `vbaProject.bin`、ActiveX、巨集簽章、外部資料連線、Power Query、嵌入 OLE 物件及公式均不執行；巨集位元組不進索引。公式只沿用檔案內已有的 cached display value，沒有安全可用顯示值時不自行計算。
+- OOXML 必要部件缺失、損壞或加密沿用穩定 Office 錯誤分類；副檔名為 `.xlsm` 不代表內容一定可信，仍驗證 ZIP／OOXML 結構。
+
+### 40.3 ODT
+
+- `.odt` 解析本機 ZIP 套件內的 `content.xml`，擷取標題、段落、清單、表格儲存格、註腳／尾註及超連結的顯示文字與目標；位置以章節／段落或表格列儲存格表示，不宣稱固定頁碼。
+- 不讀取或連線載入外部圖片、外部文件、連結目標、巨集或嵌入物件。重複樣式定義、metadata 與二進位預覽不作正文。
+- 必要部件缺失或 XML 損壞回報穩定格式錯誤；manifest 顯示內容加密時標記 `encrypted`，不要求密碼、不嘗試解密。沒有可見文字時標記 `no_text`。
+
+### 40.4 獨立 RTF
+
+- `.rtf` 重用並抽出 MSG 已驗證的 RTF tokenizer／de-encapsulation 安全核心，支援 RTF Unicode escape、宣告 code page、段落、換行、表格文字及可安全取得的 hyperlink 顯示文字／目標。
+- 圖片、OLE object、embedded file、字型表、色彩表、樣式表、文件資訊與欄位指令不得當正文或執行。解析器在讀取 `\\bin` 長度、群組深度與輸出量前後設限，避免異常配置記憶體。
+- 缺少 RTF signature、無效控制字結構、未知字碼頁及輸出超限分別使用穩定錯誤碼；不得以替代字元靜默吞掉無效文字。
+
+### 40.5 CSV
+
+- `.csv` 依 RFC 4180 相容規則解析逗號分隔、雙引號跳脫、quoted newline、CRLF／LF／CR 與最後一列無換行。每個邏輯資料列建立一個 block，位置顯示列號及非空白欄位範圍；空檔或只有空白欄位為 `no_text`。
+- 文字解碼沿用明確 BOM 優先、無訊號時嚴格 UTF-8 成功即停、失敗才嚴格 Big5。初版不依內容猜分號、tab 或系統語系 delimiter；TSV 及其他分隔格式另定規格。
+- 儲存格內容只作文字索引；以 `=`, `+`, `-`, `@` 開頭的公式樣式值不得計算、執行或傳給試算表程式。解析不得自動偵測或下載外部資料。
+
+### 40.6 實作與驗收門檻
+
+1. 將 XLSM 安全接到 OOXML 試算表解析器；將 MSG 的 RTF 共用核心抽出而不改變既有 MSG 行為；新增獨立 ODT 與 CSV parser，再登錄四種副檔名。
+2. 測試涵蓋大小寫副檔名、中文、空檔、100 MiB 上限、舊 unsupported 普通 index 升級、修改／刪除、背景局部更新、格式篩選、open／reveal、context 與完整搜尋回歸。
+3. XLSM 覆蓋 shared strings、inline strings、日期／數字、超連結、cached formula、巨集存在但不讀取／執行、必要部件缺失及假副檔名；與 XLSX 相同行為不得分叉。
+4. ODT 覆蓋段落、標題、清單、表格、註腳、連結、Unicode、加密 manifest、外部資源不載入、缺部件與損壞 XML。
+5. RTF 覆蓋 Unicode、Big5／CP950、段落、表格、超連結、binary／object 排除、未知 code page、異常 `\\bin`、巢狀群組及輸出上限；MSG RTF 全套回歸必須保持通過。
+6. CSV 覆蓋 quoted comma、quoted newline、escaped quote、三種換行、UTF-8／UTF-16 BOM／Big5、空欄、長列、公式樣式文字及錯誤解碼。精確記錄 logical row，而非以實體換行誤算位置。
+7. 公司 Windows 使用非機密或已獲准的代表檔驗證四種格式；只回報搜尋文字是否命中、位置、狀態及錯誤碼，不上傳公司內容。0.31.0 背景驗收與公司真實 PDF／PPTX 診斷依 `docs/COMPANY-WINDOWS-DIAGNOSTICS.md` 另行處理，不阻塞本機實作。
