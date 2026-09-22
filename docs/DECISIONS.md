@@ -1,5 +1,13 @@
 # 設計決策紀錄
 
+## D050：0.33.0 以唯讀 stdio MCP 串接 AI，TUI 保留人工選取
+
+- 日期：2026-09-22。使用者確認搜尋核心完成後，下一目標是讓 AI 能接用，同時保留「選擇後才加入上下文」的關鍵操作。MCP 與人選介面不是互斥方案：MCP 定義能力與資料邊界，TUI 或支援 MCP Apps 的 Host 負責人機選取。
+- 第一版採本機 stdio，不開 HTTP／localhost port。依官方 MCP TypeScript SDK 的 server package 實作，stdout 僅承載 JSON-RPC。提供 `search_documents`、`prepare_context`、`index_status` 三個唯讀工具；不提供索引寫入、根目錄變更、open／reveal 或任意讀檔。
+- `prepare_context` 必須收到 1～20 個明確文件代碼，重用既有 context 的搜尋、來源核對、passage 與 256 KiB 契約。MCP 回傳內容可直接成為該次工具呼叫的模型上下文，但沒有「全選」或整庫自動匯入。
+- 0.32.0 TUI 加入選取籃、完整預覽與逐字 `yes` 後複製，作為所有終端都能用的人選介面。MCP Apps 的滑鼠 UI 可沿同一工具契約追加，但不把尚未被所有本機 Host 穩定支援的嵌入 UI 當作 0.33.0 核心依賴。
+- 不自動修改 Codex／其他 Host 設定，只提供明確註冊命令與專案設定範例。ChatGPT 網頁不讀本機 Codex stdio 設定，若日後需要網頁端使用，須另案評估遠端部署與公司資料政策，不能把本機 server 暴露出去。
+
 ## D049：0.32.0 先交付純 Node 終端互動介面
 
 - 日期：2026-09-22。使用者要求 0.32.0 同版加入類似 Claude Code 的終端互動介面，並允許參考 OpenCode。採用其「CLI 管程序生命週期、TUI 與核心分層、slash commands、鍵盤導向」概念，但不複製元件程式碼。

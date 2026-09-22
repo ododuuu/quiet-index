@@ -927,3 +927,39 @@ docsearch autoupdate stop
 - 直接輸入文字等同精確片語搜尋；slash commands 至少提供 `/search`、`/all`、`/next`、`/prev`、`/refine`、`/back`、`/reset`、`/open`、`/reveal`、`/status`、`/roots`、`/help`、`/quit`。搜尋、排序、結果內縮小及索引版本檢查必須重用既有 `SearchSession`，不得另寫一套語意。
 - TUI 只在互動終端啟動，不改變既有命令的非互動輸出。離開、EOF、Ctrl+C 或錯誤都必須還原 alternate screen；不開 TCP port、不傳送文件或索引內容、不暗中啟動背景更新。
 - 本版先完成日常搜尋、翻頁、縮小、開啟、狀態與根目錄查看。`context` 的完整勾選／預覽流程與 autoupdate 管理仍可使用原 CLI；若實際使用證明需要滑鼠、寬表格或文件預覽，再另案增加 localhost Web UI。
+
+## 41. 0.33.0 本機 MCP 與人選上下文閉環
+
+### 41.1 目標與安全邊界
+
+- 以本機 stdio MCP server 將既有搜尋、索引狀態與人選上下文提供給 Codex 等相容 Host；不開 TCP port、不提供遠端 HTTP endpoint，也不將文件、索引、查詢或路徑送往 LocalDocSearch 自己控制的外部服務。
+- MCP 僅開放唯讀工具，不提供 index、rebuild、roots remove、autoupdate 管理、open／reveal 或任意檔案讀取。AI 不能藉 MCP 擴大已登錄範圍、修改索引、啟動桌面程式或取得未選全文。
+- 搜尋結果只含既有有界片段與來源資訊；上下文工具必須接收使用者已選的穩定文件代碼，最多 20 份、每份最多 10 段，整體輸出最多 256 KiB。不得提供「全部結果／全部索引自動匯入」參數。
+- 來源文字一律標示為資料而非指令。產生上下文時重新搜尋並核對文件代碼、索引及來源 metadata；已修改、遺失或不再命中的來源要拒絕，不靜默換成其他文件。
+
+### 41.2 MCP 命令與工具
+
+```text
+docsearch mcp
+```
+
+- `docsearch mcp` 的 stdout 專供 MCP JSON-RPC；診斷只可寫 stderr。程序由 Host 透過 stdio 啟動，stdin 結束即關閉，不另建常駐服務或狀態檔。
+- `search_documents`：接受非空白 query、`phrase|all-terms`、可選 types／root，以及有界 page／pageSize。最多只允許瀏覽前 500 筆候選；回傳總數、頁次、文件代碼、路徑、狀態、命中原因、位置及既有短片段。
+- `prepare_context`：接受 1～20 個 `{query, reference}` 選取項、共同搜尋模式、可選 types／root 及 passages；只回傳重新驗證後的 Markdown 與結構化資料，不寫檔、不碰剪貼簿、不呼叫模型。
+- `index_status`：回傳索引位置、各狀態數、已登錄根目錄及其最近同步狀態；不掃描來源、不觸發升級或背景更新。
+- 所有工具以唯讀方式開啟現有 SQLite。索引不存在、需要寫入升級、忙碌、來源變更或參數錯誤時，回傳可讀的 tool error；不得在錯誤中輸出正文或解析器原始例外。
+
+### 41.3 TUI 人選上下文
+
+- `docsearch tui` 新增 `/select <本頁編號|文件代碼>`、`/unselect <已選編號|文件代碼>`、`/selected`、`/clear` 與 `/context [1～10]`。畫面以 `[x]` 標示已選結果，跨搜尋最多累積 20 份。
+- 選取項保存當時的查詢與搜尋模式；同一選取籃不得混用 phrase 與 all-terms。結果內縮小後選取時，以最新一層明確條件作為該文件的 passage 查詢。
+- `/context` 先顯示完整 Markdown 預覽，只有逐字輸入 `yes` 才寫入本機剪貼簿；取消不改剪貼簿。它與 MCP 共用同一個上下文建立與驗證服務，不另寫搜尋語意。
+- TUI 的選取／複製是任何終端皆可用的人工作業面；支援 MCP Apps 的 Host 未來可在同一工具契約上增加滑鼠按鈕。0.33.0 不以 Host 專屬內嵌 UI 作必要條件，也不開 localhost Web UI。
+
+### 41.4 測試與交付門檻
+
+1. 純函式測試覆蓋三工具的 schema 邊界、片語／全部詞、格式／根目錄篩選、分頁、穩定代碼、最多 500 候選、20 文件、10 passages 與 256 KiB 上限。
+2. stdio 程序測試完成 MCP initialize、tools/list 與 tools/call，並證明 stdout 沒有 banner／一般 CLI 文字；索引不存在時 server 仍可啟動並由工具回報明確錯誤。
+3. TUI 測試覆蓋選取、取消、跨搜尋、模式衝突、清空、完整預覽、非 yes 不複製、yes 後只複製已選片段及 alternate screen 還原。
+4. 回歸既有 `search`、`context`、TUI open／reveal、status 與全部解析格式；MCP 執行不載入 Office／PDF parser、不寫 SQLite、不掃描來源。
+5. 文件提供 Codex CLI 的專案／使用者層註冊範例，但不自動修改使用者設定。公司 Windows 驗證只使用獲准的代表文件，回報工具名稱、結果數、代碼與錯誤碼，不提交公司內容。

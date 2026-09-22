@@ -1,9 +1,12 @@
 # 專案狀態
 
-最後更新：2026-09-22（0.32.0 格式擴充與終端互動介面已完成本機實作）
+最後更新：2026-09-23（0.33.0 本機 MCP 與人選上下文閉環已完成本機實作）
 
 ## 目前狀態
 
+- 目前版本：**0.33.0 本機 MCP 與人選上下文閉環**，規格見 SPEC §41、D050；本機實作完成。唯讀 stdio MCP 提供 `search_documents`／`prepare_context`／`index_status`，TUI 提供選取籃、預覽與確認複製；不含 MCP 寫入工具、遠端 HTTP、整庫自動匯入或 Host 專屬滑鼠 UI。
+- 0.33.0 本機 Node.js 22.13.1 完整 `npm test` 共 222 項：221 通過、0 失敗、1 項 Windows cmd 專屬略過；正式最低仍為 22.17.0，不得把此結果宣稱為公司 Windows 通過。驗證見 `docs/0.33.0-VALIDATION.md`。
+- 交付包逐檔核對 239 個檔案：`LocalDocSearch-0.33.0.zip`，SHA-256 `adb5a8485cc2aa083b86955ca5caf05a67ce98e5d252ce739a4f09af20882b57`。
 - 目前版本：**0.32.0 XLSM／ODT／RTF／CSV 正文解析＋終端互動介面**，規格見 SPEC §40、D048、D049；本機實作完成。從 0.31.0 起以版本號作唯一里程碑名稱，不再新增 M 編號。
 - `.xlsm` 共用安全 OOXML 儲存格解析；`.odt` 擷取 `content.xml` 可見文字；`.rtf` 與 MSG 共用受限核心；`.csv` 支援 RFC 4180 相容 quoting、quoted newline、BOM／UTF-8／Big5。禁止執行巨集、公式、物件或外部資源；舊 unsupported 下一次普通 index／背景完整校正會重試。
 - `docsearch tui` 已提供純 Node 全螢幕終端介面，整合搜尋、全部詞、翻頁、結果內縮小、open／reveal、status 與 roots。它不開網路連接埠；context 與 autoupdate 管理仍使用既有 CLI。

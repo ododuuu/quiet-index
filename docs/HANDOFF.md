@@ -1,5 +1,13 @@
 # 跨對話交接方式
 
+## 已交付：0.33.0 本機 MCP 與人選上下文閉環（2026-09-23）
+
+權威規格為 SPEC §41，決策為 D050。`docsearch mcp` 以 stdio 提供 `search_documents`、`prepare_context`、`index_status` 三個唯讀工具；沒有索引寫入、根目錄變更、open／reveal、任意讀檔或整庫匯入。`prepare_context` 只接受使用者選定的 1～20 個文件代碼，重用既有來源核對、passage 與 256 KiB 上限。
+
+TUI 新增 `/select`、`/unselect`、`/selected`、`/clear`、`/context`；以 `[x]` 顯示選取，完整預覽後只有逐字 `yes` 才複製。MCP 與 TUI 共用 `prepareSelectedContext`，不得分叉搜尋語意。Node.js 22.13.1 本機 222 項為 221 通過、0 失敗、1 項 Windows cmd 專屬略過；低於正式 22.17.0，公司 Windows 及真實 Codex Host 尚未驗收。
+
+下一版依使用者要求直接進入 0.34.0 大幅整合：優先做相容 Host 內的 MCP App 搜尋／勾選／送回對話，以及一鍵註冊與診斷；headless MCP 與 TUI 必須在 Host 不支援嵌入 UI 時保持完整可用。不得把 ChatGPT 網頁描述成本機 stdio 已連接。
+
 ## 已交付：0.32.0 格式解析與終端互動介面（2026-09-22）
 
 權威規格為 SPEC §40，決策為 D048／D049。`.xlsm` 共用安全 OOXML 試算表解析、`.odt` 解析本機 `content.xml`、獨立 `.rtf` 抽出 MSG 已用安全核心、`.csv` 採 RFC 4180 相容逗號解析；全部禁止執行巨集、公式、物件或外部資源。`docsearch tui` 以純 Node ANSI／readline 實作，重用 `SearchSession`，不開網路連接埠。context／autoupdate 管理仍使用既有 CLI。

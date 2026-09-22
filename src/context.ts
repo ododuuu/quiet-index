@@ -64,6 +64,11 @@ interface ContextPick {
   result: SearchResult;
 }
 
+export interface SelectedContextReference {
+  query: string;
+  reference: string;
+}
+
 export class ContextSessionSelection {
   private readonly chosen = new Map<string, ContextPick>();
   page = 0;
@@ -210,8 +215,51 @@ function renderMarkdown(data: Awaited<ReturnType<typeof bundle>>): string {
   return `${lines.join("\n")}\n`;
 }
 
-function serializeContext(data: Awaited<ReturnType<typeof bundle>>, format: "json" | "md"): string {
+export type ContextBundle = Awaited<ReturnType<typeof bundle>>;
+
+export function serializeContext(data: ContextBundle, format: "json" | "md"): string {
   return format === "md" ? renderMarkdown(data) : `${JSON.stringify(data, null, 2)}\n`;
+}
+
+export async function prepareSelectedContext(
+  store: IndexStore,
+  selections: readonly SelectedContextReference[],
+  options: Pick<ContextOptions, "types" | "root" | "subtree" | "passages" | "allTerms"> & { format?: "json" | "md" } = {},
+  createdAt = new Date().toISOString(),
+): Promise<{ data: ContextBundle; text: string }> {
+  if (!selections.length || selections.length > 20 || new Set(selections.map(item => item.reference)).size !== selections.length) {
+    throw new ContextError("CONTEXT_SELECTION_INVALID", "上下文需要 1～20 份不重複的文件代碼。");
+  }
+  const passages = options.passages ?? 3;
+  if (!Number.isSafeInteger(passages) || passages < 1 || passages > 10) {
+    throw new ContextError("CONTEXT_OPTIONS_INVALID", "每份文件的 passage 數量必須為 1～10。");
+  }
+  const picked: ContextPick[] = [];
+  for (const selection of selections) {
+    const query = selection.query.trim();
+    if (!query || !/^[1-9]\d*-[0-9a-f]{16}$/u.test(selection.reference)) {
+      throw new ContextError("CONTEXT_SELECTION_INVALID", "每個選取項都需要非空白查詢與有效文件代碼。");
+    }
+    const result = search(store, query, 500, options.types, options.root, options.allTerms ? "all-terms" : "phrase", options.subtree)
+      .find(item => item.reference === selection.reference);
+    if (!result) throw new ContextError("CONTEXT_REFERENCE_MISSING", "選取文件已不在目前搜尋結果中，請重新搜尋與選取。");
+    picked.push({ query, result });
+  }
+  const bundleOptions: ContextOptions = {
+    limit: 500,
+    passages,
+    format: options.format ?? "md",
+    ...(options.types ? { types: options.types } : {}),
+    ...(options.root ? { root: options.root } : {}),
+    ...(options.subtree ? { subtree: options.subtree } : {}),
+    ...(options.allTerms ? { allTerms: true } : {}),
+  };
+  const data = await bundle(store, bundleOptions, picked, createdAt);
+  const text = serializeContext(data, bundleOptions.format!);
+  if (Buffer.byteLength(text, "utf8") > 256 * 1024) {
+    throw new ContextError("CONTEXT_OUTPUT_LIMIT", "上下文超過 256 KiB，請減少選取內容。");
+  }
+  return { data, text };
 }
 
 export async function writeContext(output: string, text: string): Promise<void> {

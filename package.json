@@ -1,6 +1,6 @@
 {
   "name": "localdocsearch",
-  "version": "0.32.0",
+  "version": "0.33.0",
   "private": true,
   "description": "Offline local document search and context selection CLI",
   "type": "module",
@@ -29,6 +29,7 @@
   "dependencies": {
     "@kenjiuno/decompressrtf": "0.1.4",
     "@kenjiuno/msgreader": "1.28.0",
+    "@modelcontextprotocol/server": "2.0.0",
     "fast-xml-parser": "5.11.1",
     "fflate": "0.8.3",
     "htmlparser2": "12.0.0",
@@ -37,6 +38,7 @@
     "postal-mime": "3.0.0",
     "rtf-stream-parser": "3.8.1",
     "word-extractor": "1.0.4",
-    "xlsx": "file:vendor/xlsx-0.20.3.tgz"
+    "xlsx": "file:vendor/xlsx-0.20.3.tgz",
+    "zod": "4.2.0"
   }
 }

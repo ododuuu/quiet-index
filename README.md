@@ -1,6 +1,6 @@
 # LocalDocSearch
 
-目前版本為 **0.32.0**：新增 `.xlsm`、`.odt`、`.rtf`、`.csv` 正文搜尋，以及 `docsearch tui` 全螢幕終端互動介面。全部解析留在本機；不執行巨集、公式、RTF 物件或 ODT 外部資源。`autoupdate start|status|stop` 可在關閉原終端後繼續更新已登錄根目錄。公司 Windows 0.31.0／0.32.0 驗收尚待回報。
+目前版本為 **0.33.0**：新增唯讀本機 stdio MCP，讓 Codex 等相容 Host 搜尋既有索引，並只把使用者選定的文件片段建立成上下文。`docsearch tui` 同步加入 `[x]` 選取籃、完整預覽與逐字 `yes` 後複製。MCP 不提供 index、刪除、open／reveal 或整庫匯入；文件解析與索引仍全部留在本機。公司 Windows 0.31.0～0.33.0 驗收尚待回報。
 
 LocalDocSearch 0.26.2 是純本機 CLI，目前以 macOS 作為主要可執行與迭代環境，並保留 Windows 相容方向。它支援原有六種格式，並新增 `.doc`、`.xls`、`.mht`／`.mhtml`、`.html`／`.htm`／`.xhtml`、`.adoc`、`.msg` 與 `.vsd`，搜尋檔名、標題及內容。其他格式與無副檔名檔案會進入本機清冊，可依檔名及副檔名找到。文件留在原位置，索引與搜尋不需要網路或外部 AI。
 
@@ -57,6 +57,7 @@ node dist/src/cli.js autoupdate start
 node dist/src/cli.js autoupdate status
 node dist/src/cli.js autoupdate stop
 node dist/src/cli.js tui
+node dist/src/cli.js mcp
 node dist/src/cli.js status
 node dist/src/cli.js status --issues --types
 node dist/src/cli.js rebuild --verbose
@@ -64,7 +65,7 @@ node dist/src/cli.js rebuild --verbose
 ```
 
 - `index`：新增、重新處理修改文件、重試解析錯誤、略過未變更文件，並移除已確認刪除的索引。可登錄多個根目錄；若新路徑涵蓋既有子根，會合併歸屬而不刪文件。已包含於上層的子目錄只同步該子樹。不帶路徑則更新全部已登錄位置。
-- `tui`：啟動鍵盤導向的本機終端介面。直接輸入文字搜尋；`/search`、`/all`、`/next`、`/prev`、`/refine`、`/back`、`/reset`、`/open`、`/reveal`、`/status`、`/roots`、`/help`、`/quit` 可完成日常操作。TUI 不開網路連接埠，非互動 CLI 行為保持不變。
+- `tui`：啟動鍵盤導向的本機終端介面。除搜尋、翻頁、縮小、open／reveal 外，可用 `/select`、`/unselect`、`/selected`、`/clear` 管理最多 20 份文件，再以 `/context [1～10]` 完整預覽；只有輸入 `yes` 才複製到本機剪貼簿。TUI 不開網路連接埠，非互動 CLI 行為保持不變。
 - `search`：只搜尋現有索引。互動終端每頁預設 20 份，可輸入 `n` 下一頁、`p` 上一頁、`/ 關鍵字` 縮小目前全部命中、`back` 撤回、`reset` 重設、`q` 結束；即使只有一頁或零結果也可操作。非互動輸出只顯示指定頁並提示下一頁命令。`--page-size` 為 1～100，`--page` 從 1 起算；舊 `--limit` 保留為單次輸出，不能與分頁參數併用。每次都會顯示總命中數，避免把前 20 筆誤認為全部。`--type` 接受逗號分隔格式，可有前導點且忽略大小寫；例如 `.PDF,DocX,xml`。
 - `.xlsm`／`.odt`／`.rtf`／`.csv`：XLSM 沿用安全 OOXML 儲存格解析且忽略巨集；ODT 擷取標題、段落、清單、表格與連結；RTF 使用與 MSG 共用的受限解析核心；CSV 支援引號、逗號、quoted newline、UTF-8／Big5 與 BOM。既有 metadata-only 紀錄下一次普通 `index` 會自動重試，不必 rebuild。
 - `.xml`：依來源行保存原文，搜尋包含標籤、屬性和值；支援 UTF-8、UTF-16 BOM／XML 起始位元組，以及目前 Node.js `TextDecoder` 支援且由 XML declaration 宣告的編碼。格式不完整仍可作原文搜尋，不解析 DTD 或展開外部實體。
@@ -89,6 +90,18 @@ node dist/src/cli.js rebuild --verbose
 匯出是路徑、各自選取查詢、命中片段及來源資訊的 JSON／Markdown，只有選取內容，不含完整文件或未選文件。它留在本機，供你手動帶入允許的討論通道；本版不接模型或自動讀取聊天帳號。若來源或索引已變更，先重新 index 再選取。既有輸出檔案不覆寫，請改用新檔名。
 
 Windows 所有命令皆可用 `.\docsearch.cmd` 代替 `node dist/src/cli.js`；不需要全域安裝或修改 PATH。此入口需 Node.js 已可從終端執行。
+
+## 連接 Codex／MCP Host
+
+0.33.0 提供三個唯讀工具：`search_documents`、`prepare_context`、`index_status`。本機 Codex CLI 可在完成 `npm ci` 後註冊：
+
+```powershell
+codex mcp add localdocsearch -- node "C:\完整路徑\LocalDocSearch\dist\src\cli.js" mcp
+```
+
+macOS／Linux 將路徑改成解壓目錄的絕對路徑。可用 `codex mcp list` 核對；LocalDocSearch 不會自動修改 Codex 設定。Host 以子程序啟動 `docsearch mcp`，stdout 僅供 MCP JSON-RPC，不開 port。
+
+建議流程是：請 AI 呼叫 `search_documents` → AI 顯示文件代碼與短片段 → 你明確說要選哪些代碼 → AI 才呼叫 `prepare_context`。後者最多 20 份文件、每份 10 段、總計 256 KiB，並會重新核對來源；沒有全選或整庫自動灌入。ChatGPT 網頁不會直接讀取本機 Codex 的 stdio 設定，不能把本機索引誤當成已連上雲端。
 
 ## 多根目錄
 
