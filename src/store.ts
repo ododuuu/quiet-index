@@ -393,6 +393,11 @@ export class IndexStore {
     }
   }
 
+  /** SQLite connection-local marker that changes after another connection commits. */
+  dataVersion(): number {
+    return (this.db.prepare("PRAGMA data_version").get() as { data_version: number }).data_version;
+  }
+
   candidates(types?: readonly string[], root?: string): SearchCandidate[] {
     const filters: string[] = [];
     const values: string[] = [];

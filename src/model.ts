@@ -21,7 +21,7 @@ export interface DocumentRecord {
   blocks: TextBlock[];
 }
 
-export const supportedExtensions = new Set([".md", ".txt", ".docx", ".pptx", ".xlsx", ".pdf", ".doc", ".xls", ".mht", ".mhtml", ".html", ".htm", ".xhtml", ".adoc", ".msg", ".vsd"]);
+export const supportedExtensions = new Set([".md", ".txt", ".xml", ".docx", ".pptx", ".xlsx", ".pdf", ".doc", ".xls", ".mht", ".mhtml", ".html", ".htm", ".xhtml", ".adoc", ".msg", ".vsd"]);
 
 export interface Diagnostic {
   stage: "scan" | "read" | "parse" | "store";

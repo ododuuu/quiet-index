@@ -1,6 +1,6 @@
 # LocalDocSearch
 
-目前版本為 **0.26.3**：修復大型文件搜尋的 `too many SQL variables`，可直接使用既有索引，不需要 rebuild。`npm test` 預設逐檔執行；help／status／search 不再透過 watch 提前載入文件解析器。公司 Windows 真實搜尋仍待此版本複驗，以下版本描述保留歷史背景。
+目前版本為 **0.27.0**：搜尋會顯示總命中數、頁碼與本頁範圍；互動終端可用 `n`／`p` 翻頁，管線或批次可用 `--page`／`--page-size`。新增 `.xml` 原文逐行索引，標籤、屬性和值都可搜尋。既有索引執行一次普通 `index` 即可重試原為 `unsupported` 的 XML，不需要 rebuild。公司 Windows 尚待本版驗收。
 
 LocalDocSearch 0.26.2 是純本機 CLI，目前以 macOS 作為主要可執行與迭代環境，並保留 Windows 相容方向。它支援原有六種格式，並新增 `.doc`、`.xls`、`.mht`／`.mhtml`、`.html`／`.htm`／`.xhtml`、`.adoc`、`.msg` 與 `.vsd`，搜尋檔名、標題及內容。其他格式與無副檔名檔案會進入本機清冊，可依檔名及副檔名找到。文件留在原位置，索引與搜尋不需要網路或外部 AI。
 
@@ -48,7 +48,7 @@ M6-A 的 DOC／XLS 使用純 JavaScript，不必安裝 Word／Excel；SheetJS �
 
 ```powershell
 node dist/src/cli.js index "C:\Documents" --verbose
-node dist/src/cli.js search "合約" --type pdf,docx --limit 10 --verbose
+node dist/src/cli.js search "合約" --type pdf,docx --page 2 --page-size 20 --verbose
 node dist/src/cli.js search "付款 例外 規格" --all-terms
 node dist/src/cli.js context "合約" --out "$env:USERPROFILE\Desktop\context.json"
 node dist/src/cli.js context "合約" --clipboard
@@ -59,7 +59,8 @@ node dist/src/cli.js rebuild --verbose
 ```
 
 - `index`：新增、重新處理修改文件、重試解析錯誤、略過未變更文件，並移除已確認刪除的索引。可登錄多個不重疊根目錄，新增位置會保留其他索引；不帶路徑則更新全部位置。
-- `search`：只搜尋現有索引，預設最多 20 份文件。`--type` 接受逗號分隔格式，可有前導點且忽略大小寫；例如 `.PDF,DocX`。格式篩選先於排序與結果數限制。
+- `search`：只搜尋現有索引。互動終端每頁預設 20 份，可輸入 `n` 下一頁、`p` 上一頁、`q` 結束；非互動輸出只顯示指定頁並提示下一頁命令。`--page-size` 為 1～100，`--page` 從 1 起算；舊 `--limit` 保留為單次輸出，不能與分頁參數併用。每次都會顯示總命中數，避免把前 20 筆誤認為全部。`--type` 接受逗號分隔格式，可有前導點且忽略大小寫；例如 `.PDF,DocX,xml`。
+- `.xml`：依來源行保存原文，搜尋包含標籤、屬性和值；支援 UTF-8、UTF-16 BOM／XML 起始位元組，以及目前 Node.js `TextDecoder` 支援且由 XML declaration 宣告的編碼。格式不完整仍可作原文搜尋，不解析 DTD 或展開外部實體。
 - `status`：顯示各文件狀態、最後嘗試／完整同步時間、文件問題及最近同步摘要。摘要是歷史紀錄，不是即時磁碟清單。
 - `rebuild [root]`：重解析指定根目錄，省略時處理全部已登錄位置的文件，不修改或刪除來源文件。重建只影響該根目錄；根目錄無法讀取時保留既有資料並回報問題。
 

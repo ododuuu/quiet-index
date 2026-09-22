@@ -211,6 +211,29 @@ export interface SearchResult {
 
 export type SearchMode = "phrase" | "all-terms";
 
+interface RankedSearchResult {
+  result: SearchResult;
+  documentId: number;
+  ordinal: number | null;
+  sourceKind: "filename" | "heading" | "content";
+}
+
+export interface SearchResultPage {
+  page: number;
+  pageSize: number;
+  total: number;
+  pageCount: number;
+  start: number;
+  end: number;
+  results: SearchResult[];
+}
+
+export interface SearchResultSet {
+  readonly total: number;
+  readonly dataVersion: number;
+  page(page: number, pageSize: number): SearchResultPage;
+}
+
 function queryTerms(rawQuery: string, mode: SearchMode): { query: string; terms: string[] } {
   const query = normalize(rawQuery.trim());
   if (!query) throw new Error("搜尋文字不可為空白。");
@@ -230,11 +253,10 @@ function snippetTerm(source: string, terms: readonly string[]): string {
     .sort((a, b) => a.position - b.position)[0]!.term;
 }
 
-export function search(store: IndexStore, rawQuery: string, limit = 20, types?: readonly string[], root?: string,
-  mode: SearchMode = "phrase"): SearchResult[] {
+export function createSearchResultSet(store: IndexStore, rawQuery: string, types?: readonly string[], root?: string,
+  mode: SearchMode = "phrase"): SearchResultSet {
   const { query, terms } = queryTerms(rawQuery, mode);
-  if (!Number.isSafeInteger(limit) || limit <= 0) throw new Error("--limit 必須是正整數。");
-  const results: { result: SearchResult; documentId: number; ordinal: number | null; sourceKind: "filename" | "heading" | "content" }[] = [];
+  const results: RankedSearchResult[] = [];
   type SelectedBlock = { block: StoredBlockRow; source: string; coverage: number; headingHit: boolean };
   for (const { document, blocks } of store.streamCandidates(types, root, terms, mode === "all-terms")) {
     const filename = normalize(document.filename);
@@ -280,15 +302,36 @@ export function search(store: IndexStore, rawQuery: string, limit = 20, types?: 
       filenameOnly: !block, status: document.status, snippetTruncated: false },
       documentId: document.id, ordinal: block?.ordinal ?? null, sourceKind });
   }
-  return results.sort((a, b) => b.result.rank - a.result.rank || b.result.modifiedAtMs - a.result.modifiedAtMs
-    || (a.result.path < b.result.path ? -1 : a.result.path > b.result.path ? 1 : 0))
-    .slice(0, limit).map(({ result, documentId, ordinal, sourceKind }) => {
+  results.sort((a, b) => b.result.rank - a.result.rank || b.result.modifiedAtMs - a.result.modifiedAtMs
+    || (a.result.path < b.result.path ? -1 : a.result.path > b.result.path ? 1 : 0));
+  const dataVersion = store.dataVersion();
+  const materialize = ({ result, documentId, ordinal, sourceKind }: RankedSearchResult): SearchResult => {
       const source = sourceKind === "filename" ? path.basename(result.path)
         : ordinal === null ? path.basename(result.path) : store.blockSource(documentId, ordinal, sourceKind) ?? path.basename(result.path);
       const snippetQuery = snippetTerm(source, terms);
       const snippet = makeSnippet(source, snippetQuery);
       return { ...result, snippet: snippet.text, snippetTruncated: snippet.truncated };
-    });
+  };
+  return {
+    total: results.length,
+    dataVersion,
+    page(page, pageSize) {
+      if (!Number.isSafeInteger(page) || page <= 0) throw new Error("--page 必須是正整數。");
+      if (!Number.isSafeInteger(pageSize) || pageSize <= 0) throw new Error("每頁筆數必須是正整數。");
+      const pageCount = Math.max(1, Math.ceil(results.length / pageSize));
+      if (results.length > 0 && page > pageCount) throw new Error(`頁碼超出範圍；共有 ${pageCount} 頁。`);
+      const offset = (page - 1) * pageSize;
+      const selected = results.slice(offset, offset + pageSize).map(materialize);
+      return { page, pageSize, total: results.length, pageCount,
+        start: selected.length ? offset + 1 : 0, end: offset + selected.length, results: selected };
+    },
+  };
+}
+
+export function search(store: IndexStore, rawQuery: string, limit = 20, types?: readonly string[], root?: string,
+  mode: SearchMode = "phrase"): SearchResult[] {
+  if (!Number.isSafeInteger(limit) || limit <= 0) throw new Error("--limit 必須是正整數。");
+  return createSearchResultSet(store, rawQuery, types, root, mode).page(1, limit).results;
 }
 
 export interface PassageHit {

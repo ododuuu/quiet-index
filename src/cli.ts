@@ -4,7 +4,7 @@ import { interactiveContext, ContextError } from "./context.js";
 import { runWatch, WatchError, resolveWatchDebounce, resolveWatchRescan } from "./watch.js";
 import { actOnDocument, DocumentActionError } from "./open-document.js";
 import { defaultDatabasePath, IndexStore } from "./store.js";
-import { parseTypes, search } from "./search.js";
+import { createSearchResultSet, parseTypes, type SearchResult } from "./search.js";
 import { RootError } from "./scanner.js";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -14,6 +14,7 @@ import { supportedExtensions } from "./model.js";
 import { ClipboardError } from "./clipboard.js";
 import { existsSync } from "node:fs";
 import { OperationCancelledError, type ProgressUpdate } from "./progress.js";
+import { createInterface } from "node:readline/promises";
 
 function safeProgressText(value: string): string {
   return value.replace(/[\u0000-\u001f\u007f]/g, "?");
@@ -49,7 +50,7 @@ export function buildHelpText(): string {
     "LocalDocSearch — 本機文件搜尋",
     "",
     "  docsearch index [root] [--verbose]",
-    "  docsearch search <query> [--all-terms] [--limit <正整數>] [--type <格式清單>] [--root <路徑>] [--verbose]",
+    "  docsearch search <query> [--all-terms] [--page <正整數>] [--page-size <1～100>] [--limit <正整數>] [--type <格式清單>] [--root <路徑>] [--verbose]",
     "  docsearch context [query] (--out <新檔案>|--clipboard) [--all-terms] [--format json|md] [--passages <1～10>] [--select <文件代碼,...>] [--type <格式>] [--root <路徑>] [--limit <1～500>]",
     "  docsearch open <文件代碼> [--dry-run]",
     "  docsearch reveal <文件代碼> [--dry-run]",
@@ -58,7 +59,8 @@ export function buildHelpText(): string {
     "  docsearch rebuild [root] [--verbose]",
     "  docsearch watch [root] [--debounce <毫秒>] [--rescan <毫秒>] [--verbose]",
     "",
-    "search 的 --limit 預設 20；context 預設 100、最高 500。--type 例如 pdf,docx（可有前導點、忽略大小寫）。",
+    "search 在互動終端預設每頁 20 筆，可用 n／p 翻頁、q 結束；非互動輸出可用 --page 與 --page-size。--limit 保留為單次輸出的相容選項。",
+    "context 預設 100、最高 500。--type 例如 pdf,docx,xml（可有前導點、忽略大小寫）。",
     `目前支援 ${[...supportedExtensions].join("、")}（PDF 只擷取文字層）；搜尋前請先執行 index。`,
     "VSD v11 擷取直接儲存的圖形文字；不展開 master／動態欄位，舊版或不支援結構仍可搜尋檔名。",
     "查詢預設為整段子字串；--all-terms 要求空白分隔詞全部出現在同一文件。AND、*、? 不作進階查詢語法。",
@@ -72,6 +74,20 @@ function printSummary(summary: SyncSummary): void {
   console.log(`本次處理狀態：${Object.entries(summary.statuses).map(([status, count]) => `${status}=${count}`).join("、")}`);
   console.log(`略過項目（不計已排除目錄的內部文件）：內建規則 ${summary.skipped.builtin}、使用者規則 ${summary.skipped.user}、連結 ${summary.skipped.link}。${summary.skipped.unsupported ? ` 舊版未登錄格式 ${summary.skipped.unsupported}。` : ""}`);
   console.log(`掃描／讀取錯誤 ${summary.readErrors}；同步耗時 ${summary.elapsedMs} ms。`);
+}
+
+function printSearchResults(results: readonly SearchResult[], verbose: boolean): void {
+  for (const result of results) {
+    console.log(`${result.path} (${result.extension})`);
+    console.log(`  文件代碼：${result.reference}；open ${result.reference}／reveal ${result.reference}`);
+    console.log(`  命中：${result.reason}${result.filenameOnly ? "（僅檔名命中）" : ""}`);
+    if (result.status !== "indexed") console.log(`  解析狀態：${result.status}`);
+    if (result.heading) console.log(`  標題：${result.heading}`);
+    if (result.location) console.log(`  位置：${result.location}`);
+    console.log(`  片段：${result.snippet}${result.snippetTruncated ? "（命中文字已截短）" : ""}`);
+    console.log(`  修改：${new Date(result.modifiedAtMs).toISOString()}`);
+    if (verbose) console.log(`  排序：等級 ${result.rank}；同級按修改時間 ${result.modifiedAtMs} 由新到舊，再按完整路徑固定字串順序：${result.path}`);
+  }
 }
 
 export async function main(args: readonly string[]): Promise<number> {
@@ -97,6 +113,11 @@ export async function main(args: readonly string[]): Promise<number> {
   let rootFilter: string | undefined;
   let dryRun = false;
   let limit = command === "context" ? 100 : 20;
+  let limitSpecified = false;
+  let searchPage = 1;
+  let searchPageSpecified = false;
+  let searchPageSize = 20;
+  let searchPageSizeSpecified = false;
   let verbose = false;
   let types: string[] | undefined;
   try {
@@ -171,6 +192,15 @@ export async function main(args: readonly string[]): Promise<number> {
           const value = args[++i];
           if (!value || !/^[1-9]\d*$/.test(value) || !Number.isSafeInteger(Number(value))) throw new Error("--limit 必須是正整數。");
           limit = Number(value);
+          limitSpecified = true;
+        } else if (option === "--page" && command === "search") {
+          const value = args[++i];
+          if (!value || !/^[1-9]\d*$/.test(value) || !Number.isSafeInteger(Number(value))) throw new Error("--page 必須是正整數。");
+          searchPage = Number(value); searchPageSpecified = true;
+        } else if (option === "--page-size" && command === "search") {
+          const value = args[++i];
+          if (!value || !/^[1-9]\d*$/.test(value) || Number(value) > 100) throw new Error("--page-size 必須是 1～100 的整數。");
+          searchPageSize = Number(value); searchPageSizeSpecified = true;
         } else if (option === "--root") {
           const value = args[++i];
           if (!value || value.startsWith("--")) throw new Error("--root 缺少根目錄路徑。");
@@ -179,9 +209,10 @@ export async function main(args: readonly string[]): Promise<number> {
           const value = args[++i];
           if (value === undefined) throw new Error("--type 缺少格式清單。");
           types = parseTypes(value);
-        } else throw new Error(command === "context" ? "用法：docsearch context [query] (--out <新檔案>|--clipboard) [--all-terms] [--select <文件代碼,...>] [--limit <1～500>] [--type <格式>] [--root <路徑>]" : "用法：docsearch search <query> [--all-terms] [--limit <正整數>] [--type <格式清單>] [--root <路徑>] [--verbose]");
+        } else throw new Error(command === "context" ? "用法：docsearch context [query] (--out <新檔案>|--clipboard) [--all-terms] [--select <文件代碼,...>] [--limit <1～500>] [--type <格式>] [--root <路徑>]" : "用法：docsearch search <query> [--all-terms] [--page <正整數>] [--page-size <1～100>] [--limit <正整數>] [--type <格式清單>] [--root <路徑>] [--verbose]");
       }
       if (command === "context" && (Boolean(contextOutput) === contextClipboard || limit > 500)) throw new Error("context 需要在 --out <新檔案> 與 --clipboard 中擇一；--limit 限 1～500；--format 為 json|md，--passages 為 1～10。");
+      if (command === "search" && limitSpecified && (searchPageSpecified || searchPageSizeSpecified)) throw new Error("--limit 不可與 --page 或 --page-size 同時使用。");
     }
   } catch (error) {
     console.error((error as Error).message);
@@ -343,27 +374,69 @@ export async function main(args: readonly string[]): Promise<number> {
       for (const issue of issues) console.log(`  ${issue.path} [${issue.status}/${issue.errorCode ?? "UNKNOWN"}]`);
       return 0;
     }
-    const results = search(store, args[1]!, limit, types, selectedRoot, allTerms ? "all-terms" : "phrase");
+    const resultSet = createSearchResultSet(store, args[1]!, types, selectedRoot, allTerms ? "all-terms" : "phrase");
+    const availablePages = Math.max(1, Math.ceil(resultSet.total / searchPageSize));
+    if (!limitSpecified && searchPage > availablePages) {
+      console.error(`頁碼超出範圍；共有 ${availablePages} 頁。`);
+      return 2;
+    }
     console.log(`搜尋根目錄：${selectedRoot ?? `全部 ${roots.length} 個`}`);
     console.log(`查詢模式：${allTerms ? "全部關鍵字" : "精確片語"}`);
-    console.log(`格式範圍：${types?.join(",") ?? "全部支援格式"}；回傳 ${results.length} 份文件。`);
+    console.log(`格式範圍：${types?.join(",") ?? "全部已登錄格式"}。`);
     for (const root of selectedRoot ? [selectedRoot] : roots) {
       const syncReport = store.getLastSyncReport(root);
       console.log(`根目錄：${root}；最後完整同步：${syncReport.successfulAt ?? "尚未完成"}（搜尋現有索引）`);
       if (syncReport.complete === false) console.log("提示：最近同步不完整；結果可能包含尚未確認的既有文件。");
     }
-    if (results.length === 0) console.log(Object.values(store.counts()).every(count => count === 0)
-      ? "索引內沒有支援的文件；請確認根目錄、排除規則與同步狀態。" : "沒有符合的結果。");
-    for (const result of results) {
-      console.log(`${result.path} (${result.extension})`);
-      console.log(`  文件代碼：${result.reference}；open ${result.reference}／reveal ${result.reference}`);
-      console.log(`  命中：${result.reason}${result.filenameOnly ? "（僅檔名命中）" : ""}`);
-      if (result.status !== "indexed") console.log(`  解析狀態：${result.status}`);
-      if (result.heading) console.log(`  標題：${result.heading}`);
-      if (result.location) console.log(`  位置：${result.location}`);
-      console.log(`  片段：${result.snippet}${result.snippetTruncated ? "（命中文字已截短）" : ""}`);
-      console.log(`  修改：${new Date(result.modifiedAtMs).toISOString()}`);
-      if (verbose) console.log(`  排序：等級 ${result.rank}；同級按修改時間 ${result.modifiedAtMs} 由新到舊，再按完整路徑固定字串順序：${result.path}`);
+    if (resultSet.total === 0) {
+      console.log(Object.values(store.counts()).every(count => count === 0)
+        ? "索引內沒有支援的文件；請確認根目錄、排除規則與同步狀態。" : "沒有符合的結果。");
+      return 0;
+    }
+    if (limitSpecified) {
+      const page = resultSet.page(1, limit);
+      console.log(`符合 ${page.total} 份文件；顯示前 ${page.results.length} 份（--limit 單次輸出）。`);
+      printSearchResults(page.results, verbose);
+      return 0;
+    }
+    const interactive = Boolean(process.stdin.isTTY && process.stdout.isTTY && !searchPageSpecified);
+    let currentPage = searchPage;
+    const render = () => {
+      const page = resultSet.page(currentPage, searchPageSize);
+      console.log(`符合 ${page.total} 份文件；第 ${page.page}/${page.pageCount} 頁，本頁 ${page.start}–${page.end}；回傳 ${page.results.length} 份。`);
+      printSearchResults(page.results, verbose);
+      return page;
+    };
+    let page = render();
+    if (!interactive || page.pageCount === 1) {
+      if (!interactive && page.page < page.pageCount) console.log(`提示：尚有結果；使用 --page ${page.page + 1} --page-size ${page.pageSize} 查看下一頁。`);
+      return 0;
+    }
+    const readline = createInterface({ input: process.stdin, output: process.stdout });
+    let inputClosed = false;
+    readline.on("close", () => { inputClosed = true; });
+    readline.on("SIGINT", () => readline.close());
+    try {
+      while (true) {
+        if (inputClosed) break;
+        const abort = new AbortController();
+        const stop = () => abort.abort();
+        readline.once("close", stop);
+        let rawAnswer: string;
+        try { rawAnswer = await readline.question("[n] 下一頁  [p] 上一頁  [q] 結束：", { signal: abort.signal }); }
+        catch { break; }
+        finally { readline.off("close", stop); }
+        const answer = rawAnswer.trim().toLowerCase();
+        if (answer === "q") break;
+        if (answer !== "n" && answer !== "p") { console.log("請輸入 n、p 或 q。"); continue; }
+        const nextPage = answer === "n" ? currentPage + 1 : currentPage - 1;
+        if (nextPage < 1 || nextPage > page.pageCount) { console.log(nextPage < 1 ? "已是第一頁。" : "已是最後一頁。"); continue; }
+        if (store.dataVersion() !== resultSet.dataVersion) { console.error("SEARCH_INDEX_CHANGED：索引已在翻頁期間更新，請重新執行搜尋以維持一致排序。"); return 3; }
+        currentPage = nextPage;
+        page = render();
+      }
+    } finally {
+      readline.close();
     }
     return 0;
   } catch (error) {

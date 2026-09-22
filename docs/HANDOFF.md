@@ -1,6 +1,10 @@
 # 跨對話交接方式
 
-## 最新交接：0.26.3（2026-09-22）
+## 最新交接：0.27.0（2026-09-22）
+
+M24 依 SPEC §35／D043 實作搜尋分頁與 XML 原文索引。搜尋先固定完整命中排序及總數，互動 TTY 以 n／p／q 翻頁，非互動使用 --page／--page-size；舊 --limit 為互斥的單次輸出。每頁才回讀片段，索引在翻頁期間變更會停止。XML 逐行保留標籤、屬性和值，支援 BOM／UTF-16 起始位元組／declaration 編碼，不解析 entity；舊 unsupported XML 普通 index 即重試。本機完整測試結果與交付包資訊以 STATUS 最新段落為準；公司 Windows 尚未驗收。
+
+## 前一版交接：0.26.3（2026-09-22）
 
 公司索引與 status 已成功，但真實搜尋兩次證實 too many SQL variables；40,000 區塊合成案例在舊程式重現，固定參數 json_each 修正後通過。另測 33,001 payload，無需 rebuild。npm test 改逐檔、watch 延後載入 sync。Mac Node 26.7.0 全套 149 通過、0 失敗、0 取消、1 Windows CMD 略過。0.26.2 timeout 根因說法已撤回，不能再沿用。公司 10 份 PPTX 缺部件錯誤仍待診斷；0.26.3 實際搜尋及完整 Windows 測試尚待回報。
 

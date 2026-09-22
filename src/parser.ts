@@ -12,6 +12,7 @@ import { pdfParser } from "./parsers/pdf.js";
 import { docParser, xlsParser } from "./parsers/legacy.js";
 import { htmlParser, mhtParser } from "./parsers/web.js";
 import { msgParser } from "./parsers/msg.js";
+import { xmlParser } from "./parsers/xml.js";
 
 export const MAX_FILE_BYTES = 100 * 1024 * 1024;
 
@@ -27,6 +28,7 @@ const parsers = new Map<string, DocumentParser>([
   [".html", htmlParser], [".htm", htmlParser], [".xhtml", htmlParser],
   [".mht", mhtParser], [".mhtml", mhtParser],
   [".adoc", textParser],
+  [xmlParser.extension, xmlParser],
   [msgParser.extension, msgParser],
   [vsdParser.extension, vsdParser],
 ]);
