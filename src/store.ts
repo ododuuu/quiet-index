@@ -419,21 +419,45 @@ export class IndexStore {
     const bloom = this.db.prepare("SELECT bloom FROM document_blooms WHERE document_id = ?");
     const payloadBlooms = this.db.prepare("SELECT payload_ordinal, bloom FROM document_payload_blooms WHERE document_id = ? ORDER BY payload_ordinal");
     for (const document of documents.iterate(...values) as Iterable<StoredDocumentRow>) {
-      const row = bloom.get(document.id) as { bloom: Uint8Array } | undefined;
-      const possible = !terms || !row || (allTerms ? terms.some(term => bloomMayContain(row.bloom, term)) : bloomMayContain(row.bloom, terms[0]!));
-      if (!possible) { yield { document, blocks: [] }; continue; }
-      const summaries = payloadBlooms.all(document.id) as { payload_ordinal: number; bloom: Uint8Array }[];
-      // Missing payload summaries are an old/incomplete index: retain the
-      // document-level fallback rather than risking a false negative.
-      const candidates = !terms || !summaries.length || terms.some(term => term.length < 3)
-        ? undefined
-        : summaries.filter(summary => bloomMayContainAny(summary.bloom, allTerms ? terms : [terms[0]!]))
-          .map(summary => summary.payload_ordinal);
-      // A trigram may straddle two compressed payloads.  The document bloom
-      // has already established that the document is possible, so an empty
-      // payload set must conservatively read it rather than lose that match.
-      yield { document, blocks: candidates?.length ? this.streamBlocksFor(document.id, candidates) : this.streamBlocksFor(document.id) };
+      yield this.candidateFromBlooms(document, bloom, payloadBlooms, terms, allTerms);
     }
+  }
+
+  *streamCandidatesByIds(ids: readonly number[], terms?: readonly string[], allTerms = false): Generator<StreamingCandidate> {
+    if (!ids.length) return;
+    const bloom = this.db.prepare("SELECT bloom FROM document_blooms WHERE document_id = ?");
+    const payloadBlooms = this.db.prepare("SELECT payload_ordinal, bloom FROM document_payload_blooms WHERE document_id = ? ORDER BY payload_ordinal");
+    const rows = this.db.prepare(`SELECT id, path, filename, extension, size_bytes, modified_at_ms, status FROM documents
+      WHERE id IN (SELECT value FROM json_each(?))`).all(JSON.stringify([...new Set(ids)])) as unknown as StoredDocumentRow[];
+    const byId = new Map(rows.map(row => [row.id, row]));
+    for (const id of ids) {
+      const document = byId.get(id);
+      if (!document) continue;
+      yield this.candidateFromBlooms(document, bloom, payloadBlooms, terms, allTerms);
+    }
+  }
+
+  private candidateFromBlooms(
+    document: StoredDocumentRow,
+    bloom: { get(id: number): unknown },
+    payloadBlooms: { all(id: number): unknown },
+    terms?: readonly string[],
+    allTerms = false,
+  ): StreamingCandidate {
+    const row = bloom.get(document.id) as { bloom: Uint8Array } | undefined;
+    const possible = !terms || !row || (allTerms ? terms.some(term => bloomMayContain(row.bloom, term)) : bloomMayContain(row.bloom, terms[0]!));
+    if (!possible) return { document, blocks: [] };
+    const summaries = payloadBlooms.all(document.id) as { payload_ordinal: number; bloom: Uint8Array }[];
+    // Missing payload summaries are an old/incomplete index: retain the
+    // document-level fallback rather than risking a false negative.
+    const candidates = !terms || !summaries.length || terms.some(term => term.length < 3)
+      ? undefined
+      : summaries.filter(summary => bloomMayContainAny(summary.bloom, allTerms ? terms : [terms[0]!]))
+        .map(summary => summary.payload_ordinal);
+    // A trigram may straddle two compressed payloads.  The document bloom
+    // has already established that the document is possible, so an empty
+    // payload set must conservatively read it rather than lose that match.
+    return { document, blocks: candidates?.length ? this.streamBlocksFor(document.id, candidates) : this.streamBlocksFor(document.id) };
   }
 
   candidateByPath(filePath: string): SearchCandidate | undefined {

@@ -4,7 +4,8 @@ import { interactiveContext, ContextError } from "./context.js";
 import { runWatch, WatchError, resolveWatchDebounce, resolveWatchRescan } from "./watch.js";
 import { actOnDocument, DocumentActionError } from "./open-document.js";
 import { defaultDatabasePath, IndexStore } from "./store.js";
-import { createSearchResultSet, parseTypes, type SearchResult } from "./search.js";
+import { parseTypes, type SearchResult } from "./search.js";
+import { runSearchSession, SearchSession, SearchIndexChangedError } from "./search-session.js";
 import { RootError } from "./scanner.js";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -59,7 +60,7 @@ export function buildHelpText(): string {
     "  docsearch rebuild [root] [--verbose]",
     "  docsearch watch [root] [--debounce <毫秒>] [--rescan <毫秒>] [--verbose]",
     "",
-    "search 在互動終端預設每頁 20 筆，可用 n／p 翻頁、q 結束；非互動輸出可用 --page 與 --page-size。--limit 保留為單次輸出的相容選項。",
+    "search 在互動終端預設每頁 20 筆，可用 n／p 翻頁、/ 關鍵字縮小結果、back 撤回、reset 重設、q 結束；單頁與零結果仍可操作。非互動輸出可用 --page 與 --page-size。--limit 保留為單次輸出的相容選項。",
     "context 預設 100、最高 500。--type 例如 pdf,docx,xml（可有前導點、忽略大小寫）。",
     `目前支援 ${[...supportedExtensions].join("、")}（PDF 只擷取文字層）；搜尋前請先執行 index。`,
     "VSD v11 擷取直接儲存的圖形文字；不展開 master／動態欄位，舊版或不支援結構仍可搜尋檔名。",
@@ -76,17 +77,18 @@ function printSummary(summary: SyncSummary): void {
   console.log(`掃描／讀取錯誤 ${summary.readErrors}；同步耗時 ${summary.elapsedMs} ms。`);
 }
 
-function printSearchResults(results: readonly SearchResult[], verbose: boolean): void {
+function printSearchResults(results: readonly SearchResult[], verbose: boolean, write: (text: string) => void = console.log): void {
   for (const result of results) {
-    console.log(`${result.path} (${result.extension})`);
-    console.log(`  文件代碼：${result.reference}；open ${result.reference}／reveal ${result.reference}`);
-    console.log(`  命中：${result.reason}${result.filenameOnly ? "（僅檔名命中）" : ""}`);
-    if (result.status !== "indexed") console.log(`  解析狀態：${result.status}`);
-    if (result.heading) console.log(`  標題：${result.heading}`);
-    if (result.location) console.log(`  位置：${result.location}`);
-    console.log(`  片段：${result.snippet}${result.snippetTruncated ? "（命中文字已截短）" : ""}`);
-    console.log(`  修改：${new Date(result.modifiedAtMs).toISOString()}`);
-    if (verbose) console.log(`  排序：等級 ${result.rank}；同級按修改時間 ${result.modifiedAtMs} 由新到舊，再按完整路徑固定字串順序：${result.path}`);
+    write(`${result.path} (${result.extension})`);
+    write(`  文件代碼：${result.reference}；open ${result.reference}／reveal ${result.reference}`);
+    write(`  命中：${result.reason}${result.filenameOnly ? "（僅檔名命中）" : ""}`);
+    if (result.condition) write(`  條件：${result.condition}`);
+    if (result.status !== "indexed") write(`  解析狀態：${result.status}`);
+    if (result.heading) write(`  標題：${result.heading}`);
+    if (result.location) write(`  位置：${result.location}`);
+    write(`  片段：${result.snippet}${result.snippetTruncated ? "（命中文字已截短）" : ""}`);
+    write(`  修改：${new Date(result.modifiedAtMs).toISOString()}`);
+    if (verbose) write(`  排序：等級 ${result.rank}；同級按修改時間 ${result.modifiedAtMs} 由新到舊，再按完整路徑固定字串順序：${result.path}`);
   }
 }
 
@@ -374,8 +376,8 @@ export async function main(args: readonly string[]): Promise<number> {
       for (const issue of issues) console.log(`  ${issue.path} [${issue.status}/${issue.errorCode ?? "UNKNOWN"}]`);
       return 0;
     }
-    const resultSet = createSearchResultSet(store, args[1]!, types, selectedRoot, allTerms ? "all-terms" : "phrase");
-    const availablePages = Math.max(1, Math.ceil(resultSet.total / searchPageSize));
+    const session = new SearchSession(store, args[1]!, types, selectedRoot, allTerms ? "all-terms" : "phrase");
+    const availablePages = Math.max(1, Math.ceil(session.originalTotal / searchPageSize));
     if (!limitSpecified && searchPage > availablePages) {
       console.error(`頁碼超出範圍；共有 ${availablePages} 頁。`);
       return 2;
@@ -388,28 +390,22 @@ export async function main(args: readonly string[]): Promise<number> {
       console.log(`根目錄：${root}；最後完整同步：${syncReport.successfulAt ?? "尚未完成"}（搜尋現有索引）`);
       if (syncReport.complete === false) console.log("提示：最近同步不完整；結果可能包含尚未確認的既有文件。");
     }
-    if (resultSet.total === 0) {
+    const interactive = Boolean(process.stdin.isTTY && process.stdout.isTTY && !searchPageSpecified && !limitSpecified);
+    if (session.originalTotal === 0) {
       console.log(Object.values(store.counts()).every(count => count === 0)
         ? "索引內沒有支援的文件；請確認根目錄、排除規則與同步狀態。" : "沒有符合的結果。");
-      return 0;
-    }
-    if (limitSpecified) {
-      const page = resultSet.page(1, limit);
+      if (!interactive) return 0;
+    } else if (limitSpecified) {
+      const page = session.page(1, limit);
       console.log(`符合 ${page.total} 份文件；顯示前 ${page.results.length} 份（--limit 單次輸出）。`);
       printSearchResults(page.results, verbose);
       return 0;
     }
-    const interactive = Boolean(process.stdin.isTTY && process.stdout.isTTY && !searchPageSpecified);
-    let currentPage = searchPage;
-    const render = () => {
-      const page = resultSet.page(currentPage, searchPageSize);
+    if (!interactive) {
+      const page = session.page(searchPage, searchPageSize);
       console.log(`符合 ${page.total} 份文件；第 ${page.page}/${page.pageCount} 頁，本頁 ${page.start}–${page.end}；回傳 ${page.results.length} 份。`);
       printSearchResults(page.results, verbose);
-      return page;
-    };
-    let page = render();
-    if (!interactive || page.pageCount === 1) {
-      if (!interactive && page.page < page.pageCount) console.log(`提示：尚有結果；使用 --page ${page.page + 1} --page-size ${page.pageSize} 查看下一頁。`);
+      if (page.page < page.pageCount) console.log(`提示：尚有結果；使用 --page ${page.page + 1} --page-size ${page.pageSize} 查看下一頁。`);
       return 0;
     }
     const readline = createInterface({ input: process.stdin, output: process.stdout });
@@ -417,33 +413,31 @@ export async function main(args: readonly string[]): Promise<number> {
     readline.on("close", () => { inputClosed = true; });
     readline.on("SIGINT", () => readline.close());
     try {
-      while (true) {
-        if (inputClosed) break;
-        const abort = new AbortController();
-        const stop = () => abort.abort();
-        readline.once("close", stop);
-        let rawAnswer: string;
-        try { rawAnswer = await readline.question("[n] 下一頁  [p] 上一頁  [q] 結束：", { signal: abort.signal }); }
-        catch { break; }
-        finally { readline.off("close", stop); }
-        const answer = rawAnswer.trim().toLowerCase();
-        if (answer === "q") break;
-        if (answer !== "n" && answer !== "p") { console.log("請輸入 n、p 或 q。"); continue; }
-        const nextPage = answer === "n" ? currentPage + 1 : currentPage - 1;
-        if (nextPage < 1 || nextPage > page.pageCount) { console.log(nextPage < 1 ? "已是第一頁。" : "已是最後一頁。"); continue; }
-        if (store.dataVersion() !== resultSet.dataVersion) { console.error("SEARCH_INDEX_CHANGED：索引已在翻頁期間更新，請重新執行搜尋以維持一致排序。"); return 3; }
-        currentPage = nextPage;
-        page = render();
-      }
+      return await runSearchSession(session, {
+        pageSize: searchPageSize,
+        renderResults: (results, write) => printSearchResults(results, verbose, write),
+      }, {
+        write: text => console.log(text),
+        writeError: text => console.error(text),
+        ask: async prompt => {
+          if (inputClosed) return null;
+          const abort = new AbortController();
+          const stop = () => abort.abort();
+          readline.once("close", stop);
+          try { return await readline.question(prompt, { signal: abort.signal }); }
+          catch { return null; }
+          finally { readline.off("close", stop); }
+        },
+      });
     } finally {
       readline.close();
     }
-    return 0;
   } catch (error) {
     if (error instanceof OperationCancelledError) { console.error(`${error.code}：${error.message}`); return 130; }
     const sqliteCode = sqliteExtendedCode(error);
     if (sqliteCode === 776) { console.error("INDEX_RECOVERY_REQUIRED：索引有未完成交易，需要由下一次 index 安全回復；請勿刪除 journal 或 WAL。"); return 3; }
     if (sqliteCode !== undefined && ((sqliteCode & 0xff) === 5 || (sqliteCode & 0xff) === 6)) { console.error("INDEX_BUSY：索引目前由另一個程序使用，請稍後重試。"); return 3; }
+    if (error instanceof SearchIndexChangedError) { console.error(`SEARCH_INDEX_CHANGED：${error.message}`); return 3; }
     if (error instanceof IndexBusyError || error instanceof ContextError || error instanceof WatchError || error instanceof ClipboardError) { console.error(`${error.code}：${error.message}`); return 3; }
     if (error instanceof DocumentActionError) { console.error(`${error.code}：${error.message}`); return 3; }
     if (error instanceof RootError || error instanceof IgnoreConfigurationError) { console.error(error.message); return 3; }
