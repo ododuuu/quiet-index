@@ -1,6 +1,6 @@
 # LocalDocSearch
 
-目前版本為 **0.30.0**：新增 `.java`／`.sql`／`.js` 原文搜尋、嚴格 UTF-8 失敗後回退 Big5、舊文字索引一次性升級、百分比進度，以及 `status` 容量／`--issues`／`--types`。已登錄子根後，可再 `index` 上層目錄做範圍合併。Windows 磁碟根目錄請用 `D:/`。0.28.0 起互動搜尋可用 `/ 關鍵字` 縮小結果。0.29.1 公司 D 槽人工執行已回報成功；0.30.0 請用普通 `index` 升級，公司 Windows 驗收尚待回報。
+目前版本為 **0.31.0**：`autoupdate start|status|stop` 可在關閉原終端後繼續更新已登錄根目錄；檔案變更做局部更新，並以定期完整校正補事件遺漏。不做開機／登入自啟，不安裝 Windows Service。0.30.0 起新增 `.java`／`.sql`／`.js` 原文搜尋、嚴格 UTF-8 失敗後回退 Big5。已登錄子根後，可再 `index` 上層目錄做範圍合併。Windows 磁碟根目錄請用 `D:/`。0.28.0 起互動搜尋可用 `/ 關鍵字` 縮小結果。公司 Windows 0.31.0 驗收尚待回報。
 
 LocalDocSearch 0.26.2 是純本機 CLI，目前以 macOS 作為主要可執行與迭代環境，並保留 Windows 相容方向。它支援原有六種格式，並新增 `.doc`、`.xls`、`.mht`／`.mhtml`、`.html`／`.htm`／`.xhtml`、`.adoc`、`.msg` 與 `.vsd`，搜尋檔名、標題及內容。其他格式與無副檔名檔案會進入本機清冊，可依檔名及副檔名找到。文件留在原位置，索引與搜尋不需要網路或外部 AI。
 
@@ -53,6 +53,9 @@ node dist/src/cli.js search "付款 例外 規格" --all-terms
 node dist/src/cli.js context "合約" --out "$env:USERPROFILE\Desktop\context.json"
 node dist/src/cli.js context "合約" --clipboard
 node dist/src/cli.js watch
+node dist/src/cli.js autoupdate start
+node dist/src/cli.js autoupdate status
+node dist/src/cli.js autoupdate stop
 node dist/src/cli.js status
 node dist/src/cli.js status --issues --types
 node dist/src/cli.js rebuild --verbose

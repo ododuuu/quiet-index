@@ -2,6 +2,7 @@
 import { IndexBusyError } from "./write-lock.js";
 import { interactiveContext, ContextError } from "./context.js";
 import { runWatch, WatchError, resolveWatchDebounce, resolveWatchRescan } from "./watch.js";
+import { runAutoupdateCommand } from "./autoupdate.js";
 import { actOnDocument, DocumentActionError } from "./open-document.js";
 import { defaultDatabasePath, formatMib, IndexStore, type ExtensionStats, type StorageFootprint } from "./store.js";
 import { parseTypes, type SearchResult } from "./search.js";
@@ -82,6 +83,9 @@ export function buildHelpText(): string {
     "  docsearch status [--issues] [--types]",
     "  docsearch rebuild [root] [--verbose]",
     "  docsearch watch [root] [--debounce <毫秒>] [--rescan <毫秒>] [--verbose]",
+    "  docsearch autoupdate start [--debounce <毫秒>] [--reconcile <毫秒>]",
+    "  docsearch autoupdate status",
+    "  docsearch autoupdate stop",
     "",
     "search 在互動終端預設每頁 20 筆，可用 n／p 翻頁、/ 關鍵字縮小結果、back 撤回、reset 重設、q 結束；單頁與零結果仍可操作。非互動輸出可用 --page 與 --page-size。--limit 保留為單次輸出的相容選項。",
     "index 可將涵蓋的既有子根合併為上層登錄；已包含於上層的子目錄只同步該子樹。--root 可為已登錄根目錄或其下子樹／已合併原子根。",
@@ -93,6 +97,7 @@ export function buildHelpText(): string {
     "查詢預設為整段子字串；--all-terms 要求空白分隔詞全部出現在同一文件。AND、*、? 不作進階查詢語法。",
     "context 內可用 s <查詢> 跨查詢累積選取，b 查看已選清單，r <編號> 移除。",
     "status 預設顯示容量與問題彙總；--issues 列出文件問題與各根同步診斷，--types 依副檔名統計。",
+    "autoupdate start 在關閉原終端後繼續更新；不安裝服務、不開機自啟。重開機後 status 會顯示已停止。",
   ].join("\n");
 }
 
@@ -125,6 +130,7 @@ export async function main(args: readonly string[]): Promise<number> {
     return 0;
   }
   const command = args[0];
+  if (command === "autoupdate") return runAutoupdateCommand(args.slice(1));
   if (!["index", "search", "status", "rebuild", "open", "reveal", "roots", "context", "watch"].includes(command ?? "")) {
     console.error(`未知命令：${command}`);
     return 2;

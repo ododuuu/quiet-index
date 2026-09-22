@@ -1,5 +1,15 @@
 # 跨對話交接方式
 
+## 已交付：0.31.0 背景自動更新（2026-09-22）
+
+依 SPEC §39／D047 實作。局部更新服務處理精確檔案新增／修改／刪除與子樹校正；前景 `watch` 與 `autoupdate start|status|stop` 共用 `LiveUpdateEngine`。不得把每個事件全根 `sync()` 當成完成。detached 啟動後必須控制通道握手；status 詢問活體實例；stop 不 PID 殺 Node。待機不持 writer lock。完整校正預設 6 小時且背景不得為 0。編碼政策維持 0.30.0。
+
+本機測試見 `docs/0.31.0-VALIDATION.md`。公司 Windows 人工驗收尚未回報。下一步若無新規格，先等公司驗收或使用者指定下一版。
+
+建議 commit：`Implement 0.31.0 background autoupdate with local file updates.`
+
+以下保留歷史交接；驗收現況以本節及 STATUS 為準。
+
 ## 交接給 Grok：實作 0.31.0 背景自動更新（2026-09-22）
 
 0.31.0 的權威規格是 SPEC §39，設計理由見 D047，目前僅完成文件、尚未實作。本版起不再新增 M 編號；package、tag、驗證文件與交付包統一使用 0.31.0。

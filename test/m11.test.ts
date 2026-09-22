@@ -9,6 +9,7 @@ import { IndexStore } from "../src/store.js";
 import { sync } from "../src/sync.js";
 import { search } from "../src/search.js";
 import { runWatch, shouldIgnoreWatchPath, resolveWatchDebounce, WatchError } from "../src/watch.js";
+import { applyFileUpdate } from "../src/local-update.js";
 
 test("M11 ignore rules skip editor and VCS noise", () => {
   assert.equal(shouldIgnoreWatchPath(".git/HEAD"), true);
@@ -88,17 +89,18 @@ test("M11 watch debounces and syncs the dirty root once", async () => {
   assert.equal(timers.length, 1);
   assert.equal(timers[0]!.ms, 200);
   const pending = timers.shift()!;
-  const synced = new Promise<void>(resolve => {
-    const previous = syncCalls.length;
+  const updated = new Promise<void>((resolve, reject) => {
+    const start = Date.now();
+    pending.fn();
     const check = () => {
-      if (syncCalls.length > previous) resolve();
+      if (search(store, "關鍵字").length) resolve();
+      else if (Date.now() - start > 5000) reject(new Error("local update did not become searchable"));
       else setImmediate(check);
     };
-    pending.fn();
     check();
   });
-  await synced;
-  assert.equal(syncCalls.length, 1);
+  await updated;
+  assert.equal(syncCalls.length, 0, "file events must not run a full-root sync");
   assert.equal(search(store, "關鍵字").length, 1);
 
   emitter.emit("change", "change", ".git/HEAD");
@@ -144,6 +146,7 @@ async function lifecycle(t: test.TestContext) {
   let closed = false;
   watcher.close = () => { closed = true; };
   let calls = 0;
+  let localCalls = 0;
   const timers = new Map<number, () => void>();
   let id = 0;
   const options = {
@@ -157,6 +160,11 @@ async function lifecycle(t: test.TestContext) {
       if (calls === 1) { entered.resolve(); await release.promise; }
       return sync(...args);
     }) as typeof sync,
+    applyFileUpdate: (async (...args: Parameters<typeof applyFileUpdate>) => {
+      localCalls++;
+      if (localCalls === 1) { entered.resolve(); await release.promise; }
+      return applyFileUpdate(...args);
+    }) as typeof applyFileUpdate,
     setTimer: (fn: () => void) => { timers.set(++id, fn); return id as unknown as ReturnType<typeof setTimeout>; },
     clearTimer: (timer: ReturnType<typeof setTimeout>) => { timers.delete(timer as unknown as number); },
   };
@@ -165,7 +173,7 @@ async function lifecycle(t: test.TestContext) {
     waitForStop: () => stop.promise,
   };
   return { store, root, stop, entered, release, ready, watcher, options, io, timers,
-    calls: () => calls, closed: () => closed };
+    calls: () => calls, localCalls: () => localCalls, closed: () => closed };
 }
 
 test("M11 startup events survive initial sync and trigger one follow-up", async t => {
@@ -182,7 +190,8 @@ test("M11 startup events survive initial sync and trigger one follow-up", async 
   h.timers.delete(id); callback();
   h.stop.resolve();
   assert.equal(await running, 0);
-  assert.equal(h.calls(), 2);
+  assert.equal(h.calls(), 1);
+  assert.ok(h.localCalls() >= 1);
   assert.ok(h.closed());
 });
 
@@ -204,7 +213,8 @@ test("M11 stop waits for active writes and prevents queued or late work", async 
   h.watcher.emit("change", "change", "a.txt");
   h.release.resolve();
   assert.equal(await running, 0);
-  assert.equal(h.calls(), 1);
+  assert.equal(h.localCalls(), 1);
+  assert.equal(h.calls(), 0);
   assert.equal(h.timers.size, 0);
 });
 

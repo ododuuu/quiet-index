@@ -19,6 +19,35 @@ export function defaultDatabasePath(): string {
   return path.join(base, "LocalDocSearch", "index.db");
 }
 
+export function dataDirectory(databasePath = defaultDatabasePath()): string {
+  return path.dirname(path.resolve(databasePath));
+}
+
+export function indexArtifactPaths(databasePath: string): string[] {
+  const resolved = path.resolve(databasePath);
+  const dir = path.dirname(resolved);
+  return [
+    resolved,
+    `${resolved}-wal`, `${resolved}-shm`, `${resolved}-journal`,
+    `${resolved}.writer.sqlite`, `${resolved}.writer.sqlite-wal`, `${resolved}.writer.sqlite-shm`, `${resolved}.writer.sqlite-journal`,
+    `${resolved}.live.sqlite`, `${resolved}.live.sqlite-wal`, `${resolved}.live.sqlite-shm`, `${resolved}.live.sqlite-journal`,
+    path.join(dir, "autoupdate.json"),
+    path.join(dir, "autoupdate.json.tmp"),
+    path.join(dir, "autoupdate.log"),
+    path.join(dir, "autoupdate.log.1"),
+    path.join(dir, "autoupdate.log.2"),
+    path.join(dir, "autoupdate.log.3"),
+    path.join(dir, "autoupdate.log.4"),
+  ];
+}
+
+export function isIndexArtifact(filePath: string, databasePath: string): boolean {
+  const resolved = path.resolve(filePath);
+  if (indexArtifactPaths(databasePath).some(item => item === resolved)) return true;
+  const base = path.basename(resolved);
+  return base.startsWith("autoupdate-") && (base.endsWith(".sock") || base.endsWith(".sock.tmp"));
+}
+
 export interface StoredDocumentRow {
   id: number;
   path: string;
@@ -588,6 +617,18 @@ export class IndexStore {
       throw error;
     }
     return removed;
+  }
+
+  removeDocument(filePath: string): boolean {
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const result = this.db.prepare("DELETE FROM documents WHERE path = ?").run(filePath);
+      this.db.exec("COMMIT");
+      return Number(result.changes) > 0;
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
   }
 
   clearDocuments(root?: string): void {

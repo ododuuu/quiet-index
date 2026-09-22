@@ -6,7 +6,7 @@ import { parseDocument } from "./parser.js";
 import { scan, validateRoot, RootError } from "./scanner.js";
 import { canonicalizeRootInput, planRootOperation, resolveUserRootPath, runtimePathPlatform, type RootOperationKind } from "./root-plan.js";
 import { emptyStatusCounts, needsTextParseUpgrade, supportedExtensions, type Diagnostic, type DocumentRecord, type SyncSummary } from "./model.js";
-import type { IndexStore } from "./store.js";
+import { indexArtifactPaths, isIndexArtifact, type IndexStore } from "./store.js";
 import { throwIfAborted, yieldToEvents, type ProgressUpdate } from "./progress.js";
 
 export interface SyncReport extends SyncSummary {
@@ -27,6 +27,7 @@ export interface SyncReport extends SyncSummary {
 export interface SyncOptions {
   rebuild?: boolean;
   requireRegistered?: boolean;
+  lockHeld?: boolean;
   // 注入相同契約以測試零解析及讀檔失敗，不改變 CLI 行為。
   parse?: typeof parseDocument;
   scan?: typeof scan;
@@ -35,7 +36,7 @@ export interface SyncOptions {
 }
 
 export async function sync(rootInput: string, store: IndexStore, options: SyncOptions = {}): Promise<SyncReport> {
-  const release = acquireWriteLock(store.databasePath);
+  const release = options.lockHeld ? undefined : acquireWriteLock(store.databasePath);
   try {
     options.onProgress?.({ stage: "upgrade", message: "檢查索引格式" });
     await store.upgrade({ lockHeld: true, ...(options.signal ? { signal: options.signal } : {}),
@@ -58,7 +59,7 @@ export async function sync(rootInput: string, store: IndexStore, options: SyncOp
         [{ stage: "scan", path: registered, code: "ROOT_SYNC_FAILED", message: "根目錄無法同步，保留既有索引" }]);
     }
     throw error;
-  } finally { release(); }
+  } finally { release?.(); }
 }
 
 async function syncLocked(rootInput: string, store: IndexStore, options: SyncOptions): Promise<SyncReport> {
@@ -97,11 +98,8 @@ async function syncLocked(rootInput: string, store: IndexStore, options: SyncOpt
   // 使用者可能把索引資料目錄放在被掃描根目錄內；LocalDocSearch 自己的資料庫
   // 與 WAL／協調檔不是來源文件，納入會造成每次同步都修改自己的輸入。
   const databasePath = path.resolve(store.databasePath);
-  const internalPaths = new Set([
-    databasePath, `${databasePath}-wal`, `${databasePath}-shm`, `${databasePath}-journal`,
-    `${databasePath}.writer.sqlite`, `${databasePath}.writer.sqlite-wal`, `${databasePath}.writer.sqlite-shm`, `${databasePath}.writer.sqlite-journal`,
-  ]);
-  const sourcePaths = found.paths.filter(filePath => !internalPaths.has(path.resolve(filePath)));
+  const internalPaths = new Set(indexArtifactPaths(databasePath));
+  const sourcePaths = found.paths.filter(filePath => !internalPaths.has(path.resolve(filePath)) && !isIndexArtifact(filePath, databasePath));
   found.skipped.builtin += found.paths.length - sourcePaths.length;
   found.paths = sourcePaths;
   const notices: string[] = [];
