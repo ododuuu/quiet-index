@@ -108,7 +108,7 @@ test("M23 fix status reads committed data during a real main-database write", as
     const result = spawnSync(process.execPath, [path.resolve("dist/src/cli.js"), "status"], {
       env: { ...process.env, LOCALDOCSEARCH_DATA_DIR: data }, encoding: "utf8", timeout: 5000,
     });
-    assert.equal(result.error, undefined, result.error?.message);
+    assert.equal(result.error, undefined, `${result.error?.message ?? ""}\nstdout: ${result.stdout}\nstderr: ${result.stderr}`);
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /讀取索引狀態/);
     assert.match(result.stdout, /索引升級：已完成/);
@@ -152,6 +152,7 @@ test("M23 fix reports a hot journal and the next writer recovers it", async () =
     const status = spawnSync(process.execPath, [path.resolve("dist/src/cli.js"), "status"], {
       env: { ...process.env, LOCALDOCSEARCH_DATA_DIR: data }, encoding: "utf8", timeout: 5000,
     });
+    assert.equal(status.error, undefined, `${status.error?.message ?? ""}\nstdout: ${status.stdout}\nstderr: ${status.stderr}`);
     assert.equal(status.status, 3, status.stderr);
     assert.match(status.stdout, /讀取索引狀態/);
     assert.match(status.stderr, /INDEX_RECOVERY_REQUIRED/);

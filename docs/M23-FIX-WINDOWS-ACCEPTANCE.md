@@ -1,4 +1,18 @@
-# M23 修正版 0.26.2 公司 Windows 複驗
+# M23 修正版公司 Windows 複驗
+
+## 0.26.3 搜尋修正複驗（優先）
+
+下載新版本至新目錄後執行下列命令；預期版本 0.26.3。沿用既有資料庫，無需重新 index 或 rebuild。
+
+```cmd
+npm ci
+node -p "require('./package.json').version"
+node dist/src/cli.js search "的 BUG 的 Log"
+node dist/src/cli.js status
+npm test
+```
+
+搜尋應正常回傳結果或無命中提示，不能回報 LDS-001。npm test 現在預設逐檔執行，跨程序互斥測試仍保留。請回報搜尋與測試結尾；公司實測前不宣稱通過。以下為 0.26.2 舊索引升級的歷史複驗步驟。
 
 此複驗針對 0.26.0 的啟動阻塞。不得刪除 `%LOCALAPPDATA%\LocalDocSearch` 內的資料庫、journal、WAL 或 writer 檔；來源文件不會被修改。
 

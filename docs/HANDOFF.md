@@ -1,5 +1,9 @@
 # 跨對話交接方式
 
+## 最新交接：0.26.3（2026-09-22）
+
+公司索引與 status 已成功，但真實搜尋兩次證實 too many SQL variables；40,000 區塊合成案例在舊程式重現，固定參數 json_each 修正後通過。另測 33,001 payload，無需 rebuild。npm test 改逐檔、watch 延後載入 sync。Mac Node 26.7.0 全套 149 通過、0 失敗、0 取消、1 Windows CMD 略過。0.26.2 timeout 根因說法已撤回，不能再沿用。公司 10 份 PPTX 缺部件錯誤仍待診斷；0.26.3 實際搜尋及完整 Windows 測試尚待回報。
+
 ## 最新交接：M23 修正版規格（2026-09-21）
 
 0.26.1 公司 Windows 全套結果為 142 通過、4 失敗、2 略過：三項 SQLite CLI 案例耗盡五秒，cmd launcher 在含空白與括號的下載路徑失敗。0.26.2 已把 Node.js 22.17.0 支援的 `DatabaseSync timeout: 0` 提前至主索引與 writer 協調資料庫開庫階段，保留後續 PRAGMA；M9 改以暫存 wrapper 測真正的 launcher；`npm ci` 透過 prepare 自動產生 `dist`。Mac 聚焦回歸通過，完整套件只有既有 M11 native watcher 取消及 Windows cmd 略過；交付包雜湊見同名 `.sha256`。必須等公司 Windows 重跑才能宣稱修正通過；不得刪除原索引或 journal。

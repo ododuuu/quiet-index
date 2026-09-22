@@ -1,6 +1,6 @@
 {
   "name": "localdocsearch",
-  "version": "0.26.2",
+  "version": "0.26.3",
   "private": true,
   "description": "Offline local document search and context selection CLI",
   "type": "module",
@@ -14,7 +14,7 @@
     "build": "tsc -p tsconfig.json",
     "prepare": "npm run build",
     "start": "node dist/src/cli.js",
-    "test": "npm run build && node --test dist/test/*.test.js",
+    "test": "npm run build && node --test --test-concurrency=1 dist/test/*.test.js",
     "check": "npm run test",
     "benchmark": "npm run build && node scripts/benchmark.mjs",
     "benchmark:m24": "npm run build && node scripts/benchmark-m24.mjs",

@@ -1,5 +1,7 @@
 # LocalDocSearch
 
+目前版本為 **0.26.3**：修復大型文件搜尋的 `too many SQL variables`，可直接使用既有索引，不需要 rebuild。`npm test` 預設逐檔執行；help／status／search 不再透過 watch 提前載入文件解析器。公司 Windows 真實搜尋仍待此版本複驗，以下版本描述保留歷史背景。
+
 LocalDocSearch 0.26.2 是純本機 CLI，目前以 macOS 作為主要可執行與迭代環境，並保留 Windows 相容方向。它支援原有六種格式，並新增 `.doc`、`.xls`、`.mht`／`.mhtml`、`.html`／`.htm`／`.xhtml`、`.adoc`、`.msg` 與 `.vsd`，搜尋檔名、標題及內容。其他格式與無副檔名檔案會進入本機清冊，可依檔名及副檔名找到。文件留在原位置，索引與搜尋不需要網路或外部 AI。
 
 0.26.2 延續 0.26.1 的可接續升級，並針對 Windows 在 SQLite 開庫時就明確設定零等待鎖；`npm ci` 也會自動編譯 `dist`，不必先跑完整測試才能使用 CLI。

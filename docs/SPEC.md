@@ -1,7 +1,7 @@
 # LocalDocSearch 產品規格
 
-- 規格基線：0.26.2（M23 Windows 複驗修正）
-- 日期：2026-09-21
+- 規格基線：0.26.3（M23 大型候選集合修正）
+- 日期：2026-09-22
 - 狀態：第 34 節已在目前 Mac 實作與合成驗證；公司 Windows 修正版尚未實機驗證
 
 本文件描述預定產品行為；目前實作與驗收進度以 `docs/STATUS.md` 為準。第 15 節保留 M5 基線要求；第 16 節定義 M6-A／M6-B 新增格式及後續優先序。
@@ -651,7 +651,16 @@ M5 維持 Node.js／TypeScript、SQLite、純本機、單根目錄及六種格�
 
 ### 34.6 Windows 開庫與原始碼安裝修正（0.26.2）
 
+後續證據修正：明確指定 timeout 為防禦性設定，沒有證據證明它是 Windows 逾時的根因或已改善逾時；0.26.2 全套仍有逾時，單獨逐檔執行則通過。
+
 - Node.js 22.17.0 已支援在 `DatabaseSync` 建構時指定 busy timeout。主索引的唯讀／寫入連線與 writer 協調資料庫必須在開庫時即指定零等待，不可只在開庫後以 PRAGMA 補設；鎖競爭仍須立即轉為 `INDEX_BUSY`，hot journal 的唯讀檢查仍須轉為 `INDEX_RECOVERY_REQUIRED`。
 - 開庫後保留明確的 `PRAGMA busy_timeout=0` 作防禦性設定；不得以延長測試或產品 timeout 掩蓋 Windows 的鎖等待。
 - 從 GitHub 原始碼下載的目錄沒有預先編譯的 `dist` 時，標準 `npm ci` 必須完成 TypeScript 編譯，使 README 所列 CLI 命令可直接執行。
 - Windows cmd launcher 測試若專案絕對路徑含空白或括號，應避免把該路徑同時交給 Node argv 與 `cmd.exe /c` 做兩層字串解析；仍須從不同工作目錄實際呼叫 `docsearch.cmd`。
+
+### 34.7 大型候選集合與測試負載（0.26.3）
+
+- 搜尋與片段回讀的候選 payload／block 集合以單一 JSON 參數及 SQLite `json_each` 查詢；參數數量不得隨集合大小增加，不修改 schema 或既有 payload，不要求 rebuild。
+- 保留完整 block 的所有 payload、排序、去重與跨 payload 精確比對。回歸涵蓋 40,000 個候選 block、33,001 個候選 payload、尾端命中、跨 payload 命中、多詞及唯讀開庫。
+- `npm test` 預設逐檔執行；跨程序互斥測試仍啟動真正並行的持鎖程序，不調高鎖競爭／CLI 的五秒期限。
+- `watch` 僅在實際啟動時載入同步與解析器，避免 help／status／search 經靜態 watch import 提前載入解析依賴。

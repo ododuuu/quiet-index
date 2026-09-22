@@ -1,7 +1,7 @@
 import { IndexBusyError } from "./write-lock.js";
 import fs from "node:fs";
 import path from "node:path";
-import { sync, type SyncOptions, type SyncReport } from "./sync.js";
+import type { sync, SyncOptions, SyncReport } from "./sync.js";
 import type { IndexStore } from "./store.js";
 import type { ProgressUpdate } from "./progress.js";
 
@@ -74,7 +74,7 @@ export async function runWatch(
   const debounceMs = resolveWatchDebounce(options.debounceMs);
   const rescanMs = resolveWatchRescan(options.rescanMs);
   const watchFn = options.watch ?? fs.watch;
-  const syncFn = options.sync ?? sync;
+  const syncFn = options.sync ?? (await import("./sync.js")).sync;
   const now = options.now ?? Date.now;
   const setTimer = options.setTimer ?? setTimeout;
   const clearTimer = options.clearTimer ?? clearTimeout;

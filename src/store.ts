@@ -461,19 +461,20 @@ export class IndexStore {
     let selectedIds: Set<number> | undefined;
     if (candidatePayloads) {
       if (!candidatePayloads.length) return;
-      const placeholders = candidatePayloads.map(() => "?").join(",");
-      selectedIds = new Set((this.db.prepare(`SELECT DISTINCT block_id FROM document_payload_blocks WHERE document_id = ? AND payload_ordinal IN (${placeholders})`)
-        .all(documentId, ...candidatePayloads) as { block_id: number }[]).map(row => row.block_id));
+      // 用單一 JSON 參數傳遞集合，避免大型文件超過 SQLite 綁定參數上限。
+      selectedIds = new Set((this.db.prepare(`SELECT DISTINCT block_id FROM document_payload_blocks
+        WHERE document_id = ? AND payload_ordinal IN (SELECT value FROM json_each(?))`)
+        .all(documentId, JSON.stringify(candidatePayloads)) as { block_id: number }[]).map(row => row.block_id));
       // An incomplete map must never hide content; this only occurs while an
       // interrupted old-index migration is being recovered.
       if (!selectedIds.size) selectedIds = undefined;
     }
     let payloads: { ordinal: number; payload: Uint8Array }[];
     if (selectedIds) {
-      const ids = [...selectedIds]; const placeholders = ids.map(() => "?").join(",");
       payloads = this.db.prepare(`SELECT p.ordinal, p.payload FROM document_payloads p WHERE p.document_id = ? AND p.ordinal IN (
-        SELECT DISTINCT payload_ordinal FROM document_payload_blocks WHERE document_id = ? AND block_id IN (${placeholders})
-      ) ORDER BY p.ordinal`).all(documentId, documentId, ...ids) as { ordinal: number; payload: Uint8Array }[];
+        SELECT DISTINCT payload_ordinal FROM document_payload_blocks WHERE document_id = ?
+        AND block_id IN (SELECT value FROM json_each(?))
+      ) ORDER BY p.ordinal`).all(documentId, documentId, JSON.stringify([...selectedIds])) as { ordinal: number; payload: Uint8Array }[];
     } else {
       payloads = this.db.prepare("SELECT ordinal, payload FROM document_payloads WHERE document_id = ? ORDER BY ordinal").all(documentId) as { ordinal: number; payload: Uint8Array }[];
     }

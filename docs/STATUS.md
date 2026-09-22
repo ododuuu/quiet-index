@@ -1,8 +1,14 @@
 # 專案狀態
 
-最後更新：2026-09-21（M23 Windows 複驗修正 0.26.2 施工完成，待公司 Windows 重跑）
+最後更新：2026-09-22（M23 大型候選集合修正 0.26.3）
 
 ## 目前狀態
+
+- 目前進行中里程碑：0.26.3，依 SPEC §34.7 修復公司搜尋已確認的 `too many SQL variables`。下列 0.26.2 為歷史紀錄。
+- 公司 0.26.2 真實 index／status 已成功：9,845 份檔案、593 indexed，payload Bloom 1；10 份 PPTX 的 OFFICE_MISSING_PART 與 1 份 XLS 錯誤尚未定位，不能宣稱格式驗收全部通過。
+- 公司兩次直接搜尋診斷都在 streamBlocksFor 得到 ERR_SQLITE_ERROR／too many SQL variables。本機新增單份 40,000 區塊案例已在修正前重現相同堆疊；改用固定參數的 json_each 後通過，另驗證 33,001 payload 的跨邊界命中。
+- 公司逐檔 M24 為 4 通過；M7／M9／M12／M13 為 33 通過、1 略過。2026-09-22 並行全套為 143 通過、3 失敗、2 略過，仍是 CLI 五秒逾時。0.26.3 預設逐檔測試並延後 watch 的解析器載入；不得將 0.26.2 timeout 設定宣稱為已證根因。
+- 0.26.3 在 macOS／Node.js 26.7.0 完整逐檔回歸為 150 項：149 通過、0 失敗、0 取消、1 Windows CMD 專屬略過（16.48 秒）。公司真實搜尋與新版完整測試仍待複驗。交付包由 npm run package 逐檔核對，SHA-256 見同名 .sha256。
 
 - 里程碑：M23 Windows 複驗修正 0.26.2——索引升級、唯讀 status、Windows 開庫零等待與原始碼安裝；規格見 SPEC §34。6。程式、本機回歸與交付包已完成，公司 Windows 重跑尚未完成。
 - 公司 Windows／Node.js 22.17.0／0.26.1 全套實測為 148 項：142 通過、4 失敗、2 略過。M13 寫入鎖競爭及 M24 的 live writer／hot journal 三項都在 CLI 子程序五秒期限耗盡；M9 cmd launcher 在 `quiet-index-main (1)` 的含空白／括號路徑回傳 1。這次已執行但未通過，不能標記 Windows 驗收完成。
