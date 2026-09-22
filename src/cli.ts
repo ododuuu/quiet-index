@@ -61,6 +61,7 @@ export function buildHelpText(): string {
     "  docsearch watch [root] [--debounce <毫秒>] [--rescan <毫秒>] [--verbose]",
     "",
     "search 在互動終端預設每頁 20 筆，可用 n／p 翻頁、/ 關鍵字縮小結果、back 撤回、reset 重設、q 結束；單頁與零結果仍可操作。非互動輸出可用 --page 與 --page-size。--limit 保留為單次輸出的相容選項。",
+    "index 可將涵蓋的既有子根合併為上層登錄；已包含於上層的子目錄只同步該子樹。--root 可為已登錄根目錄或其下子樹／已合併原子根。",
     "context 預設 100、最高 500。--type 例如 pdf,docx,xml（可有前導點、忽略大小寫）。",
     `目前支援 ${[...supportedExtensions].join("、")}（PDF 只擷取文字層）；搜尋前請先執行 index。`,
     "VSD v11 擷取直接儲存的圖形文字；不展開 master／動態欄位，舊版或不支援結構仍可搜尋檔名。",
@@ -248,7 +249,12 @@ export async function main(args: readonly string[]): Promise<number> {
       if (rootInput) {
         const requested = path.resolve(rootInput);
         const existing = registered.find(root => process.platform === "win32" ? root.toLowerCase() === requested.toLowerCase() : root === requested);
-        if (!existing) throw new RootError("監看只接受已登錄根目錄；新增位置請先 index。");
+        if (!existing) {
+          const merged = store.findMergedParent(requested);
+          throw new RootError(merged
+            ? `該路徑已合併至上層索引：${merged}；請改監看上層根目錄。`
+            : "監看只接受已登錄根目錄；新增位置請先 index。");
+        }
         targets = [existing];
       } else {
         targets = registered;
@@ -278,7 +284,12 @@ export async function main(args: readonly string[]): Promise<number> {
       if (command === "rebuild" && rootInput) {
         const requested = path.resolve(rootInput);
         const existing = store.roots().find(root => process.platform === "win32" ? root.toLowerCase() === requested.toLowerCase() : root === requested);
-        if (!existing) throw new RootError("重建只接受已登錄根目錄；新增位置請使用 index。");
+        if (!existing) {
+          const merged = store.findMergedParent(requested);
+          throw new RootError(merged
+            ? `該路徑已合併至上層索引：${merged}；重建請指定有效根目錄，避免隱式擴大範圍。`
+            : "重建只接受已登錄根目錄；新增位置請使用 index。");
+        }
         rootInput = existing;
       }
       const targets = rootInput ? [rootInput] : store.roots();
@@ -291,6 +302,9 @@ export async function main(args: readonly string[]): Promise<number> {
           const report = await sync(target, store, { rebuild: command === "rebuild", requireRegistered: !rootInput || command === "rebuild",
             ...(abortController ? { signal: abortController.signal } : {}), onProgress: update => reporter?.update(update) });
           console.log(`根目錄：${report.root}`);
+          for (const notice of report.notices.filter(item => item.startsWith("合併根目錄範圍：") || item.startsWith("合併：") || item.startsWith("已包含於上層索引："))) {
+            console.log(`提示：${notice}`);
+          }
           if (command === "rebuild") console.log(report.complete ? "重建完成。" : "重建未完整完成。");
           printSummary(report);
           console.log(`同步完整：${report.complete ? "是" : "否"}（文件解析狀態另列）`);
@@ -299,7 +313,9 @@ export async function main(args: readonly string[]): Promise<number> {
           if (!report.complete) console.log(command === "rebuild"
             ? "提示：本次重建不完整；部分內容可能尚未更新，請查看問題清單。"
             : "提示：本次同步不完整；為避免誤刪，保留無法確認的既有索引資料。");
-          for (const notice of report.notices) console.log(`提示：${notice}`);
+          for (const notice of report.notices.filter(item => !item.startsWith("合併根目錄範圍：") && !item.startsWith("合併：") && !item.startsWith("已包含於上層索引："))) {
+            console.log(`提示：${notice}`);
+          }
           for (const error of report.errors) console.error(`文件問題：${error}`);
           if (verbose) {
             console.log("內建排除：.git/、node_modules/、.localdocsearch/、~$ 暫存項目；不追蹤符號連結／junction。");
@@ -315,11 +331,16 @@ export async function main(args: readonly string[]): Promise<number> {
       }
       return exitCode;
     }
-    const roots = store.roots();
+    const indexStore = store;
+    const roots = indexStore.roots();
     const registeredRoot = (value: string) => {
       const requested = path.resolve(value);
       const root = roots.find(item => process.platform === "win32" ? item.toLowerCase() === requested.toLowerCase() : item === requested);
-      if (!root) throw new RootError("該根目錄未登錄；請以 roots 顯示的路徑操作。");
+      if (!root) {
+        const merged = indexStore.findMergedParent(requested);
+        if (merged) throw new RootError(`該路徑已合併至上層索引：${merged}；請對上層根目錄操作 remove。`);
+        throw new RootError("該根目錄未登錄；請以 roots 顯示的路徑操作。");
+      }
       return root;
     };
     if (command === "roots") {
@@ -335,7 +356,9 @@ export async function main(args: readonly string[]): Promise<number> {
     if (!roots.length) {
       console.error("索引尚未建立；請先執行 docsearch index <root>。"); return 3;
     }
-    const selectedRoot = rootFilter ? registeredRoot(rootFilter) : undefined;
+    const searchScope = rootFilter ? store.resolveSearchScope(rootFilter) : undefined;
+    const selectedRoot = searchScope?.root;
+    const selectedSubtree = searchScope?.subtree;
     if (command === "context") {
       await interactiveContext(store, {
         ...(contextOutput ? { output: contextOutput } : {}), ...(contextClipboard ? { clipboard: true } : {}),
@@ -344,6 +367,7 @@ export async function main(args: readonly string[]): Promise<number> {
         ...(contextQuery !== undefined ? { query: contextQuery } : {}),
         ...(selectedReferences ? { select: selectedReferences } : {}),
         ...(types ? { types } : {}), ...(selectedRoot ? { root: selectedRoot } : {}),
+        ...(selectedSubtree ? { subtree: selectedSubtree } : {}),
       });
       return 0;
     }
@@ -376,13 +400,13 @@ export async function main(args: readonly string[]): Promise<number> {
       for (const issue of issues) console.log(`  ${issue.path} [${issue.status}/${issue.errorCode ?? "UNKNOWN"}]`);
       return 0;
     }
-    const session = new SearchSession(store, args[1]!, types, selectedRoot, allTerms ? "all-terms" : "phrase");
+    const session = new SearchSession(store, args[1]!, types, selectedRoot, allTerms ? "all-terms" : "phrase", selectedSubtree);
     const availablePages = Math.max(1, Math.ceil(session.originalTotal / searchPageSize));
     if (!limitSpecified && searchPage > availablePages) {
       console.error(`頁碼超出範圍；共有 ${availablePages} 頁。`);
       return 2;
     }
-    console.log(`搜尋根目錄：${selectedRoot ?? `全部 ${roots.length} 個`}`);
+    console.log(`搜尋根目錄：${selectedSubtree ? `${selectedSubtree}（上層 ${selectedRoot}）` : selectedRoot ?? `全部 ${roots.length} 個`}`);
     console.log(`查詢模式：${allTerms ? "全部關鍵字" : "精確片語"}`);
     console.log(`格式範圍：${types?.join(",") ?? "全部已登錄格式"}。`);
     for (const root of selectedRoot ? [selectedRoot] : roots) {

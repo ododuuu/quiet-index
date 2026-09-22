@@ -303,12 +303,12 @@ function rankDocument(document: StoredDocumentRow, blocks: Iterable<StoredBlockR
 }
 
 export function collectHits(store: IndexStore, rawQuery: string, types?: readonly string[], root?: string,
-  mode: SearchMode = "phrase", restrictIds?: readonly number[]): RankedSearchResult[] {
+  mode: SearchMode = "phrase", restrictIds?: readonly number[], subtree?: string): RankedSearchResult[] {
   const { query, terms } = queryTerms(rawQuery, mode);
   const results: RankedSearchResult[] = [];
   const source = restrictIds
     ? store.streamCandidatesByIds(restrictIds, terms, mode === "all-terms")
-    : store.streamCandidates(types, root, terms, mode === "all-terms");
+    : store.streamCandidates(types, root, terms, mode === "all-terms", subtree);
   for (const { document, blocks } of source) {
     const ranked = rankDocument(document, blocks, query, terms, mode);
     if (ranked) results.push(ranked);
@@ -342,8 +342,8 @@ function materializeHits(store: IndexStore, ranked: readonly RankedSearchResult[
 }
 
 export function createSearchResultSet(store: IndexStore, rawQuery: string, types?: readonly string[], root?: string,
-  mode: SearchMode = "phrase"): SearchResultSet {
-  const results = collectHits(store, rawQuery, types, root, mode);
+  mode: SearchMode = "phrase", subtree?: string): SearchResultSet {
+  const results = collectHits(store, rawQuery, types, root, mode, undefined, subtree);
   const dataVersion = store.dataVersion();
   return {
     total: results.length,
@@ -356,9 +356,9 @@ export { materializeHits };
 export type { RankedSearchResult };
 
 export function search(store: IndexStore, rawQuery: string, limit = 20, types?: readonly string[], root?: string,
-  mode: SearchMode = "phrase"): SearchResult[] {
+  mode: SearchMode = "phrase", subtree?: string): SearchResult[] {
   if (!Number.isSafeInteger(limit) || limit <= 0) throw new Error("--limit 必須是正整數。");
-  return createSearchResultSet(store, rawQuery, types, root, mode).page(1, limit).results;
+  return createSearchResultSet(store, rawQuery, types, root, mode, subtree).page(1, limit).results;
 }
 
 export interface PassageHit {

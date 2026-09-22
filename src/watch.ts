@@ -101,7 +101,10 @@ export async function runWatch(
       if (state.timer) clearTimer(state.timer);
       if (state.rescanTimer) clearTimer(state.rescanTimer);
       state.watcher?.close();
-      io.write(`已停止監看移除的根目錄：${state.root}`);
+      const parent = store.findMergedParent(state.root);
+      io.write(parent
+        ? `已停止監看已合併的根目錄：${state.root}；請以新根 ${parent} 重新啟動監看。`
+        : `已停止監看移除的根目錄：${state.root}`);
       if ([...states.values()].every(item => item.removed)) allFailed();
       return;
     }

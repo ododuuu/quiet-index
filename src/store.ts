@@ -6,6 +6,8 @@ import { DatabaseSync } from "node:sqlite";
 import { brotliCompressSync, brotliDecompressSync, constants as zlibConstants } from "node:zlib";
 import { documentStatuses, type Diagnostic, type SyncSummary, type DocumentRecord, type DocumentStatus, type TextBlock } from "./model.js";
 import { throwIfAborted, yieldToEvents, type ProgressUpdate } from "./progress.js";
+import { coversPath, samePath } from "./root-plan.js";
+import { RootError } from "./scanner.js";
 
 export function defaultDatabasePath(): string {
   const base = process.env.LOCALDOCSEARCH_DATA_DIR
@@ -136,11 +138,21 @@ export interface IndexFormatStatus {
   totalDocuments: number;
 }
 
+export interface SearchScope {
+  root: string;
+  subtree?: string;
+}
+
+export interface MergeChildRootsOptions {
+  beforeCommit?: () => void;
+}
+
 export interface UpgradeOptions {
   lockHeld?: boolean;
   signal?: AbortSignal;
   onProgress?: (update: ProgressUpdate) => void;
 }
+
 
 // Node.js 22.16.0 起支援建構時設定 timeout，但目前鎖定的 @types/node
 // 尚未宣告此欄位。必須在 sqlite3_open_v2() 後、任何查詢前就安裝
@@ -172,7 +184,7 @@ export class IndexStore {
       this.initializeSchema();
       if (fresh) {
         this.db.exec(`INSERT OR REPLACE INTO metadata(key, value) VALUES
-          ('content_storage_version', '2'), ('payload_bloom_version', '1'), ('multi_root_version', '1')`);
+          ('content_storage_version', '2'), ('payload_bloom_version', '1'), ('multi_root_version', '1'), ('root_merge_version', '1')`);
       }
     } finally { release(); }
   }
@@ -229,6 +241,18 @@ export class IndexStore {
         root_path TEXT NOT NULL REFERENCES roots(path) ON DELETE CASCADE
       );
       CREATE INDEX IF NOT EXISTS document_roots_path ON document_roots(root_path);
+      CREATE TABLE IF NOT EXISTS root_ignore_scopes (
+        root_path TEXT NOT NULL REFERENCES roots(path) ON DELETE CASCADE,
+        base_path TEXT NOT NULL,
+        PRIMARY KEY (root_path, base_path)
+      );
+      CREATE TABLE IF NOT EXISTS root_merge_history (
+        parent_path TEXT NOT NULL REFERENCES roots(path) ON DELETE CASCADE,
+        former_path TEXT NOT NULL,
+        merged_at TEXT NOT NULL,
+        document_count INTEGER NOT NULL,
+        PRIMARY KEY (parent_path, former_path)
+      );
     `);
   }
 
@@ -240,7 +264,8 @@ export class IndexStore {
     const completedDocuments = this.hasTable("index_migration_documents")
       ? Number((this.db.prepare("SELECT count(*) AS count FROM index_migration_documents WHERE version = 'payload_bloom_1'").get() as { count: number }).count) : 0;
     return { contentStorageVersion, payloadBloomVersion,
-      needsUpgrade: contentStorageVersion !== "2" || payloadBloomVersion !== "1" || this.metadata("multi_root_version") !== "1",
+      needsUpgrade: contentStorageVersion !== "2" || payloadBloomVersion !== "1" || this.metadata("multi_root_version") !== "1"
+        || this.metadata("root_merge_version") !== "1",
       completedDocuments, totalDocuments };
   }
 
@@ -254,6 +279,7 @@ export class IndexStore {
         this.migratePayloads();
       }
       if (this.metadata("multi_root_version") !== "1") this.migrateMultiRoot();
+      if (this.metadata("root_merge_version") !== "1") this.migrateRootMerge();
       if (this.metadata("payload_bloom_version") !== "1") await this.migratePayloadBlooms(options);
     } finally { release?.(); }
   }
@@ -273,6 +299,16 @@ export class IndexStore {
     }
   }
 
+  private migrateRootMerge(): void {
+    if (this.metadata("root_merge_version") !== "1") {
+      this.db.exec("BEGIN IMMEDIATE");
+      try {
+        this.db.prepare("INSERT OR REPLACE INTO metadata(key, value) VALUES ('root_merge_version', '1')").run();
+        this.db.exec("COMMIT");
+      } catch (error) { this.db.exec("ROLLBACK"); throw error; }
+    }
+  }
+
   private hasTable(name: string): boolean {
     return Boolean(this.db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(name));
   }
@@ -282,6 +318,103 @@ export class IndexStore {
   }
 
   registerRoot(root: string): void { this.db.prepare("INSERT OR IGNORE INTO roots(path) VALUES (?)").run(root); }
+
+  documentCountForRoot(root: string): number {
+    return Number((this.db.prepare("SELECT count(*) AS count FROM document_roots WHERE root_path = ?").get(root) as { count: number }).count);
+  }
+
+  ignoreBases(root: string): string[] {
+    return (this.db.prepare("SELECT base_path FROM root_ignore_scopes WHERE root_path = ? ORDER BY base_path")
+      .all(root) as { base_path: string }[]).map(row => row.base_path);
+  }
+
+  private matchRoot(value: string, roots: readonly string[] = this.roots()): string | undefined {
+    return roots.find(item => samePath(item, value));
+  }
+
+  findMergedParent(former: string): string | null {
+    const registered = this.roots();
+    if (this.matchRoot(former, registered)) return null;
+    const history = this.db.prepare("SELECT parent_path, former_path FROM root_merge_history")
+      .all() as { parent_path: string; former_path: string }[];
+    const parentOf = new Map(history.map(row => [row.former_path, row.parent_path]));
+    if (process.platform === "win32") {
+      for (const row of history) parentOf.set(row.former_path.toLowerCase(), row.parent_path);
+    }
+    let cursor = former;
+    const seen = new Set<string>();
+    while (!seen.has(cursor.toLowerCase())) {
+      seen.add(cursor.toLowerCase());
+      const parent = parentOf.get(cursor) ?? (process.platform === "win32" ? parentOf.get(cursor.toLowerCase()) : undefined);
+      if (!parent) break;
+      const live = this.matchRoot(parent, registered);
+      if (live) return live;
+      cursor = parent;
+    }
+    for (const root of registered) {
+      if (this.ignoreBases(root).some(base => samePath(base, former) || coversPath(base, former))) return root;
+      if (coversPath(root, former)) return root;
+    }
+    return null;
+  }
+
+  resolveSearchScope(input: string): SearchScope {
+    const requested = path.resolve(input);
+    const roots = this.roots();
+    const exact = this.matchRoot(requested, roots);
+    if (exact) return { root: exact };
+    for (const root of roots) {
+      const bases = this.ignoreBases(root);
+      if (bases.some(base => samePath(base, requested) || coversPath(base, requested))) {
+        return samePath(root, requested) ? { root } : { root, subtree: requested };
+      }
+    }
+    const covering = roots.filter(root => coversPath(root, requested));
+    if (covering[0]) {
+      const root = covering.reduce((best, item) => coversPath(best, item) ? item : best);
+      return samePath(root, requested) ? { root } : { root, subtree: requested };
+    }
+    const merged = this.findMergedParent(requested);
+    if (merged) return samePath(merged, requested) ? { root: merged } : { root: merged, subtree: requested };
+    throw new RootError("該根目錄未登錄；請以 roots 顯示的路徑操作。");
+  }
+
+  ownershipBase(id: number, filePath: string): string | null {
+    const root = this.documentRoot(id);
+    if (!root) return null;
+    if (coversPath(root, filePath)) return root;
+    return this.ignoreBases(root).find(base => coversPath(base, filePath)) ?? root;
+  }
+
+  mergeChildRoots(parent: string, children: readonly string[], options: MergeChildRootsOptions = {}): { transferred: number } {
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      this.db.prepare("INSERT OR IGNORE INTO roots(path) VALUES (?)").run(parent);
+      let transferred = 0;
+      const mergedAt = new Date().toISOString();
+      for (const child of children) {
+        const count = this.documentCountForRoot(child);
+        transferred += count;
+        this.db.prepare(`INSERT OR IGNORE INTO root_ignore_scopes(root_path, base_path)
+          SELECT ?, base_path FROM root_ignore_scopes WHERE root_path = ?`).run(parent, child);
+        this.db.prepare("INSERT OR IGNORE INTO root_ignore_scopes(root_path, base_path) VALUES (?, ?)").run(parent, child);
+        this.db.prepare("UPDATE root_merge_history SET parent_path = ? WHERE parent_path = ?").run(parent, child);
+        this.db.prepare(`INSERT INTO root_merge_history(parent_path, former_path, merged_at, document_count)
+          VALUES (?, ?, ?, ?) ON CONFLICT(parent_path, former_path) DO UPDATE SET merged_at=excluded.merged_at, document_count=excluded.document_count`)
+          .run(parent, child, mergedAt, count);
+        this.db.prepare("UPDATE document_roots SET root_path = ? WHERE root_path = ?").run(parent, child);
+        this.db.prepare("DELETE FROM roots WHERE path = ?").run(child);
+      }
+      const previous = this.getLastSyncReport(parent);
+      this.db.prepare("UPDATE roots SET report = ? WHERE path = ?").run(JSON.stringify({
+        attemptedAt: mergedAt, successfulAt: previous.successfulAt, complete: false,
+        errors: [], notices: children.map(child => `已合併子根：${child}`), summary: null, diagnostics: [],
+      } satisfies LastSyncReport), parent);
+      options.beforeCommit?.();
+      this.db.exec("COMMIT");
+      return { transferred };
+    } catch (error) { this.db.exec("ROLLBACK"); throw error; }
+  }
 
   documentRoot(id: number): string | null {
     return (this.db.prepare("SELECT root_path FROM document_roots WHERE document_id = ?").get(id) as { root_path: string } | undefined)?.root_path ?? null;
@@ -361,13 +494,14 @@ export class IndexStore {
     }
   }
 
-  removeMissing(knownPaths: Set<string>, root?: string): number {
+  removeMissing(knownPaths: Set<string>, root?: string, subtree?: string): number {
     let removed = 0;
     const rows = (root ? this.db.prepare("SELECT path FROM documents WHERE id IN (SELECT document_id FROM document_roots WHERE root_path = ?)").all(root) : this.db.prepare("SELECT path FROM documents").all()) as { path: string }[];
     const remove = this.db.prepare("DELETE FROM documents WHERE path = ?");
     this.db.exec("BEGIN IMMEDIATE");
     try {
       for (const row of rows) {
+        if (subtree && !coversPath(subtree, row.path)) continue;
         if (!knownPaths.has(row.path)) {
           remove.run(row.path);
           removed++;
@@ -398,24 +532,36 @@ export class IndexStore {
     return (this.db.prepare("PRAGMA data_version").get() as { data_version: number }).data_version;
   }
 
-  candidates(types?: readonly string[], root?: string): SearchCandidate[] {
+  private documentWhere(types?: readonly string[], root?: string, subtree?: string): { sql: string; values: string[] } {
     const filters: string[] = [];
     const values: string[] = [];
     if (types) { filters.push(`extension IN (${types.map(() => "?").join(",")})`); values.push(...types); }
     if (root) { filters.push("id IN (SELECT document_id FROM document_roots WHERE root_path = ?)"); values.push(root); }
-    const where = filters.length ? ` WHERE ${filters.join(" AND ")}` : "";
-    const documents = this.db.prepare(`SELECT id, path, filename, extension, size_bytes, modified_at_ms, status FROM documents${where}`)
+    if (subtree) {
+      const sep = path.sep;
+      const prefix = `${subtree.endsWith(sep) ? subtree : subtree + sep}`
+        .replaceAll("\\", "\\\\").replaceAll("%", "\\%").replaceAll("_", "\\_");
+      if (process.platform === "win32") {
+        filters.push("(lower(path) = lower(?) OR lower(path) LIKE lower(?) ESCAPE '\\')");
+        values.push(subtree, `${prefix}%`);
+      } else {
+        filters.push("(path = ? OR path LIKE ? ESCAPE '\\')");
+        values.push(subtree, `${prefix}%`);
+      }
+    }
+    return { sql: filters.length ? ` WHERE ${filters.join(" AND ")}` : "", values };
+  }
+
+  candidates(types?: readonly string[], root?: string, subtree?: string): SearchCandidate[] {
+    const { sql, values } = this.documentWhere(types, root, subtree);
+    const documents = this.db.prepare(`SELECT id, path, filename, extension, size_bytes, modified_at_ms, status FROM documents${sql}`)
       .all(...values) as unknown as StoredDocumentRow[];
     return documents.map(document => ({ document, blocks: this.blocksFor(document.id) }));
   }
 
-  *streamCandidates(types?: readonly string[], root?: string, terms?: readonly string[], allTerms = false): Generator<StreamingCandidate> {
-    const filters: string[] = [];
-    const values: string[] = [];
-    if (types) { filters.push(`extension IN (${types.map(() => "?").join(",")})`); values.push(...types); }
-    if (root) { filters.push("id IN (SELECT document_id FROM document_roots WHERE root_path = ?)"); values.push(root); }
-    const where = filters.length ? ` WHERE ${filters.join(" AND ")}` : "";
-    const documents = this.db.prepare(`SELECT id, path, filename, extension, size_bytes, modified_at_ms, status FROM documents${where}`);
+  *streamCandidates(types?: readonly string[], root?: string, terms?: readonly string[], allTerms = false, subtree?: string): Generator<StreamingCandidate> {
+    const { sql, values } = this.documentWhere(types, root, subtree);
+    const documents = this.db.prepare(`SELECT id, path, filename, extension, size_bytes, modified_at_ms, status FROM documents${sql}`);
     const bloom = this.db.prepare("SELECT bloom FROM document_blooms WHERE document_id = ?");
     const payloadBlooms = this.db.prepare("SELECT payload_ordinal, bloom FROM document_payload_blooms WHERE document_id = ? ORDER BY payload_ordinal");
     for (const document of documents.iterate(...values) as Iterable<StoredDocumentRow>) {

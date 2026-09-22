@@ -35,10 +35,11 @@ export class SearchSession {
     types?: readonly string[],
     root?: string,
     mode: SearchMode = "phrase",
+    subtree?: string,
   ) {
     this.originalQuery = rawQuery;
     this.mode = mode;
-    const ranked = collectHits(store, rawQuery, types, root, mode);
+    const ranked = collectHits(store, rawQuery, types, root, mode, undefined, subtree);
     this.history = [{ rawQuery, ranked }];
     this.originalTotal = ranked.length;
     this.dataVersion = store.dataVersion();

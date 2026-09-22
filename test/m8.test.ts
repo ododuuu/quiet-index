@@ -8,7 +8,7 @@ import { spawnSync } from "node:child_process";
 import { IndexStore } from "../src/store.js";
 import { sync } from "../src/sync.js";
 import { search } from "../src/search.js";
-import { scan, RootError } from "../src/scanner.js";
+import { scan } from "../src/scanner.js";
 import { actOnDocument, resolveDocument } from "../src/open-document.js";
 import { parseDocument } from "../src/parser.js";
 import { documentReference } from "../src/document-reference.js";
@@ -56,7 +56,7 @@ test("M8 deletions, ignores, rebuild and root removal cannot clear a sibling roo
   } finally { store.close(); }
 }));
 
-test("M8 aliases reuse roots and parent-child overlap is rejected", () => fixture(async (a, _b, temp) => {
+test("M8 aliases reuse roots and child paths sync as subtree", () => fixture(async (a, _b, temp) => {
   const store = new IndexStore(path.join(temp, "index.db"));
   try {
     await writeFile(path.join(a, "甲.txt"), "內容"); await sync(a, store);
@@ -64,9 +64,13 @@ test("M8 aliases reuse roots and parent-child overlap is rejected", () => fixtur
     assert.equal((await sync(alias, store)).parserCalls, 0);
     assert.equal(store.roots().length, 1);
     const child = path.join(a, "child"); await mkdir(child);
-    await assert.rejects(sync(child, store), RootError);
-    await assert.rejects(sync(temp, store), RootError);
-    assert.equal(search(store, "內容").length, 1);
+    await writeFile(path.join(child, "子.txt"), "子內容");
+    const subtree = await sync(child, store);
+    assert.equal(subtree.operation, "subtree");
+    assert.equal(store.roots().length, 1);
+    assert.equal(store.roots()[0], a);
+    assert.equal(search(store, "子內容").length, 1);
+    assert.match(subtree.notices.join("\n"), /已包含於上層索引/);
   } finally { store.close(); }
 }));
 

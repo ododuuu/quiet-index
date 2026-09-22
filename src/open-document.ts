@@ -14,7 +14,7 @@ export async function resolveDocument(store: IndexStore, reference: string) {
   const match = /^([1-9]\d*)-([0-9a-f]{16})$/.exec(reference);
   if (!match || !Number.isSafeInteger(Number(match[1]))) throw new DocumentActionError("ACTION_REFERENCE_INVALID", "文件代碼格式錯誤，請從搜尋結果複製。");
   const row = store.getDocumentById(Number(match[1]));
-  const root = row ? store.documentRoot(row.id) : null;
+  const root = row ? store.ownershipBase(row.id, row.path) : null;
   if (!row || !root || documentReference(row.id, row.path) !== reference) throw new DocumentActionError("ACTION_REFERENCE_STALE", "文件代碼已失效，請重新搜尋。");
   const relative = path.relative(root, row.path);
   if (!relative || relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {

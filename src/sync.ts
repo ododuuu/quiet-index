@@ -4,6 +4,7 @@ import path from "node:path";
 import { realpath, stat } from "node:fs/promises";
 import { parseDocument } from "./parser.js";
 import { scan, validateRoot, RootError } from "./scanner.js";
+import { planRootOperation, type RootOperationKind } from "./root-plan.js";
 import { emptyStatusCounts, supportedExtensions, type Diagnostic, type DocumentRecord, type SyncSummary } from "./model.js";
 import type { IndexStore } from "./store.js";
 import { throwIfAborted, yieldToEvents, type ProgressUpdate } from "./progress.js";
@@ -16,6 +17,11 @@ export interface SyncReport extends SyncSummary {
   ignoreFile: string | null;
   ignorePatterns: string[];
   complete: boolean;
+  operation: RootOperationKind;
+  mergedRoots: string[];
+  retainedDocuments: number;
+  coveringRoot: string | null;
+  scanStart: string;
 }
 
 export interface SyncOptions {
@@ -36,6 +42,12 @@ export async function sync(rootInput: string, store: IndexStore, options: SyncOp
       ...(options.onProgress ? { onProgress: options.onProgress } : {}) });
     throwIfAborted(options.signal);
     if ((options.requireRegistered || options.rebuild) && !store.roots().includes(path.resolve(rootInput))) {
+      const merged = store.findMergedParent(path.resolve(rootInput));
+      if (merged) {
+        throw new RootError(options.rebuild
+          ? `該路徑已合併至上層索引：${merged}；重建請指定有效根目錄，避免隱式擴大範圍。`
+          : `該路徑已合併至上層索引：${merged}；請改對上層根目錄操作。`);
+      }
       throw new RootError("根目錄已移除或尚未登錄，請重新選擇位置。");
     }
     return await syncLocked(rootInput, store, options);
@@ -52,22 +64,35 @@ export async function sync(rootInput: string, store: IndexStore, options: SyncOp
 async function syncLocked(rootInput: string, store: IndexStore, options: SyncOptions): Promise<SyncReport> {
   const started = performance.now();
   options.onProgress?.({ stage: "scan", message: "開始掃描根目錄", path: rootInput });
-  let root = await validateRoot(rootInput);
-  const actual = await realpath(root);
-  const normalizePath = (value: string) => process.platform === "win32" ? value.toLowerCase() : value;
-  for (const existing of store.roots()) {
+  const resolved = await validateRoot(rootInput);
+  let actual: string;
+  try { actual = await realpath(resolved); } catch { actual = resolved; }
+  const existing = await Promise.all(store.roots().map(async registered => {
     let canonical: string;
-    try { canonical = await realpath(existing); } catch { canonical = path.resolve(existing); }
-    if (normalizePath(canonical) === normalizePath(actual)) { root = existing; continue; }
-    const within = (a: string, b: string) => {
-      const relative = path.relative(normalizePath(a), normalizePath(b));
-      return relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
-    };
-    if (within(canonical, actual) || within(actual, canonical)) throw new RootError(`根目錄與已登錄位置重疊：${existing}；請選擇不重疊的位置。`);
+    try { canonical = await realpath(registered); } catch { canonical = path.resolve(registered); }
+    return { registered, actual: canonical };
+  }));
+  const plan = planRootOperation({ resolved, actual }, existing);
+  let retainedDocuments = 0;
+  if (plan.kind === "merge") {
+    retainedDocuments = store.mergeChildRoots(plan.registeredRoot, plan.mergedRoots).transferred;
   }
+  const root = plan.registeredRoot;
+  const extraIgnoreBases = store.ignoreBases(root);
+  const scanStart = plan.subtree ?? root;
   const found = options.scan
-    ? await options.scan(root, { ...(options.signal ? { signal: options.signal } : {}), ...(options.onProgress ? { onProgress: options.onProgress } : {}) })
-    : await scan(root, { ...(options.signal ? { signal: options.signal } : {}), ...(options.onProgress ? { onProgress: options.onProgress } : {}) });
+    ? await options.scan(root, {
+      ...(options.signal ? { signal: options.signal } : {}),
+      ...(options.onProgress ? { onProgress: options.onProgress } : {}),
+      ...(extraIgnoreBases.length ? { extraIgnoreBases } : {}),
+      ...(scanStart !== root ? { start: scanStart } : {}),
+    })
+    : await scan(root, {
+      ...(options.signal ? { signal: options.signal } : {}),
+      ...(options.onProgress ? { onProgress: options.onProgress } : {}),
+      ...(extraIgnoreBases.length ? { extraIgnoreBases } : {}),
+      ...(scanStart !== root ? { start: scanStart } : {}),
+    });
   // 使用者可能把索引資料目錄放在被掃描根目錄內；LocalDocSearch 自己的資料庫
   // 與 WAL／協調檔不是來源文件，納入會造成每次同步都修改自己的輸入。
   const databasePath = path.resolve(store.databasePath);
@@ -78,12 +103,22 @@ async function syncLocked(rootInput: string, store: IndexStore, options: SyncOpt
   const sourcePaths = found.paths.filter(filePath => !internalPaths.has(path.resolve(filePath)));
   found.skipped.builtin += found.paths.length - sourcePaths.length;
   found.paths = sourcePaths;
+  const notices: string[] = [];
+  if (plan.kind === "merge") {
+    notices.push(`合併根目錄範圍：新增 ${root}，合併既有子根 ${plan.mergedRoots.length} 個，保留文件 ${retainedDocuments} 份。`);
+    for (const child of plan.mergedRoots) notices.push(`合併：${child}`);
+  } else if (plan.kind === "subtree") {
+    notices.push(`已包含於上層索引：${plan.subtree} 屬於 ${root}；僅同步指定子樹，不新增重疊登錄。`);
+  }
+  for (const file of found.extraIgnoreFiles ?? []) notices.push(`沿用排除作用域：${file}`);
   const report: SyncReport = { root, found: found.paths.length, updated: 0, added: 0, reprocessed: 0,
     unchanged: 0, removed: 0, parserCalls: 0, statuses: emptyStatusCounts(), skipped: found.skipped,
     readErrors: found.diagnostics.length, elapsedMs: 0, diagnostics: [...found.diagnostics],
     ignoreFile: found.ignoreFile, ignorePatterns: found.ignorePatterns,
-    errors: [...found.errors], notices: [], complete: found.errors.length === 0 };
-  store.registerRoot(root);
+    errors: [...found.errors], notices, complete: found.errors.length === 0,
+    operation: plan.kind, mergedRoots: plan.mergedRoots, retainedDocuments,
+    coveringRoot: plan.kind === "subtree" ? root : null, scanStart };
+  if (plan.kind !== "subtree") store.registerRoot(root);
   if (options.rebuild && found.errors.length === 0) store.clearDocuments(root);
   const knownPaths = new Set(found.paths);
   let processed = 0;
@@ -153,10 +188,15 @@ async function syncLocked(rootInput: string, store: IndexStore, options: SyncOpt
     processed++;
     if (processed % 100 === 0) await yieldToEvents();
   }
-  if (report.complete) report.removed = store.removeMissing(knownPaths, root);
+  if (report.complete) {
+    report.removed = store.removeMissing(knownPaths, root, plan.kind === "subtree" ? scanStart : undefined);
+  }
   report.elapsedMs = Math.round((performance.now() - started) * 100) / 100;
-  const { root: _root, errors, notices, complete, diagnostics, ignoreFile: _ignoreFile, ignorePatterns: _ignorePatterns, ...summary } = report;
-  store.recordSync(root, complete, errors, notices, summary, diagnostics);
+  if (plan.kind !== "subtree") {
+    const { root: _root, errors, notices: _notices, complete, diagnostics, ignoreFile: _ignoreFile, ignorePatterns: _ignorePatterns,
+      operation: _operation, mergedRoots: _mergedRoots, retainedDocuments: _retainedDocuments, coveringRoot: _coveringRoot, scanStart: _scanStart, ...summary } = report;
+    store.recordSync(root, complete, errors, report.notices, summary, diagnostics);
+  }
   options.onProgress?.({ stage: "complete", message: "索引同步完成", current: found.paths.length, total: found.paths.length, path: root });
   return report;
 }

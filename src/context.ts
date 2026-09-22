@@ -16,6 +16,7 @@ export interface ContextOptions {
   limit?: number;
   types?: readonly string[];
   root?: string;
+  subtree?: string;
   select?: readonly string[];
   format?: "json" | "md";
   passages?: number;
@@ -135,7 +136,7 @@ async function bundle(store: IndexStore, options: ContextOptions, picked: readon
     const { query, result } = pick;
     let current = searches.get(query);
     if (!current) {
-      current = new Map(search(store, query, options.limit ?? 100, options.types, options.root, mode).map(item => [item.reference, item]));
+      current = new Map(search(store, query, options.limit ?? 100, options.types, options.root, mode, options.subtree).map(item => [item.reference, item]));
       searches.set(query, current);
     }
     if (JSON.stringify(current.get(result.reference)) !== JSON.stringify(result)) throw new ContextError("CONTEXT_INDEX_CHANGED", "搜尋結果已變更，請重新搜尋與選取。");
@@ -246,7 +247,7 @@ export async function runContext(store: IndexStore, options: ContextOptions, io:
   if (!enteredQuery?.trim()) { io.write(cancelled); return false; }
   const query = enteredQuery.trim();
   const mode: SearchMode = options.allTerms ? "all-terms" : "phrase";
-  const results = search(store, query, options.limit ?? 100, options.types, options.root, mode);
+  const results = search(store, query, options.limit ?? 100, options.types, options.root, mode, options.subtree);
   if (!results.length) { io.write(output ? "沒有符合的結果，未建立檔案。" : "沒有符合的結果，未改動剪貼簿。"); return false; }
   const selection = new ContextSessionSelection(query, results);
   if (options.select) {
@@ -269,7 +270,7 @@ export async function runContext(store: IndexStore, options: ContextOptions, io:
     if (answer?.startsWith("s ")) {
       const nextQuery = answer.slice(2).trim();
       if (!nextQuery) { io.write("請在 s 後輸入搜尋文字。"); continue; }
-      const nextResults = search(store, nextQuery, options.limit ?? 100, options.types, options.root, mode);
+      const nextResults = search(store, nextQuery, options.limit ?? 100, options.types, options.root, mode, options.subtree);
       if (!nextResults.length) { io.write(`查詢「${terminalText(nextQuery)}」沒有結果；保留目前候選與已選清單。`); continue; }
       selection.search(nextQuery, nextResults);
       continue;
