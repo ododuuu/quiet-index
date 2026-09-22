@@ -1,10 +1,12 @@
 # 跨對話交接方式
 
-## 下一版：0.32.0 XLSM／ODT／RTF／CSV（2026-09-22）
+## 已交付：0.32.0 格式解析與終端互動介面（2026-09-22）
 
-使用者已確認四種尚未支援的格式列入 0.32.0；權威規格為 SPEC §40，決策為 D048，目前尚未實作。`.xlsm` 共用安全 OOXML 試算表解析、`.odt` 解析本機 `content.xml`、獨立 `.rtf` 抽出 MSG 已用安全核心、`.csv` 採 RFC 4180 相容逗號解析；全部禁止執行巨集、公式、物件或外部資源。每項行為變更須補測試並更新 STATUS／DECISIONS。
+權威規格為 SPEC §40，決策為 D048／D049。`.xlsm` 共用安全 OOXML 試算表解析、`.odt` 解析本機 `content.xml`、獨立 `.rtf` 抽出 MSG 已用安全核心、`.csv` 採 RFC 4180 相容逗號解析；全部禁止執行巨集、公式、物件或外部資源。`docsearch tui` 以純 Node ANSI／readline 實作，重用 `SearchSession`，不開網路連接埠。context／autoupdate 管理仍使用既有 CLI。
 
-需要真實公司檔案的 PDF／PPTX／XLS 診斷入口是 `docs/COMPANY-WINDOWS-DIAGNOSTICS.md`。只能由公司 Windows 電腦上的 Codex 讀取指定檔案；不得把公司文件或內容推上 Git。操作介面建議見 `docs/UI-DIRECTION.md`，目前建議先終端互動介面、必要時再加 localhost Web UI。
+本機完整 218 項為 217 通過、0 失敗、1 項 Windows cmd 專屬略過。交付包 `LocalDocSearch-0.32.0.zip` 逐檔核對 232 個檔案，SHA-256 `6e2665d0a624ff33f6dd567a4e3a76f5ecca84bdd8898f66e7ed4e52f3ca77f3`。測試 Node.js 22.13.1 低於正式最低 22.17.0，公司 Windows 尚未驗收。
+
+需要真實公司檔案的 PDF／PPTX／XLS 診斷入口是 `docs/COMPANY-WINDOWS-DIAGNOSTICS.md`。只能由公司 Windows 電腦上的 Codex 讀取指定檔案；不得把公司文件或內容推上 Git。操作介面後續方向見 `docs/UI-DIRECTION.md`；只有實際需要滑鼠／預覽時才規格化 localhost Web UI。
 
 ## 已交付：0.31.0 背景自動更新（2026-09-22）
 

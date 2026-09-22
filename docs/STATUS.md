@@ -1,15 +1,16 @@
 # 專案狀態
 
-最後更新：2026-09-22（0.31.0 本機已實作；0.32.0 格式擴充已規劃）
+最後更新：2026-09-22（0.32.0 格式擴充與終端互動介面已完成本機實作）
 
 ## 目前狀態
 
-- 目前進行中版本：**0.32.0 XLSM／ODT／RTF／CSV 正文解析**，規格見 SPEC §40／D048；尚未實作。從 0.31.0 起以版本號作唯一里程碑名稱，不再新增 M 編號。
-- 四種格式目前皆只保存 metadata／可依檔名搜尋；MSG 內文的 RTF 還原不是獨立 `.rtf` 支援。0.32.0 將加入安全正文解析，禁止執行 XLSM 巨集、CSV 公式、RTF 物件或 ODT 外部資源。
+- 目前版本：**0.32.0 XLSM／ODT／RTF／CSV 正文解析＋終端互動介面**，規格見 SPEC §40、D048、D049；本機實作完成。從 0.31.0 起以版本號作唯一里程碑名稱，不再新增 M 編號。
+- `.xlsm` 共用安全 OOXML 儲存格解析；`.odt` 擷取 `content.xml` 可見文字；`.rtf` 與 MSG 共用受限核心；`.csv` 支援 RFC 4180 相容 quoting、quoted newline、BOM／UTF-8／Big5。禁止執行巨集、公式、物件或外部資源；舊 unsupported 下一次普通 index／背景完整校正會重試。
+- `docsearch tui` 已提供純 Node 全螢幕終端介面，整合搜尋、全部詞、翻頁、結果內縮小、open／reveal、status 與 roots。它不開網路連接埠；context 與 autoupdate 管理仍使用既有 CLI。
 - 需要公司真實檔案才能定位的 PDF／PPTX／XLS 問題已集中至 `docs/COMPANY-WINDOWS-DIAGNOSTICS.md`，由公司 Windows 電腦上的 Codex 處理；不得上傳公司文件。
 - 已提供 `autoupdate start|status|stop`、可驗證本機單例、事件佇列與精確檔案／子樹更新、預設 6 小時完整增量校正、動態 roots、降級復原、安全停止及有界日誌。本版不做開機／登入自啟，不安裝 Windows Service，0.30.0 索引可直接使用。
 - 編碼政策已鎖定：明確 BOM／XML 宣告優先；無訊號時整份嚴格 UTF-8，失敗才整份嚴格 Big5。精度優先，不加統計猜測或要求使用者指定目錄編碼。
-- 產品 package **0.31.0**。交付包逐檔核對 217 個檔案：`LocalDocSearch-0.31.0.zip`，SHA-256 `7596679e13b83eb4d5ff2460fb93efc21a03f55b7a2344b0b7467bafb0cab150`。公司 Windows 請依 `docs/0.31.0-VALIDATION.md` 人工驗收；未回報前不得宣稱 Windows 通過。
+- 產品 package **0.32.0**。本機 Node.js 22.13.1（低於正式最低 22.17.0）建置及 0.32.0 聚焦測試通過；完整 218 項為 217 通過、0 失敗、1 項 Windows cmd 專屬測試略過。另修正 macOS `/var` 與 `/private/var` 根目錄別名通過安全驗證後，open／reveal 應保留使用者登錄路徑。交付包逐檔核對 232 個檔案：`LocalDocSearch-0.32.0.zip`，SHA-256 `6e2665d0a624ff33f6dd567a4e3a76f5ecca84bdd8898f66e7ed4e52f3ca77f3`；不得把本機結果宣稱為公司 Windows 通過。
 - 前景 `watch` 已改用局部更新引擎；檔案事件不再每個都全根 `sync()`。search／status 不會暗中啟動背景程序。
 - Linux 開發沙盒完整 `npm test`：213 項中 210 通過、1 失敗、2 略過。新增 16 項 0.31.0。失敗項為既有 M7 開啟在非 darwin／win32 回報 `ACTION_PLATFORM_UNSUPPORTED`。略過項為 M5 無法讀取目錄（root）及 Windows cmd 專屬測試。不得把此沙盒結果宣稱為 macOS 全套通過或 Windows 驗收。
 - 0.30.0 原始碼、Big5 與索引觀測 **已完成實作**。下列 0.30.0／0.29.1 為歷史紀錄。

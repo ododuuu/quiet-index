@@ -1,6 +1,6 @@
 # LocalDocSearch 操作介面方向
 
-更新：2026-09-22。使用者已確認需要易於日常操作的介面；具體版本尚未排定。本文是後續規格化的建議，不代表已實作。
+更新：2026-09-22。0.32.0 已交付第一版終端互動介面；本文保留後續擴充與本機 Web UI 的判斷依據。
 
 ## 建議結論
 
@@ -21,8 +21,8 @@ Web UI 的優點是版面、可及性與預覽較好；代價是要管理 port�
 
 ## 建議分期
 
-1. 0.32.0 先完成 XLSM／ODT／RTF／CSV，避免介面與解析器同版擴張。
-2. 下一個介面版本先建立可測試的 application service，再做 TUI；CLI 保持相容，介面不直接操作 SQLite schema。
+1. 使用者後續明確要求同版完成；0.32.0 已交付 XLSM／ODT／RTF／CSV 與純 Node 終端互動介面。
+2. 後續介面功能持續經既有 application service／`SearchSession` 擴充；CLI 保持相容，介面不直接操作 SQLite schema。
 3. 在公司 Windows 驗證鍵盤、中文輸入、終端尺寸、open／reveal 與背景狀態。
 4. 收集兩週日常摩擦；只有 TUI 無法解決的問題明確出現時，再規格化 localhost Web UI。
 

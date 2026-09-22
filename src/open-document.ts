@@ -30,7 +30,9 @@ export async function resolveDocument(store: IndexStore, reference: string) {
     const info = await lstat(current);
     if (!info.isFile()) throw new DocumentActionError("ACTION_NOT_FILE", "來源已不是一般檔案。");
     await access(current, constants.R_OK);
-    return { path: current, changed: row.size_bytes !== info.size || row.modified_at_ms !== info.mtimeMs };
+    // 驗證使用實體路徑，但保留索引中的使用者路徑，避免 macOS /var 與 /private/var
+    // 或使用者明確登錄的根目錄別名在 open／reveal 回傳時無故改寫。
+    return { path: row.path, changed: row.size_bytes !== info.size || row.modified_at_ms !== info.mtimeMs };
   } catch (error) {
     if (error instanceof DocumentActionError) throw error;
     throw new DocumentActionError("ACTION_SOURCE_UNAVAILABLE", "來源不存在或無法讀取，請確認權限並重新索引。");

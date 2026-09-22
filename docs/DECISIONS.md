@@ -1,5 +1,12 @@
 # 設計決策紀錄
 
+## D049：0.32.0 先交付純 Node 終端互動介面
+
+- 日期：2026-09-22。使用者要求 0.32.0 同版加入類似 Claude Code 的終端互動介面，並允許參考 OpenCode。採用其「CLI 管程序生命週期、TUI 與核心分層、slash commands、鍵盤導向」概念，但不複製元件程式碼。
+- 不採 OpenCode 的 Bun／Zig／OpenTUI 技術堆疊，避免破壞既定 Node.js 22、免額外編譯與公司 Windows 可攜方向。以 ANSI alternate screen、Node readline 與既有 `SearchSession` 建立唯一 TUI 實作；索引、搜尋、open／reveal 邏輯仍只有一份。
+- 公開入口為 `docsearch tui`，不改無參數顯示 help 或任何既有非互動命令。第一版涵蓋搜尋、全部詞、翻頁、結果內縮小、撤回／重設、open／reveal、status、roots 與 help；context／autoupdate 保留原 CLI，待實際使用證明需要再整合。
+- 不開 localhost port、不載入遠端頁面、不送出文件或索引。未來若需要滑鼠、寬表格或文件預覽，才在同一核心上另行規格化本機 Web UI。
+
 ## D048：0.32.0 加入 XLSM／ODT／RTF／CSV 正文解析
 
 - 日期：2026-09-22。使用者確認四種格式若尚未支援，就列為 0.32.0。程式盤點證實 `.xlsm`、`.odt`、`.rtf`、`.csv` 尚未登錄正文 parser；MSG 內部的 RTF 還原不能視為獨立 RTF 檔案支援。

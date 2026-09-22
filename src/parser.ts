@@ -13,6 +13,9 @@ import { docParser, xlsParser } from "./parsers/legacy.js";
 import { htmlParser, mhtParser } from "./parsers/web.js";
 import { msgParser } from "./parsers/msg.js";
 import { xmlParser } from "./parsers/xml.js";
+import { csvParser } from "./parsers/csv.js";
+import { odtParser } from "./parsers/odt.js";
+import { rtfParser } from "./parsers/rtf.js";
 
 export const MAX_FILE_BYTES = 100 * 1024 * 1024;
 
@@ -22,6 +25,10 @@ const parsers = new Map<string, DocumentParser>([
   [docxParser.extension, docxParser],
   [pptxParser.extension, pptxParser],
   [xlsxParser.extension, xlsxParser],
+  [".xlsm", xlsxParser],
+  [odtParser.extension, odtParser],
+  [rtfParser.extension, rtfParser],
+  [csvParser.extension, csvParser],
   [pdfParser.extension, pdfParser],
   [docParser.extension, docParser],
   [xlsParser.extension, xlsParser],
@@ -63,7 +70,7 @@ export async function parseDocument(filePath: string): Promise<DocumentRecord> {
     document.blocks = await parser.parse(content);
     if (document.blocks.length === 0) document.status = "no_text";
   } catch (error) {
-    document.status = error instanceof Error && "code" in error && ["PDF_ENCRYPTED", "DOC_ENCRYPTED", "XLS_ENCRYPTED"].includes(String(error.code)) ? "encrypted" : "error";
+    document.status = error instanceof Error && "code" in error && ["PDF_ENCRYPTED", "DOC_ENCRYPTED", "XLS_ENCRYPTED", "ODT_ENCRYPTED"].includes(String(error.code)) ? "encrypted" : "error";
     document.errorCode = error instanceof Error && "code" in error ? String(error.code) : "PARSE_ERROR";
     if (["VSD_VERSION_UNSUPPORTED", "VSD_STRUCTURE_UNSUPPORTED"].includes(document.errorCode)) document.status = "unsupported";
     document.errorMessage = document.status === "unsupported" ? "此 VSD 版本或結構尚不支援，僅可搜尋檔名" : error instanceof Error ? error.message : String(error);

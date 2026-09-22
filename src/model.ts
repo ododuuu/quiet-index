@@ -23,7 +23,7 @@ export interface DocumentRecord {
 
 export const supportedExtensions = new Set([
   ".md", ".txt", ".xml", ".java", ".sql", ".js",
-  ".docx", ".pptx", ".xlsx", ".pdf", ".doc", ".xls",
+  ".docx", ".pptx", ".xlsx", ".xlsm", ".odt", ".rtf", ".csv", ".pdf", ".doc", ".xls",
   ".mht", ".mhtml", ".html", ".htm", ".xhtml", ".adoc", ".msg", ".vsd",
 ]);
 

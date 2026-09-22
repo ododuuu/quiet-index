@@ -878,7 +878,7 @@ docsearch autoupdate stop
 6. 回歸 M25／M26／0.30.0 搜尋、根目錄歸屬、ignore scope、解析版本與 Windows cmd launcher。量測待機 RSS／CPU、單檔事件至可搜尋延遲、1000 檔事件暴增、完整無變更校正，以及搜尋期間背景提交。
 7. 公司 Windows 人工驗收：start → 關閉原 CMD → 新增／修改／改名／刪除文件 → 另一 CMD 搜尋驗證 → 新增及合併根目錄 → status → 手動 index 競爭 → stop；另重開機確認誠實顯示已停止，再 start 補齊停機期間變動。不得以本機測試取代此流程。
 
-## 40. 0.32.0 XLSM／ODT／RTF／CSV 正文解析（已確認規劃，待實作）
+## 40. 0.32.0 XLSM／ODT／RTF／CSV 正文解析與終端互動介面
 
 ### 40.1 目標與共同邊界
 
@@ -920,3 +920,10 @@ docsearch autoupdate stop
 5. RTF 覆蓋 Unicode、Big5／CP950、段落、表格、超連結、binary／object 排除、未知 code page、異常 `\\bin`、巢狀群組及輸出上限；MSG RTF 全套回歸必須保持通過。
 6. CSV 覆蓋 quoted comma、quoted newline、escaped quote、三種換行、UTF-8／UTF-16 BOM／Big5、空欄、長列、公式樣式文字及錯誤解碼。精確記錄 logical row，而非以實體換行誤算位置。
 7. 公司 Windows 使用非機密或已獲准的代表檔驗證四種格式；只回報搜尋文字是否命中、位置、狀態及錯誤碼，不上傳公司內容。0.31.0 背景驗收與公司真實 PDF／PPTX 診斷依 `docs/COMPANY-WINDOWS-DIAGNOSTICS.md` 另行處理，不阻塞本機實作。
+
+### 40.7 終端互動介面
+
+- `docsearch tui` 提供類似 Claude Code／OpenCode 的鍵盤導向全螢幕介面，但以純 Node.js ANSI／readline 實作，不引入 Bun、Zig、原生 TUI runtime 或網頁伺服器。CLI 繼續擁有參數、程序與索引生命週期，TUI 只作展示及命令轉譯。
+- 直接輸入文字等同精確片語搜尋；slash commands 至少提供 `/search`、`/all`、`/next`、`/prev`、`/refine`、`/back`、`/reset`、`/open`、`/reveal`、`/status`、`/roots`、`/help`、`/quit`。搜尋、排序、結果內縮小及索引版本檢查必須重用既有 `SearchSession`，不得另寫一套語意。
+- TUI 只在互動終端啟動，不改變既有命令的非互動輸出。離開、EOF、Ctrl+C 或錯誤都必須還原 alternate screen；不開 TCP port、不傳送文件或索引內容、不暗中啟動背景更新。
+- 本版先完成日常搜尋、翻頁、縮小、開啟、狀態與根目錄查看。`context` 的完整勾選／預覽流程與 autoupdate 管理仍可使用原 CLI；若實際使用證明需要滑鼠、寬表格或文件預覽，再另案增加 localhost Web UI。

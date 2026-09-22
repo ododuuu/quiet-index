@@ -1,21 +1,18 @@
 import { parentPort, workerData } from "node:worker_threads";
 import { createRequire } from "node:module";
 import { crc32 } from "node:zlib";
-import { Readable } from "node:stream";
-import { pipeline } from "node:stream/promises";
 import type { FieldsData, ParserConfig } from "@kenjiuno/msgreader";
 import XLSX from "xlsx";
 import iconv from "iconv-lite";
 import { decompressRTF } from "@kenjiuno/decompressrtf";
-import { DeEncapsulate, Tokenize } from "rtf-stream-parser";
 import { htmlBlocks, decodeHtml } from "./web.js";
 import type { TextBlock } from "../model.js";
+import { decodeRtf, RTF_LIMIT } from "./rtf-core.js";
 
 const require = createRequire(import.meta.url);
 const MsgReader = (require("@kenjiuno/msgreader") as {
   default: new (data: Uint8Array) => { parserConfig: ParserConfig; getFileData(): FieldsData };
 }).default;
-const RTF_LIMIT = 20 * 1024 * 1024;
 function fail(code: string): never { throw Object.assign(new Error(code), { code }); }
 const clean = (text?: string) => (text ?? "").replace(/\0/g, "").trim();
 function encoding(codepage: number): string {
@@ -35,32 +32,7 @@ async function rtfBody(data: Uint8Array): Promise<{ mode: "text" | "html"; text:
   const raw = Buffer.from(decompressRTF([...bytes]));
   if (raw.length !== size || !raw.subarray(0, 5).equals(Buffer.from("{\\rtf"))) fail("MSG_RTF_INVALID");
   if (raw.length > RTF_LIMIT) fail("MSG_RTF_LIMIT");
-  const rtf = raw.toString("latin1");
-  // 3.8.1 的 tokenizer 會依 bin 參數配置記憶體；進入解析器前界定上限。
-  for (const match of rtf.matchAll(/\\bin(-?\d+)/g)) {
-    const length = Number(match[1]);
-    if (!Number.isSafeInteger(length) || length < 0 || length > raw.length) fail("MSG_RTF_INVALID");
-  }
-  // 一般 RTF 以文字模式處理相同的 Unicode、字碼頁與目的區塊規則。
-  const source = /\\from(?:html\d*|text)\b/.test(rtf) ? raw : Buffer.from(rtf.replace(/^(\{\\rtf\d+)/, "$1\\fromtext "), "latin1");
-  const decoder = new DeEncapsulate({ decode: iconv.decode, warn: () => {} });
-  // 版本鎖定的 feature hook：一般 RTF 不得把圖片 hex、物件及中繼資料當正文。
-  decoder._featureHandlers.unshift({ outputDataFilter(global) {
-    const destinations = global._state.allDestinations ?? {};
-    if (["pict", "object", "objdata", "info", "filetbl", "listtable", "listoverridetable", "fldinst"].some(name => destinations[name])) return true;
-    return undefined;
-  } });
-  const chunks: Buffer[] = [];
-  let outputBytes = 0;
-  await pipeline(Readable.from([source]), new Tokenize(), decoder, async source => {
-    for await (const chunk of source) {
-      const bytes = Buffer.from(chunk);
-      outputBytes += bytes.length;
-      if (outputBytes > RTF_LIMIT) fail("MSG_RTF_LIMIT");
-      chunks.push(bytes);
-    }
-  });
-  return { mode: decoder.isHtml ? "html" : "text", text: Buffer.concat(chunks).toString("utf8") };
+  return decodeRtf(raw, "MSG");
 }
 
 async function parse(data: Uint8Array): Promise<TextBlock[]> {

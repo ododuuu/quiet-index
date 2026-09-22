@@ -18,6 +18,7 @@ import { ClipboardError } from "./clipboard.js";
 import { existsSync } from "node:fs";
 import { createProgressReporter, OperationCancelledError } from "./progress.js";
 import { createInterface } from "node:readline/promises";
+import { runTui } from "./tui.js";
 
 function formatCountMap(counts: Record<string, number>): string {
   const entries = Object.entries(counts).filter(([, count]) => count > 0).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
@@ -86,6 +87,7 @@ export function buildHelpText(): string {
     "  docsearch autoupdate start [--debounce <毫秒>] [--reconcile <毫秒>]",
     "  docsearch autoupdate status",
     "  docsearch autoupdate stop",
+    "  docsearch tui",
     "",
     "search 在互動終端預設每頁 20 筆，可用 n／p 翻頁、/ 關鍵字縮小結果、back 撤回、reset 重設、q 結束；單頁與零結果仍可操作。非互動輸出可用 --page 與 --page-size。--limit 保留為單次輸出的相容選項。",
     "index 可將涵蓋的既有子根合併為上層登錄；已包含於上層的子目錄只同步該子樹。--root 可為已登錄根目錄或其下子樹／已合併原子根。",
@@ -131,7 +133,7 @@ export async function main(args: readonly string[]): Promise<number> {
   }
   const command = args[0];
   if (command === "autoupdate") return runAutoupdateCommand(args.slice(1));
-  if (!["index", "search", "status", "rebuild", "open", "reveal", "roots", "context", "watch"].includes(command ?? "")) {
+  if (!["index", "search", "status", "rebuild", "open", "reveal", "roots", "context", "watch", "tui"].includes(command ?? "")) {
     console.error(`未知命令：${command}`);
     return 2;
   }
@@ -183,6 +185,9 @@ export async function main(args: readonly string[]): Promise<number> {
         }
       }
       rootInput = values[0];
+    } else if (command === "tui") {
+      if (args.length !== 1) throw new Error("用法：docsearch tui");
+      if (!process.stdin.isTTY || !process.stdout.isTTY) throw new Error("tui 需要互動終端。");
     } else if (command === "index" || command === "rebuild") {
       const values = args.slice(1).filter(value => value !== "--verbose");
       if (values.length > 1 || args.filter(value => value === "--verbose").length > 1 || values.some(value => !value.trim() || value.startsWith("--"))) {
@@ -375,6 +380,22 @@ export async function main(args: readonly string[]): Promise<number> {
     }
     const indexStore = store;
     const roots = indexStore.roots();
+    if (command === "tui") {
+      const readline = createInterface({ input: process.stdin, output: process.stdout, terminal: true });
+      let closed = false;
+      readline.on("close", () => { closed = true; });
+      readline.on("SIGINT", () => readline.close());
+      try {
+        return await runTui(store, {
+          ansi: true,
+          write: text => process.stdout.write(text),
+          ask: async prompt => {
+            if (closed) return null;
+            try { return await readline.question(prompt); } catch { return null; }
+          },
+        });
+      } finally { readline.close(); }
+    }
     const registeredRoot = (value: string) => {
       const requested = resolveUserRootPath(value);
       const root = roots.find(item => process.platform === "win32" ? item.toLowerCase() === requested.toLowerCase() : item === requested);
