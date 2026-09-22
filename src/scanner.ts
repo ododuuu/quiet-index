@@ -1,7 +1,7 @@
 import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import { loadIgnoreRules, type IgnoreRules } from "./ignore.js";
-import { coversPath, RootError } from "./root-plan.js";
+import { canonicalizeRootInput, coversPath, RootError } from "./root-plan.js";
 import type { Diagnostic, SkippedCounts } from "./model.js";
 import { throwIfAborted, type ProgressUpdate } from "./progress.js";
 
@@ -75,10 +75,8 @@ export async function scan(root: string, options: ScanOptions = {}): Promise<Sca
 }
 
 export async function validateRoot(input: string): Promise<string> {
-  if (process.platform === "win32" && /^[A-Za-z]:(?![\\/])/u.test(input.trim())) {
-    throw new RootError(`磁碟代號路徑不完整：${input}；請使用 ${input.trim().slice(0, 2)}\\ 表示該磁碟根目錄。`);
-  }
-  const root = path.resolve(input);
+  const candidate = process.platform === "win32" ? canonicalizeRootInput(input, "win32").path : input;
+  const root = path.resolve(candidate);
   let info;
   try {
     info = await stat(root);

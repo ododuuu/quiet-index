@@ -4,7 +4,7 @@ import path from "node:path";
 import { realpath, stat } from "node:fs/promises";
 import { parseDocument } from "./parser.js";
 import { scan, validateRoot, RootError } from "./scanner.js";
-import { planRootOperation, type RootOperationKind } from "./root-plan.js";
+import { canonicalizeRootInput, planRootOperation, resolveUserRootPath, runtimePathPlatform, type RootOperationKind } from "./root-plan.js";
 import { emptyStatusCounts, supportedExtensions, type Diagnostic, type DocumentRecord, type SyncSummary } from "./model.js";
 import type { IndexStore } from "./store.js";
 import { throwIfAborted, yieldToEvents, type ProgressUpdate } from "./progress.js";
@@ -41,8 +41,8 @@ export async function sync(rootInput: string, store: IndexStore, options: SyncOp
     await store.upgrade({ lockHeld: true, ...(options.signal ? { signal: options.signal } : {}),
       ...(options.onProgress ? { onProgress: options.onProgress } : {}) });
     throwIfAborted(options.signal);
-    if ((options.requireRegistered || options.rebuild) && !store.roots().includes(path.resolve(rootInput))) {
-      const merged = store.findMergedParent(path.resolve(rootInput));
+    if ((options.requireRegistered || options.rebuild) && !store.roots().includes(resolveUserRootPath(rootInput))) {
+      const merged = store.findMergedParent(resolveUserRootPath(rootInput));
       if (merged) {
         throw new RootError(options.rebuild
           ? `該路徑已合併至上層索引：${merged}；重建請指定有效根目錄，避免隱式擴大範圍。`
@@ -53,7 +53,7 @@ export async function sync(rootInput: string, store: IndexStore, options: SyncOp
     return await syncLocked(rootInput, store, options);
   } catch (error) {
     if (error instanceof RootError || error instanceof IgnoreConfigurationError) {
-      const registered = store.roots().find(root => root === path.resolve(rootInput));
+      const registered = store.roots().find(root => root === resolveUserRootPath(rootInput));
       if (registered) store.recordSync(registered, false, [error.message], [], undefined,
         [{ stage: "scan", path: registered, code: "ROOT_SYNC_FAILED", message: "根目錄無法同步，保留既有索引" }]);
     }
@@ -63,8 +63,9 @@ export async function sync(rootInput: string, store: IndexStore, options: SyncOp
 
 async function syncLocked(rootInput: string, store: IndexStore, options: SyncOptions): Promise<SyncReport> {
   const started = performance.now();
-  options.onProgress?.({ stage: "scan", message: "開始掃描根目錄", path: rootInput });
-  const resolved = await validateRoot(rootInput);
+  const canon = runtimePathPlatform() === "win32" ? canonicalizeRootInput(rootInput, "win32") : { path: rootInput };
+  options.onProgress?.({ stage: "scan", message: "開始掃描根目錄", path: canon.path });
+  const resolved = await validateRoot(canon.path);
   let actual: string;
   try { actual = await realpath(resolved); } catch { actual = resolved; }
   const existing = await Promise.all(store.roots().map(async registered => {
@@ -104,6 +105,7 @@ async function syncLocked(rootInput: string, store: IndexStore, options: SyncOpt
   found.skipped.builtin += found.paths.length - sourcePaths.length;
   found.paths = sourcePaths;
   const notices: string[] = [];
+  if (canon.rewrittenFrom !== undefined) notices.push(`已將根目錄 ${canon.rewrittenFrom} 視為 ${canon.path}`);
   if (plan.kind === "merge") {
     notices.push(`合併根目錄範圍：新增 ${root}，合併既有子根 ${plan.mergedRoots.length} 個，保留文件 ${retainedDocuments} 份。`);
     for (const child of plan.mergedRoots) notices.push(`合併：${child}`);

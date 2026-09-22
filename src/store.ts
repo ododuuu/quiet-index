@@ -6,7 +6,7 @@ import { DatabaseSync } from "node:sqlite";
 import { brotliCompressSync, brotliDecompressSync, constants as zlibConstants } from "node:zlib";
 import { documentStatuses, type Diagnostic, type SyncSummary, type DocumentRecord, type DocumentStatus, type TextBlock } from "./model.js";
 import { throwIfAborted, yieldToEvents, type ProgressUpdate } from "./progress.js";
-import { coversPath, samePath } from "./root-plan.js";
+import { coversPath, resolveUserRootPath, samePath } from "./root-plan.js";
 import { RootError } from "./scanner.js";
 
 export function defaultDatabasePath(): string {
@@ -359,7 +359,7 @@ export class IndexStore {
   }
 
   resolveSearchScope(input: string): SearchScope {
-    const requested = path.resolve(input);
+    const requested = resolveUserRootPath(input);
     const roots = this.roots();
     const exact = this.matchRoot(requested, roots);
     if (exact) return { root: exact };

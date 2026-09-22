@@ -17,7 +17,7 @@ import { acquireWriteLock } from "../src/write-lock.js";
 import { OperationCancelledError } from "../src/progress.js";
 import { runWatch } from "../src/watch.js";
 import {
-  parseFsPath, planRootOperation, coversPath, samePath, strictlyCovers,
+  parseFsPath, planRootOperation, coversPath, samePath, strictlyCovers, canonicalizeRootInput,
 } from "../src/root-plan.js";
 
 async function fixture(run: (temp: string, store: IndexStore) => Promise<void>) {
@@ -44,6 +44,14 @@ test("M26 path coverage uses components, not string prefixes", () => {
   assert.equal(samePath("d:\\Backup", "D:\\backup", "win32"), true);
   assert.throws(() => parseFsPath("D:", "win32"), RootError);
   assert.throws(() => parseFsPath("D:foo", "win32"), RootError);
+  assert.equal(canonicalizeRootInput("D:", "win32").path, "D:\\");
+  assert.equal(canonicalizeRootInput("D:", "win32").rewrittenFrom, "D:");
+  assert.equal(canonicalizeRootInput("D:\\", "win32").path, "D:\\");
+  assert.equal(canonicalizeRootInput("D:/", "win32").path, "D:\\");
+  assert.equal(canonicalizeRootInput("D:＼", "win32").path, "D:\\");
+  assert.equal(canonicalizeRootInput("Ｄ：／", "win32").path, "D:\\");
+  assert.equal(parseFsPath("D:＼", "win32").drive, "d:");
+  assert.deepEqual([...parseFsPath("D:／", "win32").parts], []);
   const disk = parseFsPath("D:\\", "win32");
   assert.equal(disk.drive, "d:");
   assert.deepEqual(disk.parts, []);

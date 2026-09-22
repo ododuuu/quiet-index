@@ -1,3 +1,5 @@
+import path from "node:path";
+
 export class RootError extends Error {}
 
 export type PathPlatform = "posix" | "win32";
@@ -26,15 +28,41 @@ export interface RootOperationPlan {
   subtree: string | null;
 }
 
+export interface CanonicalRootInput {
+  path: string;
+  rewrittenFrom?: string;
+}
+
 export function runtimePathPlatform(): PathPlatform {
   return process.platform === "win32" ? "win32" : "posix";
 }
 
+/** NFKC 會把全形 ＼／：Ｄ 轉成半形；命令列引號裡的 "D:\\" 常被吃成 D:。 */
+export function normalizeWindowsPathText(value: string): string {
+  return value.normalize("NFKC").trim().replaceAll("/", "\\");
+}
+
+export function canonicalizeRootInput(input: string, platform: PathPlatform = runtimePathPlatform()): CanonicalRootInput {
+  if (platform !== "win32") return { path: input };
+  const normalized = normalizeWindowsPathText(input);
+  const driveRoot = /^([A-Za-z]:)[\\]*$/u.exec(normalized);
+  if (driveRoot) {
+    const next = `${driveRoot[1]}\\`;
+    return normalized === next ? { path: next } : { path: next, rewrittenFrom: input };
+  }
+  return { path: normalized };
+}
+
+export function resolveUserRootPath(input: string, platform: PathPlatform = runtimePathPlatform()): string {
+  const { path: canonical } = canonicalizeRootInput(input, platform);
+  return (platform === "win32" ? path.win32 : path.posix).resolve(canonical);
+}
+
 export function parseFsPath(value: string, platform: PathPlatform = runtimePathPlatform()): ParsedFsPath {
   if (platform === "win32") {
-    const raw = value.replaceAll("/", "\\");
+    const raw = normalizeWindowsPathText(value);
     if (/^[A-Za-z]:(?![\\])/u.test(raw)) {
-      throw new RootError(`磁碟代號路徑不完整：${value}；請使用 ${raw.slice(0, 2)}\\ 表示該磁碟根目錄。`);
+      throw new RootError(`磁碟代號路徑不完整：${value}；磁碟根目錄請使用 ${raw.slice(0, 2)}:/ （加引號時不要寫成 "${raw.slice(0, 2)}:\\"，尾端反斜線會被吃掉）。`);
     }
     if (raw.startsWith("\\\\")) {
       const segs = raw.slice(2).split(/\\+/u).filter(Boolean);

@@ -6,6 +6,7 @@ import { actOnDocument, DocumentActionError } from "./open-document.js";
 import { defaultDatabasePath, IndexStore } from "./store.js";
 import { parseTypes, type SearchResult } from "./search.js";
 import { runSearchSession, SearchSession, SearchIndexChangedError } from "./search-session.js";
+import { resolveUserRootPath } from "./root-plan.js";
 import { RootError } from "./scanner.js";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -62,6 +63,7 @@ export function buildHelpText(): string {
     "",
     "search 在互動終端預設每頁 20 筆，可用 n／p 翻頁、/ 關鍵字縮小結果、back 撤回、reset 重設、q 結束；單頁與零結果仍可操作。非互動輸出可用 --page 與 --page-size。--limit 保留為單次輸出的相容選項。",
     "index 可將涵蓋的既有子根合併為上層登錄；已包含於上層的子目錄只同步該子樹。--root 可為已登錄根目錄或其下子樹／已合併原子根。",
+    "Windows 磁碟根目錄請用 D:/ ；加引號時請寫 D:/，不要讓路徑以反斜線結尾。",
     "context 預設 100、最高 500。--type 例如 pdf,docx,xml（可有前導點、忽略大小寫）。",
     `目前支援 ${[...supportedExtensions].join("、")}（PDF 只擷取文字層）；搜尋前請先執行 index。`,
     "VSD v11 擷取直接儲存的圖形文字；不展開 master／動態欄位，舊版或不支援結構仍可搜尋檔名。",
@@ -247,7 +249,7 @@ export async function main(args: readonly string[]): Promise<number> {
       const registered = store.roots();
       let targets: string[];
       if (rootInput) {
-        const requested = path.resolve(rootInput);
+        const requested = resolveUserRootPath(rootInput);
         const existing = registered.find(root => process.platform === "win32" ? root.toLowerCase() === requested.toLowerCase() : root === requested);
         if (!existing) {
           const merged = store.findMergedParent(requested);
@@ -282,7 +284,7 @@ export async function main(args: readonly string[]): Promise<number> {
     }
     if (command === "index" || command === "rebuild") {
       if (command === "rebuild" && rootInput) {
-        const requested = path.resolve(rootInput);
+        const requested = resolveUserRootPath(rootInput);
         const existing = store.roots().find(root => process.platform === "win32" ? root.toLowerCase() === requested.toLowerCase() : root === requested);
         if (!existing) {
           const merged = store.findMergedParent(requested);
@@ -334,7 +336,7 @@ export async function main(args: readonly string[]): Promise<number> {
     const indexStore = store;
     const roots = indexStore.roots();
     const registeredRoot = (value: string) => {
-      const requested = path.resolve(value);
+      const requested = resolveUserRootPath(value);
       const root = roots.find(item => process.platform === "win32" ? item.toLowerCase() === requested.toLowerCase() : item === requested);
       if (!root) {
         const merged = indexStore.findMergedParent(requested);
