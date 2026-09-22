@@ -1,6 +1,6 @@
 # LocalDocSearch
 
-目前版本為 **0.33.0**：新增唯讀本機 stdio MCP，讓 Codex 等相容 Host 搜尋既有索引，並只把使用者選定的文件片段建立成上下文。`docsearch tui` 同步加入 `[x]` 選取籃、完整預覽與逐字 `yes` 後複製。MCP 不提供 index、刪除、open／reveal 或整庫匯入；文件解析與索引仍全部留在本機。公司 Windows 0.31.0～0.33.0 驗收尚待回報。
+目前版本為 **0.34.0**：在 0.33.0 唯讀本機 stdio MCP 上加入標準 MCP App 搜尋工作台。相容 Host 可直接搜尋、跨頁勾選最多 20 份文件、把重新驗證後的片段加入模型上下文，並只在使用者明確按鍵後送出問題；不支援 UI 的 Host 仍可使用四個 headless 工具或 `docsearch tui`。另提供安全冪等的 Codex 註冊與唯讀 doctor。MCP 不提供 index、刪除、open／reveal 或整庫匯入；文件解析與索引仍全部留在本機。公司 Windows 0.31.0～0.34.0 驗收尚待回報。
 
 LocalDocSearch 0.26.2 是純本機 CLI，目前以 macOS 作為主要可執行與迭代環境，並保留 Windows 相容方向。它支援原有六種格式，並新增 `.doc`、`.xls`、`.mht`／`.mhtml`、`.html`／`.htm`／`.xhtml`、`.adoc`、`.msg` 與 `.vsd`，搜尋檔名、標題及內容。其他格式與無副檔名檔案會進入本機清冊，可依檔名及副檔名找到。文件留在原位置，索引與搜尋不需要網路或外部 AI。
 
@@ -58,6 +58,9 @@ node dist/src/cli.js autoupdate status
 node dist/src/cli.js autoupdate stop
 node dist/src/cli.js tui
 node dist/src/cli.js mcp
+node dist/src/cli.js setup codex --dry-run
+node dist/src/cli.js setup codex
+node dist/src/cli.js doctor
 node dist/src/cli.js status
 node dist/src/cli.js status --issues --types
 node dist/src/cli.js rebuild --verbose
@@ -87,21 +90,29 @@ node dist/src/cli.js rebuild --verbose
 
 如果先用 search 找過文件，可加 `--select "文件代碼1,文件代碼2"` 預選，再調整並確認；省略 query 則先提示輸入關鍵字。預選代碼需出現在本次候選中。
 
-匯出是路徑、各自選取查詢、命中片段及來源資訊的 JSON／Markdown，只有選取內容，不含完整文件或未選文件。它留在本機，供你手動帶入允許的討論通道；本版不接模型或自動讀取聊天帳號。若來源或索引已變更，先重新 index 再選取。既有輸出檔案不覆寫，請改用新檔名。
+匯出是路徑、各自選取查詢、命中片段及來源資訊的 JSON／Markdown，只有選取內容，不含完整文件或未選文件。CLI `context` 本身仍不接模型，內容留在本機供你手動帶入允許的討論通道；0.34.0 的可選 MCP App 則只在相容 Host 內、經你按鍵後更新該 Host 的模型上下文。若來源或索引已變更，先重新 index 再選取。既有輸出檔案不覆寫，請改用新檔名。
 
 Windows 所有命令皆可用 `.\docsearch.cmd` 代替 `node dist/src/cli.js`；不需要全域安裝或修改 PATH。此入口需 Node.js 已可從終端執行。
 
 ## 連接 Codex／MCP Host
 
-0.33.0 提供三個唯讀工具：`search_documents`、`prepare_context`、`index_status`。本機 Codex CLI 可在完成 `npm ci` 後註冊：
+0.34.0 提供四個唯讀工具：`search_documents`、`prepare_context`、`index_status`、`open_search_app`。最後一個工具會在支援 MCP Apps 的 Host 顯示搜尋／勾選工作台；資料工具仍可脫離介面使用。完成 `npm ci` 後可先唯讀診斷並預覽註冊內容：
+
+```powershell
+node dist/src/cli.js doctor
+node dist/src/cli.js setup codex --dry-run
+node dist/src/cli.js setup codex
+```
+
+`setup codex` 先檢查既有 `localdocsearch`：相同設定不重複新增，同名但指向不同安裝時拒絕覆寫。若要手動註冊，官方 Codex CLI 等價命令為：
 
 ```powershell
 codex mcp add localdocsearch -- node "C:\完整路徑\LocalDocSearch\dist\src\cli.js" mcp
 ```
 
-macOS／Linux 將路徑改成解壓目錄的絕對路徑。可用 `codex mcp list` 核對；LocalDocSearch 不會自動修改 Codex 設定。Host 以子程序啟動 `docsearch mcp`，stdout 僅供 MCP JSON-RPC，不開 port。
+macOS／Linux 將路徑改成解壓目錄的絕對路徑。可用 `codex mcp list` 或 Codex 內的 `/mcp` 核對。只有明確執行 `setup codex` 才會請 Codex CLI 寫入設定；`doctor` 與 `--dry-run` 都不修改設定。Host 以子程序啟動 `docsearch mcp`，stdout 僅供 MCP JSON-RPC，不開 port。
 
-建議流程是：請 AI 呼叫 `search_documents` → AI 顯示文件代碼與短片段 → 你明確說要選哪些代碼 → AI 才呼叫 `prepare_context`。後者最多 20 份文件、每份 10 段、總計 256 KiB，並會重新核對來源；沒有全選或整庫自動灌入。ChatGPT 網頁不會直接讀取本機 Codex 的 stdio 設定，不能把本機索引誤當成已連上雲端。
+有 UI 時可請 AI 呼叫 `open_search_app`，在工作台搜尋、勾選，再按「加入 AI 上下文」或填入問題後按「加入並送出問題」。無 UI 時，流程仍是 `search_documents` → 顯示代碼與短片段 → 你明確選代碼 → `prepare_context`。後者最多 20 份文件、每份 10 段、總計 256 KiB，並會重新核對來源；沒有全選或整庫自動灌入。ChatGPT 網頁不會直接讀取本機 Codex 的 stdio 設定，不能把本機索引誤當成已連上雲端。
 
 ## 多根目錄
 

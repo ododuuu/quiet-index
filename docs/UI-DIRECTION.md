@@ -1,10 +1,10 @@
 # LocalDocSearch 操作介面方向
 
-更新：2026-09-23。0.33.0 已將 TUI 選取籃與唯讀本機 MCP 接上同一套上下文服務；本文保留 MCP App／本機 Web UI 的判斷依據。
+更新：2026-09-23。0.34.0 已將標準 MCP App 搜尋／勾選／加入上下文接上既有唯讀工具；TUI 與 headless MCP 保留為相容備援。本文保留是否需要 localhost Web UI 的判斷依據。
 
 ## 建議結論
 
-目前已完成類似 Claude Code 的本機終端互動介面（TUI）與 stdio MCP。下一步優先在 MCP 工具上增加可選的嵌入式 MCP App：搜尋、勾選、確認後把選定片段送回對話；仍保留 TUI 作所有終端可用的後備。不要做需要外部網站或雲端服務才能使用的介面。
+目前已完成類似 Claude Code 的本機終端互動介面（TUI）、stdio MCP 與可選嵌入式 MCP App。相容 Host 內可搜尋、勾選，按鍵後把選定片段加入模型上下文；不相容 Host 使用 headless tools 或 TUI。現階段不要再做需要外部網站或雲端服務才能使用的介面。
 
 ## 為何先做終端互動介面
 
@@ -24,7 +24,7 @@ Web UI 的優點是版面、可及性與預覽較好；代價是要管理 port�
 1. 使用者後續明確要求同版完成；0.32.0 已交付 XLSM／ODT／RTF／CSV 與純 Node 終端互動介面。
 2. 後續介面功能持續經既有 application service／`SearchSession` 擴充；CLI 保持相容，介面不直接操作 SQLite schema。
 3. 在公司 Windows 驗證鍵盤、中文輸入、終端尺寸、open／reveal 與背景狀態。
-4. 0.33.0 已補 `/select`／`/context` 與 MCP。0.34.0 優先評估相容 Host 內的 MCP App 選取介面及一鍵註冊／診斷；Host 不支援 UI 時，headless tools 與 TUI 必須完整可用。
+4. 0.33.0 已補 `/select`／`/context` 與 MCP；0.34.0 已完成相容 Host 內的 MCP App 選取介面、安全註冊與唯讀診斷。Host 不支援 UI 時，headless tools 與 TUI 仍完整可用。
 5. 只有嵌入 UI 與 TUI 都無法解決的滑鼠／預覽需求明確出現時，才另行規格化 localhost Web UI。
 
 ## 必要安全界線

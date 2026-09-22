@@ -1,6 +1,6 @@
 {
   "name": "localdocsearch",
-  "version": "0.33.0",
+  "version": "0.34.0",
   "private": true,
   "description": "Offline local document search and context selection CLI",
   "type": "module",

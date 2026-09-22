@@ -1,5 +1,13 @@
 # 設計決策紀錄
 
+## D051：0.34.0 以標準 MCP App 把按鈕化選取接到既有唯讀工具
+
+- 日期：2026-09-23。使用者要求 0.34.0 成為朝最終目的的大版本：AI Host 內可直接搜尋、勾選並把選定片段加入上下文。MCP 與按鈕介面不衝突；MCP 是能力與資料邊界，MCP App resource 是同一能力上的人機操作面。
+- 採公開 MCP Apps `ui://` resource、`text/html;profile=mcp-app`、`_meta.ui.resourceUri`、`tools/call`、`ui/update-model-context` 與 `ui/message`。`open_search_app` 只負責展示，三個資料工具保持 headless 可用；Codex、ChatGPT 或其他 Host 若未支援 UI，仍能用 MCP 工具或本機 TUI。
+- UI 自足且零外部資源，所有回傳文字以 DOM 安全 API 顯示；最多人工選 20 份。只有明確按鈕才更新 model context，只有另填問題並按送出才產生 `ui/message`，不做整庫自動灌入或背景對話注入。
+- 新增 `docsearch setup codex` 作官方 CLI 的安全包裝：先檢查同名設定，相同即冪等，不同則拒絕覆寫；`--dry-run` 供公司電腦先核對。另加唯讀 `doctor`，但不藉診斷建立／升級索引或修改 Host。
+- 仍維持本機 stdio，不開 HTTP。ChatGPT 網頁不讀本機 Codex config；遠端 plugin／tunnel 會改變公司文件信任邊界，0.34.0 明確不做。
+
 ## D050：0.33.0 以唯讀 stdio MCP 串接 AI，TUI 保留人工選取
 
 - 日期：2026-09-22。使用者確認搜尋核心完成後，下一目標是讓 AI 能接用，同時保留「選擇後才加入上下文」的關鍵操作。MCP 與人選介面不是互斥方案：MCP 定義能力與資料邊界，TUI 或支援 MCP Apps 的 Host 負責人機選取。

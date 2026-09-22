@@ -963,3 +963,41 @@ docsearch mcp
 3. TUI 測試覆蓋選取、取消、跨搜尋、模式衝突、清空、完整預覽、非 yes 不複製、yes 後只複製已選片段及 alternate screen 還原。
 4. 回歸既有 `search`、`context`、TUI open／reveal、status 與全部解析格式；MCP 執行不載入 Office／PDF parser、不寫 SQLite、不掃描來源。
 5. 文件提供 Codex CLI 的專案／使用者層註冊範例，但不自動修改使用者設定。公司 Windows 驗證只使用獲准的代表文件，回報工具名稱、結果數、代碼與錯誤碼，不提交公司內容。
+
+## 42. 0.34.0 MCP App 搜尋工作台與本機接入
+
+### 42.1 目標與相容層級
+
+- 0.34.0 將「搜尋 → 人工勾選 → 建立有界上下文 → 交給 AI」收斂成相容 MCP Apps Host 內的一個互動工作台。使用者不必抄文件代碼，也不必先離開 AI 對話；按鈕化與 MCP 共用同一組服務，不是兩套產品。
+- MCP server 新增 `open_search_app` 展示工具及 `ui://localdocsearch/search-context-v1.html` 資源。UI 必須採公開 MCP Apps bridge，不能依賴只在單一 Host 存在的私有全域物件；同時保留 0.33.0 的 `search_documents`、`prepare_context`、`index_status`，使不支援 UI 的 Host 仍能完成 headless 流程。
+- UI 為封裝在 MCP resource 的自足 HTML／CSS／JavaScript，不引用 CDN、字型、分析服務或外部圖片，不開 localhost port。文件內容只經已註冊的本機 stdio server 與目前 Host 間的 MCP 通道流動；LocalDocSearch 不另行上傳或保存對話。
+- ChatGPT 網頁不讀取本機 Codex 設定。0.34.0 不把本機 stdio 冒充網頁端 plugin，也不部署遠端 MCP；若公司政策日後允許遠端接入，必須另定資料邊界、認證與部署規格。
+
+### 42.2 互動工作台
+
+- `open_search_app` 接受可選 query 與 `phrase|all-terms`，只負責顯示工作台及初始狀態；真正資料仍透過 `search_documents`、`prepare_context` 呼叫取得，避免把 UI 與搜尋資料工具耦合。
+- 工作台提供查詢欄、片語／全部詞模式、搜尋、前後頁、結果清單、逐項勾選、清空及已選數量。每頁最多 20 筆，跨頁最多保留 20 個選取項；切換搜尋模式必須清空既有選取，不能混用語意。
+- 結果只以 DOM `textContent` 等安全方式顯示 server 回傳值，不用不受信任文字拼接 HTML。介面不得提供全選整庫、任意路徑讀取、索引寫入、open／reveal 或自動背景更新。
+- 「加入 AI 上下文」先呼叫 `prepare_context` 重新驗證選取，再用標準 `ui/update-model-context` 將 Markdown 與結構化摘要加入目前元件的模型上下文。每次更新覆蓋此元件先前提供的上下文，避免無限累積；空選取不能呼叫。
+- 「加入並送出問題」只有在使用者另填非空白問題並按下按鈕後，才先更新 model context，再用標準 `ui/message` 送出該問題。單純勾選、搜尋或加入上下文不得偷偷建立使用者訊息。
+- Host 不支援 `ui/update-model-context`／`ui/message` 時，UI 顯示清楚錯誤；同一份已選 Markdown 仍由 `prepare_context` 回傳給模型，並保留 TUI `/context` 作為完整備援。
+
+### 42.3 Codex 註冊與診斷
+
+```text
+docsearch setup codex [--dry-run]
+docsearch doctor
+```
+
+- `setup codex --dry-run` 只顯示將註冊的 server 名稱、執行檔及參數，不寫設定。未加 `--dry-run` 時使用官方 `codex mcp add localdocsearch -- <node> <cli> mcp` 命令註冊目前這份安裝。
+- 註冊前先用 `codex mcp get localdocsearch --json` 檢查：相同 command／args 視為已完成；名稱存在但指向不同安裝時拒絕覆寫，要求使用者明確移除或改名，不自動破壞既有設定。找不到 Codex CLI、查詢失敗或註冊失敗須保留原始 exit code 的分類，但不得輸出環境變數或文件內容。
+- `doctor` 是唯讀診斷，檢查目前 Node 是否達 22.17.0、CLI build 是否存在、預設索引是否存在且可唯讀開啟、MCP App resource 及四個工具能否註冊。它不建立索引、不升級 schema、不修改 Codex 設定；必要條件失敗時以非零結束。
+- setup 與 doctor 的測試必須注入假的程序執行器／暫存索引，不能改動開發者真實 Codex 設定。路徑含中文、空白與括號時以 argv 傳遞，不經 shell 字串重解譯。
+
+### 42.4 測試與交付門檻
+
+1. 真實 stdio 協定測試涵蓋 initialize、tools/list、resources/list、resources/read、`open_search_app` 及既有搜尋；確認 UI MIME、URI、tool metadata 與 stdout 純度。
+2. 靜態 UI 安全測試確認沒有外部 URL、`fetch`、WebSocket 或不受信任的 `innerHTML`，並包含 `tools/call`、`ui/update-model-context`、`ui/message`、20 項上限、模式切換清空及錯誤狀態。
+3. setup 測試涵蓋 dry-run、Codex 不存在、全新註冊、相同設定冪等、同名異設定拒絕及含特殊字元路徑；doctor 涵蓋版本不足、索引缺少、健康索引與唯讀不升級。
+4. 完整回歸 0.33.0 headless MCP、TUI 選取、既有 CLI 與全部 parser。UI 不是搜尋真相來源，不能改動排序、代碼、passage 或 256 KiB 上限。
+5. 公司 Windows 以解壓後路徑執行 doctor、setup dry-run、實際註冊及 Host 內搜尋／勾選／加入上下文。只有使用者在公司電腦回報後才能標示 Windows／真實 Host 驗收通過。

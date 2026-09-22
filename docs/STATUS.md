@@ -1,9 +1,12 @@
 # 專案狀態
 
-最後更新：2026-09-23（0.33.0 本機 MCP 與人選上下文閉環已完成本機實作）
+最後更新：2026-09-23（0.34.0 MCP App 搜尋工作台與本機接入已完成本機實作）
 
 ## 目前狀態
 
+- 目前版本：**0.34.0 MCP App 搜尋工作台與本機接入**，規格見 SPEC §42、D051；本機實作完成。相容 Host 可透過標準 MCP App 搜尋、跨頁勾選、更新模型上下文與明確送出問題；另有安全冪等的 Codex 註冊及唯讀 doctor。不支援 UI 時維持四個 headless 工具與 TUI 備援。
+- 0.34.0 本機 Node.js 22.13.1 完整 `npm test` 共 228 項：227 通過、0 失敗、1 項 Windows cmd 專屬略過；正式最低仍為 22.17.0，公司 Windows 與真實 MCP Apps Host 尚未驗收。驗證見 `docs/0.34.0-VALIDATION.md`。
+- 交付包逐檔核對 246 個檔案：`LocalDocSearch-0.34.0.zip`，SHA-256 `779cf31e00ce3c1513131c3d72fa2c7326e2fd3d83e6d2a2c6a760f5e1df8c6e`。
 - 目前版本：**0.33.0 本機 MCP 與人選上下文閉環**，規格見 SPEC §41、D050；本機實作完成。唯讀 stdio MCP 提供 `search_documents`／`prepare_context`／`index_status`，TUI 提供選取籃、預覽與確認複製；不含 MCP 寫入工具、遠端 HTTP、整庫自動匯入或 Host 專屬滑鼠 UI。
 - 0.33.0 本機 Node.js 22.13.1 完整 `npm test` 共 222 項：221 通過、0 失敗、1 項 Windows cmd 專屬略過；正式最低仍為 22.17.0，不得把此結果宣稱為公司 Windows 通過。驗證見 `docs/0.33.0-VALIDATION.md`。
 - 交付包逐檔核對 239 個檔案：`LocalDocSearch-0.33.0.zip`，SHA-256 `adb5a8485cc2aa083b86955ca5caf05a67ce98e5d252ce739a4f09af20882b57`。

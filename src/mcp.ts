@@ -4,6 +4,9 @@ import { serveStdio } from "@modelcontextprotocol/server/stdio";
 import * as z from "zod/v4";
 import { IndexStore } from "./store.js";
 import { indexStatus, McpToolError, prepareContextTool, searchDocuments } from "./mcp-tools.js";
+import { MCP_APP_HTML, MCP_APP_MIME_TYPE, MCP_APP_RESOURCE_URI } from "./mcp-app.js";
+
+export const MCP_TOOL_NAMES = ["search_documents", "prepare_context", "index_status", "open_search_app"] as const;
 
 const readOnlyAnnotations = {
   readOnlyHint: true,
@@ -42,10 +45,39 @@ const typesSchema = z.array(z.string().min(1).max(254)).max(50).optional();
 
 export function createMcpServer(databasePath: string): McpServer {
   const server = new McpServer(
-    { name: "localdocsearch", version: "0.33.0" },
+    { name: "localdocsearch", version: "0.34.0" },
     {
       instructions: "Search the existing local index first. Show document references to the user and call prepare_context only for references the user selected. Never imply that a snippet is the full document.",
     },
+  );
+
+  server.registerResource(
+    "localdocsearch-search-context",
+    MCP_APP_RESOURCE_URI,
+    {
+      title: "LocalDocSearch 搜尋與上下文工作台",
+      description: "在已建立的本機索引中搜尋、人工勾選，並把已選片段加入 AI 上下文。",
+      mimeType: MCP_APP_MIME_TYPE,
+      _meta: {
+        ui: {
+          csp: { connectDomains: [], resourceDomains: [], frameDomains: [], baseUriDomains: [] },
+          prefersBorder: true,
+        },
+      },
+    },
+    async uri => ({
+      contents: [{
+        uri: uri.href,
+        mimeType: MCP_APP_MIME_TYPE,
+        text: MCP_APP_HTML,
+        _meta: {
+          ui: {
+            csp: { connectDomains: [], resourceDomains: [], frameDomains: [], baseUriDomains: [] },
+            prefersBorder: true,
+          },
+        },
+      }],
+    }),
   );
 
   server.registerTool(
@@ -62,6 +94,7 @@ export function createMcpServer(databasePath: string): McpServer {
         pageSize: z.number().int().min(1).max(50).default(10),
       }),
       annotations: readOnlyAnnotations,
+      _meta: { ui: { visibility: ["model", "app"] } },
     },
     async input => withStore(databasePath, store => {
       const result = searchDocuments(store, {
@@ -95,6 +128,7 @@ export function createMcpServer(databasePath: string): McpServer {
         passages: z.number().int().min(1).max(10).default(3),
       }),
       annotations: readOnlyAnnotations,
+      _meta: { ui: { visibility: ["model", "app"] } },
     },
     async input => withStore(databasePath, async store => {
       const result = await prepareContextTool(store, {
@@ -118,6 +152,7 @@ export function createMcpServer(databasePath: string): McpServer {
       description: "唯讀查看 LocalDocSearch 索引格式、文件狀態數與已登錄根目錄；不掃描來源或啟動更新。",
       inputSchema: z.object({}),
       annotations: readOnlyAnnotations,
+      _meta: { ui: { visibility: ["model", "app"] } },
     },
     async () => withStore(databasePath, store => {
       const result = indexStatus(store);
@@ -128,6 +163,33 @@ export function createMcpServer(databasePath: string): McpServer {
     }),
   );
 
+  server.registerTool(
+    "open_search_app",
+    {
+      title: "開啟 LocalDocSearch 搜尋工作台",
+      description: "顯示本機文件搜尋、人工勾選與加入 AI 上下文的互動介面。此工具只展示介面；不支援 MCP Apps 時，請直接使用 search_documents 與 prepare_context。",
+      inputSchema: z.object({
+        query: z.string().max(1000).optional(),
+        mode: modeSchema.optional(),
+      }),
+      annotations: readOnlyAnnotations,
+      _meta: {
+        ui: { resourceUri: MCP_APP_RESOURCE_URI, visibility: ["model", "app"] },
+        "openai/outputTemplate": MCP_APP_RESOURCE_URI,
+        "openai/toolInvocation/invoking": "正在開啟本機搜尋工作台…",
+        "openai/toolInvocation/invoked": "已開啟本機搜尋工作台。",
+      },
+    },
+    async input => {
+      const result = { query: input.query?.trim() ?? "", mode: input.mode ?? "phrase", selectionLimit: 20 };
+      return {
+        content: [{ type: "text", text: "已顯示 LocalDocSearch 搜尋工作台。若 Host 未顯示互動介面，請改用 search_documents 搜尋，再讓使用者選定文件代碼後呼叫 prepare_context。" }],
+        structuredContent: result,
+        _meta: { ui: { resourceUri: MCP_APP_RESOURCE_URI } },
+      };
+    },
+  );
+
   return server;
 }
 
@@ -135,6 +197,6 @@ export async function runMcpServer(databasePath: string): Promise<number> {
   serveStdio(() => createMcpServer(databasePath), {
     onerror: () => console.error("LocalDocSearch MCP transport error."),
   });
-  console.error("LocalDocSearch MCP 0.33.0 running on stdio.");
+  console.error("LocalDocSearch MCP 0.34.0 running on stdio.");
   return 0;
 }

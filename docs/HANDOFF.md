@@ -1,12 +1,20 @@
 # 跨對話交接方式
 
+## 已交付：0.34.0 MCP App 搜尋工作台與本機接入（2026-09-23）
+
+權威規格為 SPEC §42，決策為 D051。`open_search_app` 透過 `ui://localdocsearch/search-context-v1.html` 與 `text/html;profile=mcp-app` 發布自足介面；UI 使用標準 `tools/call`、`ui/update-model-context`、`ui/message`，可搜尋、分頁、人工勾選最多 20 份、更新模型上下文，並只在使用者另填問題及按鍵後送出。沒有外部 URL、fetch、WebSocket、CDN 或 localhost port。
+
+既有 `search_documents`、`prepare_context`、`index_status` 保持 headless 可用，TUI 仍是完整備援。`docsearch setup codex [--dry-run]` 先查同名設定：相同即冪等、不同拒絕覆寫；`docsearch doctor` 只讀檢查 Node 22.17.0、build、索引及 MCP App 註冊。本機 Node.js 22.13.1 完整 228 項為 227 通過、0 失敗、1 項 Windows cmd 專屬略過；交付包 246 個檔案，SHA-256 `779cf31e00ce3c1513131c3d72fa2c7326e2fd3d83e6d2a2c6a760f5e1df8c6e`。測試環境低於正式最低版本，公司 Windows 與真實 MCP Apps Host 尚未驗收。
+
+下一步不是再造搜尋核心或自動 RAG。先在公司 Windows 依 `docs/0.34.0-VALIDATION.md` 驗證 doctor、setup、Host UI 與公司政策；真實 PDF／PPTX／XLS 修正仍只在公司電腦依 `docs/COMPANY-WINDOWS-DIAGNOSTICS.md` 處理。若 Host 不顯示 UI，不得用 headless 成功冒充按鈕已驗收。
+
 ## 已交付：0.33.0 本機 MCP 與人選上下文閉環（2026-09-23）
 
 權威規格為 SPEC §41，決策為 D050。`docsearch mcp` 以 stdio 提供 `search_documents`、`prepare_context`、`index_status` 三個唯讀工具；沒有索引寫入、根目錄變更、open／reveal、任意讀檔或整庫匯入。`prepare_context` 只接受使用者選定的 1～20 個文件代碼，重用既有來源核對、passage 與 256 KiB 上限。
 
 TUI 新增 `/select`、`/unselect`、`/selected`、`/clear`、`/context`；以 `[x]` 顯示選取，完整預覽後只有逐字 `yes` 才複製。MCP 與 TUI 共用 `prepareSelectedContext`，不得分叉搜尋語意。Node.js 22.13.1 本機 222 項為 221 通過、0 失敗、1 項 Windows cmd 專屬略過；低於正式 22.17.0，公司 Windows 及真實 Codex Host 尚未驗收。
 
-下一版依使用者要求直接進入 0.34.0 大幅整合：優先做相容 Host 內的 MCP App 搜尋／勾選／送回對話，以及一鍵註冊與診斷；headless MCP 與 TUI 必須在 Host 不支援嵌入 UI 時保持完整可用。不得把 ChatGPT 網頁描述成本機 stdio 已連接。
+0.34.0 已依使用者要求完成，見上節。不得把 ChatGPT 網頁描述成本機 stdio 已連接。
 
 ## 已交付：0.32.0 格式解析與終端互動介面（2026-09-22）
 
