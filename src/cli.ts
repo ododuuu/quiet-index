@@ -4,7 +4,7 @@ import { interactiveContext, ContextError } from "./context.js";
 import { runWatch, WatchError, resolveWatchDebounce, resolveWatchRescan } from "./watch.js";
 import { runAutoupdateCommand } from "./autoupdate.js";
 import { actOnDocument, DocumentActionError } from "./open-document.js";
-import { defaultDatabasePath, formatMib, IndexStore, type ExtensionStats, type StorageFootprint } from "./store.js";
+import { defaultDatabasePath, describeDatabaseLocation, formatMib, IndexStore, inspectDatabaseFile, type ExtensionStats, type StorageFootprint } from "./store.js";
 import { parseTypes, type SearchResult } from "./search.js";
 import { runSearchSession, SearchSession, SearchIndexChangedError } from "./search-session.js";
 import { resolveUserRootPath } from "./root-plan.js";
@@ -12,13 +12,16 @@ import { RootError } from "./scanner.js";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { IgnoreConfigurationError } from "./ignore.js";
-import type { Diagnostic, SyncSummary } from "./model.js";
+import { reprocessReasonLabels, reprocessReasons, type Diagnostic, type SyncSummary } from "./model.js";
 import { supportedExtensions } from "./model.js";
 import { ClipboardError } from "./clipboard.js";
 import { existsSync } from "node:fs";
 import { createProgressReporter, OperationCancelledError } from "./progress.js";
 import { createInterface } from "node:readline/promises";
-import { runTui } from "./tui.js";
+import { completeTuiCommand, runTui, type TuiStopReason } from "./tui.js";
+import { buildIndexProfile, profilePaths, reserveNewProfile, writeIndexProfile } from "./profile.js";
+import type { SyncReport } from "./sync.js";
+import { productVersion } from "./version.js";
 
 function formatCountMap(counts: Record<string, number>): string {
   const entries = Object.entries(counts).filter(([, count]) => count > 0).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
@@ -75,7 +78,7 @@ export function buildHelpText(): string {
   return [
     "LocalDocSearch — 本機文件搜尋",
     "",
-    "  docsearch index [root] [--verbose]",
+    "  docsearch index [root] [--verbose] [--profile <新檔案>]",
     "  docsearch search <query> [--all-terms] [--page <正整數>] [--page-size <1～100>] [--limit <正整數>] [--type <格式清單>] [--root <路徑>] [--verbose]",
     "  docsearch context [query] (--out <新檔案>|--clipboard) [--all-terms] [--format json|md] [--passages <1～10>] [--select <文件代碼,...>] [--type <格式>] [--root <路徑>] [--limit <1～500>]",
     "  docsearch open <文件代碼> [--dry-run]",
@@ -95,6 +98,8 @@ export function buildHelpText(): string {
     "",
     "search 在互動終端預設每頁 20 筆，可用 n／p 翻頁、/ 關鍵字縮小結果、back 撤回、reset 重設、q 結束；單頁與零結果仍可操作。非互動輸出可用 --page 與 --page-size。--limit 保留為單次輸出的相容選項。",
     "index 可將涵蓋的既有子根合併為上層登錄；已包含於上層的子目錄只同步該子樹。--root 可為已登錄根目錄或其下子樹／已合併原子根。",
+    "普通 index 沿用既有索引。安裝目錄或版本改變不會清空資料，也不必 rebuild。--profile <新檔案> 寫入不含路徑與正文的本機診斷，拒絕覆寫。",
+    `docsearch tui 為 ${productVersion} 全螢幕介面。/help 可翻頁；./help、./quit、./q、./exit 會改成對應命令並提示標準寫法。/quit、/q、/exit 與 EOF 退出 0，Ctrl+C 退出 130。`,
     "Windows 磁碟根目錄請用 D:/ ；加引號時請寫 D:/，不要讓路徑以反斜線結尾。",
     "context 預設 100、最高 500。--type 例如 pdf,docx,xml（可有前導點、忽略大小寫）。",
     `目前支援 ${[...supportedExtensions].join("、")}（PDF 只擷取文字層）；.class 僅檔名。搜尋前請先執行 index。`,
@@ -110,9 +115,37 @@ export function buildHelpText(): string {
   ].join("\n");
 }
 
+function emitProfile(filePath: string | undefined, status: "complete" | "cancelled" | "failed", report: SyncReport | undefined, store: IndexStore | undefined): void {
+  if (!filePath || !report) return;
+  try {
+    const content = store?.contentStats() ?? { documents: 0, blocks: 0, payloads: 0, mappings: 0 };
+    writeIndexProfile(filePath, buildIndexProfile({
+      status, found: report.found, checked: report.checked, updated: report.updated, unchanged: report.unchanged,
+      removed: report.removed, parserCalls: report.parserCalls, failedDocuments: report.failedDocuments,
+      reasonsAttempted: report.reasonsAttempted, reasonsCommitted: report.reasonsCommitted, formats: report.formats,
+      sourceBytes: report.sourceBytes, blocks: content.blocks, payloads: content.payloads, mappings: content.mappings,
+      phasesMs: report.phasesMs, reservoir: report.sample, peakRssBytes: report.peakRssBytes, slowest: report.slowest,
+    }));
+    console.log("已寫入本機 profile（不含路徑、檔名或正文）。");
+  } catch {
+    console.error("PROFILE_WRITE_FAILED：索引已保留，診斷報告沒有寫完。");
+  }
+}
+
 function printSummary(summary: SyncSummary): void {
   console.log(`找到 ${summary.found} 份一般檔案；更新 ${summary.updated}、未變更 ${summary.unchanged}、移除 ${summary.removed}。`);
   console.log(`新增 ${summary.added}、重新處理 ${summary.reprocessed}；解析器呼叫 ${summary.parserCalls} 次。`);
+  if (summary.checked === undefined) console.log("檢查／失敗計數：未提供");
+  else console.log(`已檢查 ${summary.checked}；文件失敗 ${summary.failedDocuments ?? "未提供"}。`);
+  if (summary.reasonsAttempted && summary.reasonsCommitted) {
+    const attempted = summary.reasonsAttempted;
+    const committed = summary.reasonsCommitted;
+    console.log(`更新原因（嘗試）：${reprocessReasons.map(reason => `${reprocessReasonLabels[reason]}=${attempted[reason]}`).join("、")}`);
+    console.log(`更新原因（成功提交）：${reprocessReasons.map(reason => `${reprocessReasonLabels[reason]}=${committed[reason]}`).join("、")}`);
+  } else {
+    console.log("更新原因（嘗試）：未提供");
+    console.log("更新原因（成功提交）：未提供");
+  }
   console.log(`本次處理狀態：${Object.entries(summary.statuses).map(([status, count]) => `${status}=${count}`).join("、")}`);
   console.log(`略過項目（不計已排除目錄的內部文件）：內建規則 ${summary.skipped.builtin}、使用者規則 ${summary.skipped.user}、連結 ${summary.skipped.link}。${summary.skipped.unsupported ? ` 舊版未登錄格式 ${summary.skipped.unsupported}。` : ""}`);
   console.log(`掃描／讀取錯誤 ${summary.readErrors}；同步耗時 ${summary.elapsedMs} ms。`);
@@ -188,6 +221,7 @@ export async function main(args: readonly string[]): Promise<number> {
   let searchPageSize = 20;
   let searchPageSizeSpecified = false;
   let verbose = false;
+  let profilePath: string | undefined;
   let types: string[] | undefined;
   let statusIssues = false;
   let statusTypes = false;
@@ -221,11 +255,25 @@ export async function main(args: readonly string[]): Promise<number> {
       if (args.length !== 1) throw new Error("用法：docsearch tui");
       if (!process.stdin.isTTY || !process.stdout.isTTY) throw new Error("tui 需要互動終端。");
     } else if (command === "index" || command === "rebuild") {
-      const values = args.slice(1).filter(value => value !== "--verbose");
-      if (values.length > 1 || args.filter(value => value === "--verbose").length > 1 || values.some(value => !value.trim() || value.startsWith("--"))) {
-        throw new Error(`用法：docsearch ${command} [root] [--verbose]`);
+      const values: string[] = [];
+      for (let i = 1; i < args.length; i++) {
+        const option = args[i]!;
+        if (option === "--verbose") {
+          if (verbose) throw new Error("不可重複指定 --verbose。");
+          verbose = true;
+        } else if (option === "--profile") {
+          if (command !== "index") throw new Error("--profile 只用於 index。");
+          if (profilePath) throw new Error("不可重複指定 --profile。");
+          const value = args[++i];
+          if (!value || value.startsWith("--")) throw new Error("--profile 需要一個新的檔案路徑。");
+          profilePath = path.resolve(value);
+        } else if (option.startsWith("--") || !option.trim()) {
+          throw new Error(`用法：docsearch ${command} [root] [--verbose]${command === "index" ? " [--profile <新檔案>]" : ""}`);
+        } else if (values.length) {
+          throw new Error(`用法：docsearch ${command} [root] [--verbose]${command === "index" ? " [--profile <新檔案>]" : ""}`);
+        } else values.push(option);
       }
-      rootInput = values[0]; verbose = args.includes("--verbose");
+      rootInput = values[0];
     } else if (command === "roots") {
       if (args.length !== 1 && !(args.length === 3 && args[1] === "remove" && args[2] && !args[2].startsWith("--"))) throw new Error("用法：docsearch roots [remove <root>]");
     } else if (command === "open" || command === "reveal") {
@@ -306,6 +354,19 @@ export async function main(args: readonly string[]): Promise<number> {
   try {
     const databasePath = defaultDatabasePath();
     const writes = command === "index" || command === "rebuild" || command === "watch" || (command === "roots" && args[1] === "remove");
+    if (command === "index" || command === "rebuild") {
+      const location = describeDatabaseLocation();
+      console.log(`索引位置：${location.path}`);
+      console.log(`位置來源：${location.sourceLabel}`);
+      const inspection = inspectDatabaseFile(location.path);
+      if (inspection.error) { console.error(inspection.error); return 3; }
+      console.log(inspection.exists ? "既有索引：沿用同一資料庫，不會因安裝路徑或版本變更而清空。" : "將建立新索引。");
+      if (!inspection.exists && location.source !== "home-fallback") console.log("提示：資料目錄被明確指定；請核對上方路徑是否為預期的索引。");
+    }
+    if (profilePath) {
+      try { reserveNewProfile(profilePath); }
+      catch (error) { console.error(error instanceof Error ? error.message : String(error)); return 2; }
+    }
     if (command === "status") console.log(`索引位置：${databasePath}\n讀取索引狀態…`);
     if (!writes && !existsSync(databasePath)) { console.error("索引尚未建立；請先執行 docsearch index <root>。"); return 3; }
     if (writes) {
@@ -372,13 +433,20 @@ export async function main(args: readonly string[]): Promise<number> {
       }
       const targets = rootInput ? [rootInput] : store.roots();
       if (!targets.length) { console.error("索引尚未建立；請先執行 docsearch index <root>。"); return 3; }
+      const totalDocuments = Object.values(store.counts()).reduce((sum, count) => sum + count, 0);
+      const pending = store.textUpgradePending();
+      console.log(`既有文件 ${totalDocuments}；有效根目錄 ${store.roots().length}；本次操作：${command === "rebuild" ? "明確重建" : "增量"}。`);
+      console.log(`文字解析升級待處理：${pending.total}（${pending.byExtension.map(item => `${item.extension}=${item.count}`).join("、") || "無"}）。此數由已存 metadata 推導，不是磁碟精確剩餘工作量。`);
       let exitCode = 0;
+      let lastReport: SyncReport | undefined;
       // search/status 不載入 Office/PDF 解析器，也不掃描來源目錄。
       const { sync } = await import("./sync.js");
       for (const target of targets) {
         try {
           const report = await sync(target, store, { rebuild: command === "rebuild", requireRegistered: !rootInput || command === "rebuild",
-            ...(abortController ? { signal: abortController.signal } : {}), onProgress: update => reporter?.update(update) });
+            ...(abortController ? { signal: abortController.signal } : {}), onProgress: update => reporter?.update(update),
+            ...(profilePath ? { excludePaths: profilePaths(profilePath) } : {}) });
+          lastReport = report;
           console.log(`根目錄：${report.root}`);
           for (const notice of report.notices.filter(item => OPERATIONAL_NOTICE.test(item))) {
             console.log(`提示：${notice}`);
@@ -408,25 +476,53 @@ export async function main(args: readonly string[]): Promise<number> {
 
         }
       }
+      emitProfile(profilePath, exitCode === 0 ? "complete" : "failed", lastReport, store);
       return exitCode;
     }
     const indexStore = store;
     const roots = indexStore.roots();
     if (command === "tui") {
-      const readline = createInterface({ input: process.stdin, output: process.stdout, terminal: true });
-      let closed = false;
-      readline.on("close", () => { closed = true; });
-      readline.on("SIGINT", () => readline.close());
+      const readline = createInterface({
+        input: process.stdin, output: process.stdout, terminal: true,
+        completer: (line: string): [string[], string] => [completeTuiCommand(line), line],
+      });
+      let stopReason: TuiStopReason = "eof";
+      let settled = false;
+      const pending = { abort: null as AbortController | null };
+      const mark = (reason: TuiStopReason) => {
+        if (reason !== "eof") stopReason = reason;
+        pending.abort?.abort();
+        if (!settled) { settled = true; readline.close(); }
+      };
+      readline.on("close", () => { settled = true; pending.abort?.abort(); });
+      readline.on("SIGINT", () => mark("sigint"));
+      const onInt = () => mark("sigint");
+      const onTerm = () => mark("sigterm");
+      process.on("SIGINT", onInt);
+      process.on("SIGTERM", onTerm);
       try {
         return await runTui(store, {
           ansi: true,
           write: text => process.stdout.write(text),
+          stopReason: () => stopReason,
+          size: () => ({ columns: process.stdout.columns || 80, rows: process.stdout.rows || 24 }),
           ask: async prompt => {
-            if (closed) return null;
-            try { return await readline.question(prompt); } catch { return null; }
+            if (settled) return null;
+            const abort = new AbortController();
+            pending.abort = abort;
+            if (settled) return null;
+            const stop = () => abort.abort();
+            readline.once("close", stop);
+            try { return await readline.question(prompt, { signal: abort.signal }); }
+            catch { return null; }
+            finally { readline.off("close", stop); if (pending.abort === abort) pending.abort = null; }
           },
         });
-      } finally { readline.close(); }
+      } finally {
+        process.off("SIGINT", onInt);
+        process.off("SIGTERM", onTerm);
+        if (!settled) readline.close();
+      }
     }
     const registeredRoot = (value: string) => {
       const requested = resolveUserRootPath(value);
@@ -475,8 +571,11 @@ export async function main(args: readonly string[]): Promise<number> {
     if (command === "status") {
       const format = store.formatStatus();
       console.log(`索引格式：文字儲存 ${format.contentStorageVersion ?? "舊版"}；payload Bloom ${format.payloadBloomVersion ?? "未完成"}`);
-      if (format.needsUpgrade) console.log(`索引升級：需要升級（已完成 ${format.completedDocuments}/${format.totalDocuments} 份文件）；請執行 index 接續。`);
-      else console.log("索引升級：已完成。");
+      if (format.needsUpgrade) console.log(`儲存格式升級：需要升級（已完成 ${format.completedDocuments}/${format.totalDocuments} 份文件）；請執行 index 接續，不必刪庫。`);
+      else console.log("儲存格式升級：已完成。");
+      console.log(format.mappingIndexReady ? "輔助索引：document_payload_blocks.block_id 已就緒。" : "輔助索引：待下一次寫入程序升級；唯讀狀態不會強行寫入。");
+      const pendingText = format.textUpgradeByExtension.map(item => `${item.extension}=${item.count}`).join("、");
+      console.log(`文字解析升級待處理：${format.textUpgradePending}（${pendingText || "無"}）。此數由已存 metadata 推導，不是磁碟精確剩餘工作量。`);
       printStorage(store.storageFootprint());
       for (const root of roots) {
         const syncReport = store.getLastSyncReport(root);
@@ -568,7 +667,9 @@ export async function main(args: readonly string[]): Promise<number> {
     }
   } catch (error) {
     if (error instanceof OperationCancelledError) {
-      reporter?.update({ stage: "cancelled", message: "操作已取消" });
+      reporter?.update({ stage: "cancelled", message: "操作已取消；已提交進度會保留，這不是同步完整。" });
+      const partial = error.partial && typeof error.partial === "object" ? error.partial as SyncReport : undefined;
+      emitProfile(profilePath, "cancelled", partial, store);
       console.error(`${error.code}：${error.message}`);
       return 130;
     }

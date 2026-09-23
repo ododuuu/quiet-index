@@ -57,6 +57,14 @@
 - [ ] 外部 API 只有公司政策明確允許時才測；先用合成文字與低權限／低額度 Key。不得把公司文件拿來做第一次 Provider 驗證。
 - [ ] 不把 ChatGPT／Grok 消費訂閱登入列為缺陷；兩者 API 帳務分開，產品不擷取 cookie 或密碼。
 
+## G. 0.36.0 舊索引與 TUI
+
+- [ ] 先 `status`，核對索引位置仍是公司原本那份。不要刪 journal、WAL，不要 rebuild，不要上傳索引。
+- [ ] 普通 `index D:/ --profile <一個新檔>`。看是檢查進度還是真正解析；中斷後再執行，已提交文件要接續。
+- [ ] 完成後再跑一次。未變更的成功文件應為零 parser。profile 留在公司電腦，只回報匿名的階段、格式、原因與慢檔分布。
+- [ ] Windows Terminal／PowerShell／CMD 試 `docsearch tui`：`/help` 有清單，`./help` 應改去說明並提示標準寫法，`/quit` 退出 0，Ctrl+C 退出 130，之後終端還能輸入。
+- [ ] 沒有上述回報前，不得把公司慢速或 Windows TUI 標成已通過。
+
 ## 回報模板
 
 ```text

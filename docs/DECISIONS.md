@@ -10,6 +10,8 @@
 - TUI 採單一命令登錄、明確 `/help`／退出容錯、Tab 補全、固定輸入／狀態列及可翻頁視圖；保留純 Node 與共用搜尋／context。退出碼定義為 quit／EOF 0、SIGINT 130、SIGTERM 143；全流程清理必須可重入，context 取消不得複製。
 - 本機修正與公司 Windows 驗收分開記錄。沒有公司複驗前，最多宣稱已修本機可重現問題／熱點，不宣稱已解決公司全部效能問題；本版優先於 NEXT-TODO 的 Provider 與 Web UI 擴充。
 
+實作紀錄（2026-09-23，Grok）：規劃當下不升 package 的句子仍然有效，指的是規格提交本身。程式完成並通過本機門檻後，package 與 lockfile 才升到 0.36.0。本機已證實 TUI question 未 settle，以及缺 `block_id` 索引時大型無關 mapping 會拖慢單檔替換；公司 10 分鐘／135 份仍不是已證根因。證據與未解項見 `0.36.0-VALIDATION.md`。
+
 ## D052：0.35.0 以受保護的 localhost 工作台補足拖曳與 Provider 連線
 
 - 日期：2026-09-23。使用者指出 0.34.0 尚缺拖曳檔案及 AI 帳戶／API 操作面。MCP App sandbox 適合已索引內容，但不應為大型任意檔案新增 base64 MCP 工具；因此另加只綁 `127.0.0.1`、亂數 token、嚴格 Origin／Host 與 CSP 的 `docsearch ui`，和既有 TUI／MCP 並存。

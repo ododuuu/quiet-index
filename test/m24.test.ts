@@ -111,7 +111,7 @@ test("M23 fix status reads committed data during a real main-database write", as
     assert.equal(result.error, undefined, `${result.error?.message ?? ""}\nstdout: ${result.stdout}\nstderr: ${result.stderr}`);
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /讀取索引狀態/);
-    assert.match(result.stdout, /索引升級：已完成/);
+    assert.match(result.stdout, /儲存格式升級：已完成/);
   } finally {
     if (child.exitCode === null && child.signalCode === null) {
       const exited = once(child, "exit");

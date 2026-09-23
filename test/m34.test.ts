@@ -8,6 +8,7 @@ import { setupCodex, runDoctor, type CommandResult } from "../src/host-setup.js"
 import { MCP_APP_HTML, MCP_APP_MIME_TYPE, MCP_APP_RESOURCE_URI } from "../src/mcp-app.js";
 import { defaultDatabasePath, IndexStore } from "../src/store.js";
 import { sync } from "../src/sync.js";
+import { productVersion } from "../src/version.js";
 
 test("0.34 MCP App is self-contained and uses the portable bridge", () => {
   assert.match(MCP_APP_RESOURCE_URI, /^ui:\/\//u);
@@ -73,7 +74,7 @@ test("0.34 stdio publishes one UI resource and four decoupled tools", async () =
     assert.match(JSON.stringify(responses.find(item => item.id === 5)), /selectionLimit/u);
     assert.match(JSON.stringify(responses.find(item => item.id === 6)), /mcp-app-protocol-needle/u);
     assert.ok(lines.every(line => line.startsWith("{")), child.stdout);
-    assert.match(child.stderr, /0\.35\.0 running on stdio/u);
+    assert.match(child.stderr, new RegExp(`${productVersion.replaceAll(".", "\\.")} running on stdio`, "u"));
   } finally {
     try { store.close(); } catch {}
     if (oldData === undefined) delete process.env.LOCALDOCSEARCH_DATA_DIR;

@@ -1,10 +1,14 @@
+
+
 # 跨對話交接方式
 
-## 進行中：交給 Grok 實作 0.36.0（2026-09-23）
+## 本機已實作：0.36.0 索引沿用、熱點與 TUI（2026-09-23）
 
-使用者已指定本版處理舊索引沿用、嚴重慢速及 TUI 可用性。權威規格為 [SPEC §44](SPEC.md#44-0360-索引增量效能與-tui-可用性修正)，決策為 D053，狀態以 STATUS 首節為準；優先於下方歷史交接與 NEXT-TODO 的其他功能。本次只有規格／交接，產品仍是 **0.35.0**，不得把 0.36.0 寫成已完成或延用先前暫議的 0.35.1。
+權威規格仍是 [SPEC §44](SPEC.md#44-0360-索引增量效能與-tui-可用性修正)，決策 D053。本機程式、測試、`scripts/benchmark-0.36.0.mjs` 與 `docs/0.36.0-VALIDATION.md` 已完成，package 為 **0.36.0**。公司慢速與 Windows TUI 沒有使用者回報，不得標成已修復。
 
-### 給 Grok 的實作提示
+下一任只在公司電腦做普通 `index <原根目錄> --profile <新檔>`、中斷接續、完成後無變更重跑，以及 TUI `/help`、`./help`、`/quit`、Ctrl+C。不要上傳公司內容、完整索引或含路徑的 verbose 日誌，不要刪 journal／WAL，不要要求 rebuild。
+
+### 當日實作提示（已執行，保留原文）
 
 > 請實作 LocalDocSearch 0.36.0。先讀 AGENTS.md，再依序讀 docs/SPEC.md、docs/STATUS.md、docs/DECISIONS.md、docs/HANDOFF.md；只處理 SPEC §44。程式基線是 0.35.0 的 29f4776d0f16eb2b7e03a2a86c0bf008bf1c554e，從包含本次規格的最新 main 建立工作分支。先補能重現 TUI Ctrl+C／EOF 的真實 PTY 測試、索引位置／逐文件升級接續測試，再以大型既有庫量測替換成本，依證據修正熱點。保留 TEXT_PARSE_VERSION=1、既有索引與 payload、writer lock、外鍵及資料耐久性；不能靠 rebuild／刪庫／排除文件／縮短 parser timeout 解決。依規格完成原因計數、慢階段進度、本機匿名 profile、TUI 命令補全／help／尺寸適配／可靠退出。所有行為變更補自動測試，交付前後效能數字、PTY 證據、0.36.0-VALIDATION.md、README 與更新的 STATUS／DECISIONS／HANDOFF；最後才升 package／lockfile 並打包。公司文件與索引留在公司電腦，沒有使用者回報不得宣稱 Windows 或公司慢速已修復。
 

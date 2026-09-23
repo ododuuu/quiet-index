@@ -1,7 +1,7 @@
 import { lstat, readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import { IGNORE_FILE, IgnoreConfigurationError, loadIgnoreRules } from "./ignore.js";
-import { emptyStatusCounts, needsTextParseUpgrade, supportedExtensions, type Diagnostic, type DocumentRecord } from "./model.js";
+import { classifyReprocess, emptyStatusCounts, reprocessAction, supportedExtensions, type Diagnostic, type DocumentRecord } from "./model.js";
 import { parseDocument } from "./parser.js";
 import { throwIfAborted } from "./progress.js";
 import { coversPath, samePath } from "./root-plan.js";
@@ -219,11 +219,23 @@ async function applyFileUpdateLocked(
       return result;
     }
     const extension = path.extname(filePath).toLowerCase();
-    const retryUnsupported = previous?.status === "unsupported" && supportedExtensions.has(extension);
-    const upgradeText = previous ? needsTextParseUpgrade(previous, extension) : false;
-    if (previous && previous.status !== "error" && !retryUnsupported && !upgradeText
-      && previous.size_bytes === info.size && previous.modified_at_ms === info.mtimeMs) {
+    const reason = classifyReprocess({
+      previous: previous ?? null, extension, sizeBytes: info.size, modifiedAtMs: info.mtimeMs,
+    });
+    const action = reprocessAction(reason, extension);
+    if (action === "skip") {
       result.unchanged = 1;
+      result.kind = "file-upsert";
+      return result;
+    }
+    if (action === "metadata") {
+      store.touchMetadata({
+        path: filePath, filename: path.basename(filePath), extension,
+        sizeBytes: info.size, modifiedAtMs: info.mtimeMs, status: "unsupported",
+        errorCode: null, errorMessage: null, blocks: [],
+      }, root);
+      result.updated = 1;
+      if (!previous) result.added = 1;
       result.kind = "file-upsert";
       return result;
     }

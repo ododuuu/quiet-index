@@ -10,6 +10,7 @@ import { IndexStore } from "../src/store.js";
 import { sync } from "../src/sync.js";
 import { search } from "../src/search.js";
 import { runTui } from "../src/tui.js";
+import { productVersion } from "../src/version.js";
 
 const zipped = (parts: Record<string, string | Uint8Array>) => zipSync(Object.fromEntries(Object.entries(parts)
   .map(([name, value]) => [name, typeof value === "string" ? strToU8(value) : value])));
@@ -113,7 +114,7 @@ test("0.32 formats flow through sync/search and TUI supports search/refine/statu
     const output: string[] = [];
     assert.equal(await runTui(store, { ansi: false, write: value => output.push(value), ask: async () => answers.shift() ?? null }, 1), 0);
     const rendered = output.join("\n");
-    assert.match(rendered, /LocalDocSearch 0\.33/u); assert.match(rendered, /條件：共同字 → 特別字/u);
+    assert.match(rendered, new RegExp(`LocalDocSearch ${productVersion.replaceAll(".", "\\.")}`)); assert.match(rendered, /條件：共同字 → 特別字/u);
     assert.match(rendered, /索引狀態：/u);
   } finally { store.close(); await rm(temp, { recursive: true, force: true }); }
 });

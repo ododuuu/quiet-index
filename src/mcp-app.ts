@@ -1,3 +1,5 @@
+import { productVersion } from "./version.js";
+
 export const MCP_APP_RESOURCE_URI = "ui://localdocsearch/search-context-v1.html";
 export const MCP_APP_MIME_TYPE = "text/html;profile=mcp-app";
 
@@ -288,7 +290,7 @@ export const MCP_APP_HTML = `<!doctype html>
 
   request('ui/initialize', {
     protocolVersion: '2026-01-26',
-    appInfo: { name: 'localdocsearch-search-app', version: '0.35.0' },
+    appInfo: { name: 'localdocsearch-search-app', version: '${productVersion}' },
     appCapabilities: { availableDisplayModes: ['inline', 'fullscreen'] }
   }).then(() => {
     ready = true;

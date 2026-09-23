@@ -1,15 +1,15 @@
 # 專案狀態
 
-最後更新：2026-09-23（0.36.0 索引增量／效能與 TUI 修正規格完成，交由 Grok 實作）
+最後更新：2026-09-23（0.36.0 本機實作完成；公司慢速與 Windows TUI 未驗收）
 
 ## 目前狀態
 
-- **目前進行中里程碑：0.36.0 索引增量、效能與 TUI 可用性修正**。權威規格為 SPEC §44／D053，Grok 交接見 HANDOFF 首節。本次只寫規格與交接，程式／package 仍是 0.35.0，0.36.0 尚未實作；先前建議的 0.35.1 由使用者指定的 0.36.0 取代。
-- 使用者回報 0.35.0 有舊索引卻疑似重新從頭索引、約 10 分鐘只處理 135 份、TUI 簡陋／退出失常及 `./help` 無命令清單。尚缺公司當次階段耗時與資料分布，不能宣稱整庫重建或效能根因已確定。
-- 在 `29f4776d0f16eb2b7e03a2a86c0bf008bf1c554e` 的隔離 checkout 實際建置／PTY 診斷：macOS／Node.js 22.13.1 下 `/quit` 退出 0 並還原畫面；Ctrl+C／EOF 退出 13、出現 unsettled top-level await 且未還原 alternate screen；`./help` 被當搜尋、`/help` 列命令，標題仍是 0.33。原因為 TUI 關閉 readline 後未 settle 正在等待的 question Promise，現有假 IO 測試漏測。
-- 同一 0.35.0 基線本機完整回歸為 233 項、232 通過、0 失敗、0 取消、1 Windows cmd 略過，約 47.23 秒；另 25 項索引升級／格式／TUI 聚焦測試全部通過。這是缺陷診斷基線，非 0.36.0 修正結果；Node 低於正式最低 22.17.0，不能稱為目標環境驗收。
-- 已確認普通 index 可做一次性文字解析升級及新格式補解析，0.36.0 保留解析版本 1；必須區分檢查／略過／實際解析與更新原因。Grok 先量測大型既有庫替換的 SQL 外鍵／mapping／刪除／提交等階段，再修熱點；同時完成 TUI 退出、help 容錯／補全、視窗適配與真實 PTY 回歸。
-- 下一步：Grok 依 SPEC §44 完成程式、測試、benchmark 與 `0.36.0-VALIDATION.md`。公司效能複驗尚未完成；不得以小檔合成測試、改進度文案或現有 232 項通過宣稱公司慢速已解決。本次文件檢查使用 `git diff --check`，未因文件變更重跑程式測試。
+- **目前版本：0.36.0 索引沿用、可診斷效能與 TUI 可用性。** 權威規格 SPEC §44／D053。本機程式與 package 已升到 0.36.0。公司根因與 Windows 終端還沒有使用者回報，不能標成已修復。
+- 本機已修兩件可重現問題：TUI readline 關閉時未 settle `question()`，Ctrl+C／EOF 會變成退出 13 且不還原畫面；`document_payload_blocks` 缺 `block_id` 索引，加上先刪 block，使無關 mapping 變多時單檔替換變慢。0.36.0 先刪子表、重建 `document_payload_blocks_block_id`，外鍵與 writer lock 維持。
+- 合成基準（Linux／Node.js v22.23.2，種子 20260923，各三次）：100 萬／10 萬筆無關 mapping 的固定文件替換中位數比 0.85（1.10 ms／1.29 ms），計畫使用 `document_payload_blocks_block_id`。同一庫 0.35.0 在 100 萬筆是 58.37 ms。1 萬份小檔無變更中位數 782.39 ms，parser 0，比 0.35.0 的 801.87 ms 快 2.4%。profile 額外約 0.2%。詳細見 `docs/benchmark-0.36.0.json` 與 `docs/0.36.0-VALIDATION.md`。
+- 這不是公司「10 分鐘 135 份」的驗收。沒有階段分布，不能外推全庫時間，也不能把本機熱點寫成公司根因已確認。
+- 測試環境是 Node.js v22.23.2，不是正式最低 22.17.0 的原樣重跑。完整 `npm test` 242 項：239 通過、1 失敗、2 略過，約 58 秒。失敗是既有 M7，在非 darwin／win32 開啟文件回 `ACTION_PLATFORM_UNSUPPORTED`。略過是 M5 無法讀取目錄（root）與 Windows cmd。
+- 下一步：公司電腦對現有索引做普通 `index` 與 `--profile <新檔>`，中斷後接續，完成後再跑一次確認未變更零解析；另在 Windows Terminal 試 TUI `/help`、`./help`、`/quit` 與 Ctrl+C。不要上傳索引或刪 journal／WAL／rebuild。
 
 ## 已交付基線與歷史紀錄
 

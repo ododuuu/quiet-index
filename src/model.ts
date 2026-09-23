@@ -39,6 +39,52 @@ export function needsTextParseUpgrade(
   return (previous.parse_version ?? 0) < TEXT_PARSE_VERSION;
 }
 
+export const reprocessReasons = [
+  "rebuild", "added", "source-changed", "error-retry", "text-upgrade", "unsupported-retry", "unchanged",
+] as const;
+export type ReprocessReason = typeof reprocessReasons[number];
+
+export const reprocessReasonLabels: Record<ReprocessReason, string> = {
+  rebuild: "強制重建",
+  added: "新增",
+  "source-changed": "來源變更",
+  "error-retry": "錯誤重試",
+  "text-upgrade": "文字解析升級",
+  "unsupported-retry": "未支援重試",
+  unchanged: "未變更略過",
+};
+
+export interface ClassifyDocumentInput {
+  rebuild?: boolean;
+  previous: { status: DocumentStatus; parse_version?: number | null; size_bytes: number; modified_at_ms: number } | null;
+  extension: string;
+  sizeBytes: number;
+  modifiedAtMs: number;
+}
+
+/** 依 SPEC §44.2 由上往下只取一個原因。TEXT_PARSE_VERSION 維持 1。 */
+export function classifyReprocess(input: ClassifyDocumentInput): ReprocessReason {
+  if (input.rebuild) return "rebuild";
+  if (!input.previous) return "added";
+  if (input.previous.size_bytes !== input.sizeBytes || input.previous.modified_at_ms !== input.modifiedAtMs) return "source-changed";
+  if (input.previous.status === "error") return "error-retry";
+  if (needsTextParseUpgrade(input.previous, input.extension)) return "text-upgrade";
+  if (input.previous.status === "unsupported" && supportedExtensions.has(input.extension)) return "unsupported-retry";
+  return "unchanged";
+}
+
+export type ReprocessAction = "skip" | "metadata" | "parse";
+
+export function reprocessAction(reason: ReprocessReason, extension: string): ReprocessAction {
+  if (reason === "unchanged") return "skip";
+  if (!supportedExtensions.has(extension)) return "metadata";
+  return "parse";
+}
+
+export function emptyReasonCounts(): Record<ReprocessReason, number> {
+  return Object.fromEntries(reprocessReasons.map(reason => [reason, 0])) as Record<ReprocessReason, number>;
+}
+
 export interface Diagnostic {
   stage: "scan" | "read" | "parse" | "store";
   path: string;
@@ -65,6 +111,11 @@ export interface SyncSummary {
   skipped: SkippedCounts;
   readErrors: number;
   elapsedMs: number;
+  /** 舊摘要沒有這些欄位時應顯示「未提供」，不可補 0。 */
+  checked?: number;
+  failedDocuments?: number;
+  reasonsAttempted?: Record<ReprocessReason, number>;
+  reasonsCommitted?: Record<ReprocessReason, number>;
 }
 
 export function emptyStatusCounts(): Record<DocumentStatus, number> {

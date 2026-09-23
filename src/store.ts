@@ -12,11 +12,59 @@ import { throwIfAborted, yieldToEvents, type ProgressUpdate } from "./progress.j
 import { coversPath, resolveUserRootPath, samePath } from "./root-plan.js";
 import { RootError } from "./scanner.js";
 
+export type DataDirSource = "LOCALDOCSEARCH_DATA_DIR" | "LOCALAPPDATA" | "XDG_DATA_HOME" | "home-fallback";
+
+export function describeDatabaseLocation(
+  env: NodeJS.ProcessEnv = process.env,
+  platform = process.platform,
+  homedir = os.homedir(),
+): { path: string; source: DataDirSource; sourceLabel: string } {
+  let directory: string;
+  let source: DataDirSource;
+  if (env.LOCALDOCSEARCH_DATA_DIR) {
+    directory = env.LOCALDOCSEARCH_DATA_DIR;
+    source = "LOCALDOCSEARCH_DATA_DIR";
+  } else if (platform === "win32" && env.LOCALAPPDATA) {
+    directory = env.LOCALAPPDATA;
+    source = "LOCALAPPDATA";
+  } else if (platform !== "win32" && env.XDG_DATA_HOME) {
+    directory = env.XDG_DATA_HOME;
+    source = "XDG_DATA_HOME";
+  } else {
+    directory = platform === "win32" ? path.join(homedir, "AppData", "Local") : path.join(homedir, ".local", "share");
+    source = "home-fallback";
+  }
+  const sourceLabel = {
+    LOCALDOCSEARCH_DATA_DIR: "環境變數 LOCALDOCSEARCH_DATA_DIR",
+    LOCALAPPDATA: "Windows LOCALAPPDATA",
+    XDG_DATA_HOME: "XDG_DATA_HOME",
+    "home-fallback": "使用者家目錄預設位置",
+  }[source];
+  return { path: path.join(directory, "LocalDocSearch", "index.db"), source, sourceLabel };
+}
+
+export function inspectDatabaseFile(databasePath: string): { exists: boolean; error: string | null } {
+  try {
+    const info = statSync(databasePath);
+    if (info.isDirectory()) return { exists: false, error: "索引路徑是目錄，拒絕建立。" };
+    return { exists: true, error: null };
+  } catch (error) {
+    const code = error instanceof Error && "code" in error ? String((error as NodeJS.ErrnoException).code) : "";
+    if (code !== "ENOENT") return { exists: false, error: `無法存取索引（${code || "未知"}），不會把它當成新庫。` };
+    try {
+      const parent = statSync(path.dirname(databasePath));
+      if (!parent.isDirectory()) return { exists: false, error: "索引上層路徑不是目錄，不會建立新庫。" };
+      return { exists: false, error: null };
+    } catch (parentError) {
+      const parentCode = parentError instanceof Error && "code" in parentError ? String((parentError as NodeJS.ErrnoException).code) : "";
+      if (parentCode === "ENOENT") return { exists: false, error: null };
+      return { exists: false, error: `無法存取索引位置（${parentCode || "未知"}），不會建立新庫。` };
+    }
+  }
+}
+
 export function defaultDatabasePath(): string {
-  const base = process.env.LOCALDOCSEARCH_DATA_DIR
-    ?? (process.platform === "win32" ? process.env.LOCALAPPDATA : process.env.XDG_DATA_HOME)
-    ?? (process.platform === "win32" ? path.join(os.homedir(), "AppData", "Local") : path.join(os.homedir(), ".local", "share"));
-  return path.join(base, "LocalDocSearch", "index.db");
+  return describeDatabaseLocation().path;
 }
 
 export function dataDirectory(databasePath = defaultDatabasePath()): string {
@@ -159,8 +207,12 @@ export interface LastSyncReport {
   diagnostics: Diagnostic[];
 }
 
-export interface IndexStoreOptions {
-  readOnly?: boolean;
+export interface UpsertTimings {
+  compressMs: number;
+  bloomMs: number;
+  deleteMs: number;
+  writeMs: number;
+  commitMs: number;
 }
 
 export interface IndexFormatStatus {
@@ -169,6 +221,9 @@ export interface IndexFormatStatus {
   needsUpgrade: boolean;
   completedDocuments: number;
   totalDocuments: number;
+  mappingIndexReady: boolean;
+  textUpgradePending: number;
+  textUpgradeByExtension: { extension: string; count: number }[];
 }
 
 export interface SearchScope {
@@ -255,10 +310,32 @@ function databaseOptions(options: { readOnly?: boolean } = {}): ConstructorParam
   return { ...options, timeout: 0 } as ConstructorParameters<typeof DatabaseSync>[1];
 }
 
+export interface IndexStoreOptions {
+  readOnly?: boolean;
+}
+
 export class IndexStore {
   private readonly db: DatabaseSync;
   private readonly readOnly: boolean;
   readonly databasePath: string;
+  private documentByPathSql: ReturnType<DatabaseSync["prepare"]> | null = null;
+  private documentByIdSql: ReturnType<DatabaseSync["prepare"]> | null = null;
+  private parseVersionKnown: boolean | null = null;
+  private cachedWrites: {
+    upsertDocument: ReturnType<DatabaseSync["prepare"]>;
+    bindRoot: ReturnType<DatabaseSync["prepare"]>;
+    deleteBlocks: ReturnType<DatabaseSync["prepare"]>;
+    deletePayloads: ReturnType<DatabaseSync["prepare"]>;
+    deletePayloadBlocks: ReturnType<DatabaseSync["prepare"]>;
+    deletePayloadBlooms: ReturnType<DatabaseSync["prepare"]>;
+    deleteBloom: ReturnType<DatabaseSync["prepare"]>;
+    insertBlock: ReturnType<DatabaseSync["prepare"]>;
+    lastId: ReturnType<DatabaseSync["prepare"]>;
+    insertPayload: ReturnType<DatabaseSync["prepare"]>;
+    insertPayloadBlock: ReturnType<DatabaseSync["prepare"]>;
+    insertPayloadBloom: ReturnType<DatabaseSync["prepare"]>;
+    upsertBloom: ReturnType<DatabaseSync["prepare"]>;
+  } | null = null;
 
   constructor(databasePath = defaultDatabasePath(), options: IndexStoreOptions = {}) {
     this.databasePath = databasePath;
@@ -319,6 +396,7 @@ export class IndexStore {
         PRIMARY KEY(document_id, payload_ordinal, block_id)
       );
       CREATE INDEX IF NOT EXISTS document_payload_blocks_document_block ON document_payload_blocks(document_id, block_id);
+      CREATE INDEX IF NOT EXISTS document_payload_blocks_block_id ON document_payload_blocks(block_id);
       CREATE TABLE IF NOT EXISTS document_payload_blooms (
         document_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
         payload_ordinal INTEGER NOT NULL, bloom BLOB NOT NULL,
@@ -365,10 +443,14 @@ export class IndexStore {
       ? Number((this.db.prepare("SELECT count(*) AS count FROM documents").get() as { count: number }).count) : 0;
     const completedDocuments = this.hasTable("index_migration_documents")
       ? Number((this.db.prepare("SELECT count(*) AS count FROM index_migration_documents WHERE version = 'payload_bloom_1'").get() as { count: number }).count) : 0;
+    const pending = this.textUpgradePending();
     return { contentStorageVersion, payloadBloomVersion,
       needsUpgrade: contentStorageVersion !== "2" || payloadBloomVersion !== "1" || this.metadata("multi_root_version") !== "1"
         || this.metadata("root_merge_version") !== "1",
-      completedDocuments, totalDocuments };
+      completedDocuments, totalDocuments,
+      mappingIndexReady: this.mappingIndexReady(),
+      textUpgradePending: pending.total,
+      textUpgradeByExtension: pending.byExtension };
   }
 
   async upgrade(options: UpgradeOptions = {}): Promise<void> {
@@ -554,44 +636,147 @@ export class IndexStore {
   }
 
   getDocumentById(id: number): StoredDocumentRow | undefined {
-    return this.db.prepare("SELECT id, path, filename, extension, size_bytes, modified_at_ms, status, parse_version FROM documents WHERE id = ?").get(id) as StoredDocumentRow | undefined;
+    return this.documentByIdStmt().get(id) as StoredDocumentRow | undefined;
   }
 
   getDocument(filePath: string): StoredDocumentRow | undefined {
-    return this.db.prepare("SELECT id, path, filename, extension, size_bytes, modified_at_ms, status, parse_version FROM documents WHERE path = ?").get(filePath) as StoredDocumentRow | undefined;
+    return this.documentByPathStmt().get(filePath) as StoredDocumentRow | undefined;
   }
 
-  upsert(document: DocumentRecord, root?: string): void {
+  private documentsHaveParseVersion(): boolean {
+    if (this.parseVersionKnown === null) {
+      if (!this.hasTable("documents")) this.parseVersionKnown = false;
+      else {
+        const columns = this.db.prepare("PRAGMA table_info(documents)").all() as { name: string }[];
+        this.parseVersionKnown = columns.some(item => item.name === "parse_version");
+      }
+    }
+    return this.parseVersionKnown;
+  }
+
+  private documentByPathStmt(): ReturnType<DatabaseSync["prepare"]> {
+    if (!this.documentByPathSql) {
+      const parseVersion = this.documentsHaveParseVersion() ? "parse_version" : "NULL AS parse_version";
+      this.documentByPathSql = this.db.prepare(`SELECT id, path, filename, extension, size_bytes, modified_at_ms, status, ${parseVersion} FROM documents WHERE path = ?`);
+      this.documentByIdSql = this.db.prepare(`SELECT id, path, filename, extension, size_bytes, modified_at_ms, status, ${parseVersion} FROM documents WHERE id = ?`);
+    }
+    return this.documentByPathSql;
+  }
+
+  private documentByIdStmt(): ReturnType<DatabaseSync["prepare"]> {
+    this.documentByPathStmt();
+    return this.documentByIdSql!;
+  }
+
+  mappingIndexReady(): boolean {
+    if (!this.hasTable("document_payload_blocks")) return false;
+    return Boolean(this.db.prepare("SELECT 1 AS found FROM sqlite_master WHERE type = 'index' AND name = 'document_payload_blocks_block_id'").get());
+  }
+
+  explainBlockLookup(): string {
+    const rows = this.db.prepare("EXPLAIN QUERY PLAN SELECT block_id FROM document_payload_blocks WHERE block_id = ?").all(1) as { detail: string }[];
+    return rows.map(row => row.detail).join("\n");
+  }
+
+  textUpgradePending(): { total: number; byExtension: { extension: string; count: number }[] } {
+    if (!this.hasTable("documents")) return { total: 0, byExtension: [] };
+    const extensions = [...textParseExtensions];
+    const placeholders = extensions.map(() => "?").join(", ");
+    const versionClause = this.documentsHaveParseVersion() ? " AND (parse_version IS NULL OR parse_version < ?)" : "";
+    const values = this.documentsHaveParseVersion() ? [...extensions, TEXT_PARSE_VERSION] : extensions;
+    const rows = this.db.prepare(`SELECT extension, count(*) AS count FROM documents
+      WHERE status != 'too_large' AND extension IN (${placeholders})${versionClause}
+      GROUP BY extension ORDER BY extension`).all(...values) as { extension: string; count: number }[];
+    const byExtension = rows.map(row => ({ extension: row.extension, count: Number(row.count) }));
+    return { total: byExtension.reduce((sum, row) => sum + row.count, 0), byExtension };
+  }
+
+  contentStats(): { documents: number; blocks: number; payloads: number; mappings: number } {
+    const countOf = (table: string) => this.hasTable(table)
+      ? Number((this.db.prepare(`SELECT count(*) AS count FROM ${table}`).get() as { count: number }).count) : 0;
+    return { documents: countOf("documents"), blocks: countOf("blocks"), payloads: countOf("document_payloads"), mappings: countOf("document_payload_blocks") };
+  }
+
+  private writes() {
+    if (!this.cachedWrites) {
+      this.cachedWrites = {
+        upsertDocument: this.db.prepare(`INSERT INTO documents
+          (path, filename, extension, size_bytes, modified_at_ms, indexed_at_ms, status, error_code, error_message, parse_version)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(path) DO UPDATE SET filename=excluded.filename, extension=excluded.extension,
+          size_bytes=excluded.size_bytes, modified_at_ms=excluded.modified_at_ms,
+          indexed_at_ms=excluded.indexed_at_ms, status=excluded.status,
+          error_code=excluded.error_code, error_message=excluded.error_message,
+          parse_version=excluded.parse_version`),
+        bindRoot: this.db.prepare("INSERT INTO document_roots(document_id, root_path) VALUES (?, ?) ON CONFLICT(document_id) DO UPDATE SET root_path=excluded.root_path"),
+        deleteBlocks: this.db.prepare("DELETE FROM blocks WHERE document_id = ?"),
+        deletePayloads: this.db.prepare("DELETE FROM document_payloads WHERE document_id = ?"),
+        deletePayloadBlocks: this.db.prepare("DELETE FROM document_payload_blocks WHERE document_id = ?"),
+        deletePayloadBlooms: this.db.prepare("DELETE FROM document_payload_blooms WHERE document_id = ?"),
+        deleteBloom: this.db.prepare("DELETE FROM document_blooms WHERE document_id = ?"),
+        insertBlock: this.db.prepare("INSERT INTO blocks (document_id, ordinal, heading, content, location_kind, location_value) VALUES (?, ?, ?, ?, ?, ?)"),
+        lastId: this.db.prepare("SELECT last_insert_rowid() AS id"),
+        insertPayload: this.db.prepare("INSERT INTO document_payloads (document_id, ordinal, payload) VALUES (?, ?, ?)"),
+        insertPayloadBlock: this.db.prepare("INSERT INTO document_payload_blocks (document_id, payload_ordinal, block_id) VALUES (?, ?, ?)"),
+        insertPayloadBloom: this.db.prepare("INSERT INTO document_payload_blooms (document_id, payload_ordinal, bloom) VALUES (?, ?, ?)"),
+        upsertBloom: this.db.prepare("INSERT INTO document_blooms(document_id, bloom) VALUES (?, ?) ON CONFLICT(document_id) DO UPDATE SET bloom=excluded.bloom"),
+      };
+    }
+    return this.cachedWrites;
+  }
+
+  touchMetadata(document: DocumentRecord, root?: string): void {
     this.db.exec("BEGIN IMMEDIATE");
     try {
       const parseVersion = textParseExtensions.has(document.extension) ? TEXT_PARSE_VERSION : null;
-      this.db.prepare(`INSERT INTO documents
-        (path, filename, extension, size_bytes, modified_at_ms, indexed_at_ms, status, error_code, error_message, parse_version)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(path) DO UPDATE SET filename=excluded.filename, extension=excluded.extension,
-        size_bytes=excluded.size_bytes, modified_at_ms=excluded.modified_at_ms,
-        indexed_at_ms=excluded.indexed_at_ms, status=excluded.status,
-        error_code=excluded.error_code, error_message=excluded.error_message,
-        parse_version=excluded.parse_version`)
-        .run(document.path, document.filename, document.extension, document.sizeBytes,
-          document.modifiedAtMs, Date.now(), document.status, document.errorCode, document.errorMessage, parseVersion);
+      const writes = this.writes();
+      writes.upsertDocument.run(document.path, document.filename, document.extension, document.sizeBytes,
+        document.modifiedAtMs, Date.now(), document.status, document.errorCode, document.errorMessage, parseVersion);
       const row = this.getDocument(document.path)!;
-      if (root) this.db.prepare("INSERT INTO document_roots(document_id, root_path) VALUES (?, ?) ON CONFLICT(document_id) DO UPDATE SET root_path=excluded.root_path").run(row.id, root);
-      this.db.prepare("DELETE FROM blocks WHERE document_id = ?").run(row.id);
-      const insert = this.db.prepare("INSERT INTO blocks (document_id, ordinal, heading, content, location_kind, location_value) VALUES (?, ?, ?, ?, ?, ?)");
-      this.db.prepare("DELETE FROM document_payloads WHERE document_id = ?").run(row.id);
-      this.db.prepare("DELETE FROM document_payload_blocks WHERE document_id = ?").run(row.id);
-      this.db.prepare("DELETE FROM document_payload_blooms WHERE document_id = ?").run(row.id);
+      if (root) writes.bindRoot.run(row.id, root);
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
+  upsert(document: DocumentRecord, root?: string, timings?: UpsertTimings): void {
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const parseVersion = textParseExtensions.has(document.extension) ? TEXT_PARSE_VERSION : null;
+      const writes = this.writes();
+      const writeStarted = performance.now();
+      writes.upsertDocument.run(document.path, document.filename, document.extension, document.sizeBytes,
+        document.modifiedAtMs, Date.now(), document.status, document.errorCode, document.errorMessage, parseVersion);
+      const row = this.getDocument(document.path)!;
+      if (root) writes.bindRoot.run(row.id, root);
+      if (timings) timings.writeMs += performance.now() - writeStarted;
+      const deleteStarted = performance.now();
+      writes.deletePayloadBlocks.run(row.id);
+      writes.deletePayloads.run(row.id);
+      writes.deletePayloadBlooms.run(row.id);
+      writes.deleteBloom.run(row.id);
+      writes.deleteBlocks.run(row.id);
+      if (timings) timings.deleteMs += performance.now() - deleteStarted;
       const entries: { id: number; ordinal: number; content: string }[] = [];
       for (const block of document.blocks) {
-        insert.run(row.id, block.ordinal, block.heading, "", block.locationKind, block.locationValue);
-        const blockId = (this.db.prepare("SELECT id FROM blocks WHERE document_id = ? AND ordinal = ?").get(row.id, block.ordinal) as { id: number }).id;
+        const insertStarted = performance.now();
+        writes.insertBlock.run(row.id, block.ordinal, block.heading, "", block.locationKind, block.locationValue);
+        const blockId = (writes.lastId.get() as { id: number }).id;
+        if (timings) timings.writeMs += performance.now() - insertStarted;
         entries.push({ id: blockId, ordinal: block.ordinal, content: block.content });
       }
-      this.writeDocumentPayloads(row.id, entries);
-      this.db.prepare("INSERT INTO document_blooms(document_id, bloom) VALUES (?, ?) ON CONFLICT(document_id) DO UPDATE SET bloom=excluded.bloom")
-        .run(row.id, buildBloom(document.blocks));
+      this.writeDocumentPayloads(row.id, entries, timings);
+      const bloomStarted = performance.now();
+      const bloom = buildBloom(document.blocks);
+      if (timings) timings.bloomMs += performance.now() - bloomStarted;
+      const bloomWrite = performance.now();
+      writes.upsertBloom.run(row.id, bloom);
+      if (timings) timings.writeMs += performance.now() - bloomWrite;
+      const commitStarted = performance.now();
       this.db.exec("COMMIT");
+      if (timings) timings.commitMs += performance.now() - commitStarted;
     } catch (error) {
       this.db.exec("ROLLBACK");
       throw error;
@@ -799,20 +984,24 @@ export class IndexStore {
     }
   }
 
-  private writeDocumentPayloads(documentId: number, entries: { id: number; ordinal: number; content: string }[]): void {
-    const insert = this.db.prepare("INSERT INTO document_payloads (document_id, ordinal, payload) VALUES (?, ?, ?)");
-    const insertBlocks = this.db.prepare("INSERT INTO document_payload_blocks (document_id, payload_ordinal, block_id) VALUES (?, ?, ?)");
-    const insertBloom = this.db.prepare("INSERT INTO document_payload_blooms (document_id, payload_ordinal, bloom) VALUES (?, ?, ?)");
+  private writeDocumentPayloads(documentId: number, entries: { id: number; ordinal: number; content: string }[], timings?: UpsertTimings): void {
+    const writes = this.writes();
     let batch: [number, string][] = []; let bytes = 2; let ordinal = 0;
     const flush = () => {
       if (!batch.length) return;
-      insert.run(documentId, ordinal, compressText(JSON.stringify(batch)));
-      for (const id of new Set(batch.map(item => item[0]))) insertBlocks.run(documentId, ordinal, id);
-      // Text within a payload is intentionally kept per block: joining two
-      // adjacent blocks would manufacture a false phrase candidate.
+      const compressStarted = performance.now();
+      const payload = compressText(JSON.stringify(batch));
+      if (timings) timings.compressMs += performance.now() - compressStarted;
+      const bloomStarted = performance.now();
       const byBlock = new Map<number, string>();
       for (const [id, content] of batch) byBlock.set(id, (byBlock.get(id) ?? "") + content);
-      insertBloom.run(documentId, ordinal, buildBloom([...byBlock.values()].map((content, index) => ({ ordinal: index, heading: null, content, locationKind: "line" as const, locationValue: "" }))));
+      const bloom = buildBloom([...byBlock.values()].map((content, index) => ({ ordinal: index, heading: null, content, locationKind: "line" as const, locationValue: "" })));
+      if (timings) timings.bloomMs += performance.now() - bloomStarted;
+      const writeStarted = performance.now();
+      writes.insertPayload.run(documentId, ordinal, payload);
+      for (const id of new Set(batch.map(item => item[0]))) writes.insertPayloadBlock.run(documentId, ordinal, id);
+      writes.insertPayloadBloom.run(documentId, ordinal, bloom);
+      if (timings) timings.writeMs += performance.now() - writeStarted;
       ordinal++; batch = []; bytes = 2;
     };
     for (const entry of [...entries].sort((a, b) => a.ordinal - b.ordinal)) {

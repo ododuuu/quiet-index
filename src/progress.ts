@@ -6,10 +6,19 @@ export interface ProgressUpdate {
   current?: number;
   total?: number;
   path?: string;
+  checked?: number;
+  skipped?: number;
+  committed?: number;
+  parserCalls?: number;
+  failed?: number;
+  phase?: string;
+  phaseStartedMs?: number;
+  slow?: { extension: string; bytes: number; phase: string; elapsedMs: number; reason: string };
 }
 
 export class OperationCancelledError extends Error {
   readonly code = "OPERATION_CANCELLED";
+  partial?: unknown;
   constructor() {
     super("操作已取消；已提交的索引進度會保留。下一次執行將從安全位置接續。");
     this.name = "OperationCancelledError";
@@ -39,7 +48,7 @@ export function formatPercent(current: number, total: number, done: boolean): st
 
 export function formatProgressLine(
   update: ProgressUpdate,
-  options: { elapsedMs: number; verbose?: boolean } = { elapsedMs: 0 },
+  options: { elapsedMs: number; verbose?: boolean; nowMs?: number } = { elapsedMs: 0 },
 ): string {
   const elapsed = formatElapsed(options.elapsedMs);
   const location = options.verbose && update.path ? `；${update.path.replace(/[\u0000-\u001f\u007f]/g, "?")}` : "";
@@ -51,7 +60,12 @@ export function formatProgressLine(
     const done = update.stage === "complete";
     const percent = formatPercent(update.current, update.total, done);
     if (update.total === 0) return `沒有找到文件；${update.message}；耗時 ${elapsed}`;
-    return `文件處理 ${percent}（${update.current}／${update.total}）；${update.message}${location}`;
+    const counts = update.checked === undefined ? "" : `；已檢查 ${update.checked}、略過 ${update.skipped ?? 0}、已提交 ${update.committed ?? 0}、parser ${update.parserCalls ?? 0}、失敗 ${update.failed ?? 0}`;
+    const phaseElapsed = update.phaseStartedMs === undefined || options.nowMs === undefined
+      ? ""
+      : `；階段 ${update.phase ?? "檢查"} ${formatElapsed(Math.max(0, options.nowMs - update.phaseStartedMs))}`;
+    const slow = update.slow ? `；慢檔 ${update.slow.extension || "（無副檔名）"} ${update.slow.bytes} bytes、${update.slow.phase} ${formatElapsed(update.slow.elapsedMs)}、${update.slow.reason}` : "";
+    return `檢查進度 ${percent}（${update.current}／${update.total}）；${update.message}${counts}${phaseElapsed}${slow}${location}`;
   }
   return `${update.message}；耗時 ${elapsed}${location}`;
 }
@@ -94,7 +108,7 @@ export function createProgressReporter(options: ProgressReporterOptions = {}): P
     }
   });
   const render = (update: ProgressUpdate) => {
-    const line = formatProgressLine(update, { elapsedMs: now() - started, verbose });
+    const line = formatProgressLine(update, { elapsedMs: now() - started, verbose, nowMs: now() });
     const inPlace = isTTY && update.stage !== "complete" && update.stage !== "cancelled";
     write(line, inPlace);
     if (!inPlace) hanging = false;
