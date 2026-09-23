@@ -1178,16 +1178,16 @@ docsearch doctor
 
 - 對已完成初次索引的使用者，文件與 CLI 應把 `autoupdate start` 定義為日常新增／修改／刪除的主要路徑；`index` 明確稱為「立即完整校正」，不得悄悄改成可能漏失離線變更的快速命令。
 - daemon 健康且沒有降級事件時，單檔新增／修改／刪除不得呼叫 root `scan()`，也不得把 30 萬份文件列為已檢查；變更須經既有 ignore、root ownership、parser、交易、writer lock 與刪除安全流程。
-- 完整 reconciliation 保留作正確性安全網：daemon 啟動、預設每 6 小時、watcher overflow／未知事件、ignore 或 roots 變動、恢復異常，以及使用者明確執行 `index`。頻率可設定，但不得為了漂亮延遲永久關閉。
+- 完整 reconciliation 保留作正確性安全網；0.37.0 將 daemon 啟動及週期校正改為 §46.8 的背景分批工作。預設一輪完成後 6 小時再排下一輪，既有 `--reconcile` 範圍不變，不重疊建立多輪。overflow／未知事件先校正可證明受影響的最小 scope；來源無法定位時才保護並校正整根。使用者明確執行 `index` 仍是立即完整校正，沒有新增 `index --full` 選項。
 - `autoupdate status` 應讓使用者分辨「daemon 健康／最近局部事件／上次完整校正／下一次完整校正／目前降級原因」，並顯示最近完整校正是否因 scan failure 不完整。搜尋可沿用現有不完整提示。
-- 0.37.0 必須先在公司 Windows 驗證既有 `autoupdate` 行為；若缺陷可在事件引擎／操作流程內修正，就不另造變更追蹤器。可持久化 daemon 已觀察到但尚未提交的有界事件，以改善 crash recovery；它不能補回程序未執行時根本沒觀察到的事件。
+- 0.37.0 先驗收既有 `autoupdate`，重用 `LiveUpdateEngine`／局部更新服務；持久事件佇列、scope 管理與分批校正依 §46.6～§46.10 擴充。公司驗收未取得時可先完成本機實作與故障注入，但不得宣稱 Windows 行為已通過。
 
-### 46.3 離線變更與 USN Change Journal 研究門檻
+### 46.3 普通使用者權限與離線期間
 
 - 在不使用 OS 持久變更來源時，程序關閉期間的變更只能由下一次完整 reconciliation 安全補回。不得以「上次正常停止」或時間戳猜測取代全量確認，也不得為加速而漏掉刪除。
-- NTFS USN Change Journal 只列為 RFC 候選，不在沒有驗證前直接實作。RFC 至少要驗證：公司普通使用者權限與端點政策、Node.js 22／純 Node 或經核准 helper 的相容性、volume／journal ID 與 USN checkpoint、rename pair／delete／hard link 語意、journal wrap／reset／gap 偵測、路徑重建成本，以及索引或 checkpoint 損壞的復原。
-- 非 NTFS、網路磁碟、可移除媒體、journal 不可用／權限不足及 checkpoint 不可信時必須安全回退完整 reconciliation；不得把 USN 變成安裝或管理員必要條件。所有 journal 資料與路徑仍留在本機。
-- 只有公司環境證明能以一般權限可靠讀取、Node 邊界可維護、gap 可檢出且合成與真實重播零漏失後，才另定實作版本。否則 0.37.0 以常駐 autoupdate 加定期完整校正交付。
+- 使用者已明確確認公司電腦不能取得管理員權限。0.37.0 不採用 USN／raw volume access、不安裝 Windows Service、不呼叫提權、不要求公司額外授權；原先 USN RFC 不再是本版交付工作。所有執行與狀態儲存限於目前使用者可存取範圍。
+- 重新啟動時先建立 watcher，再回放已持久化工作並排入離線期間的背景校正。搜尋立即使用既有索引；校正尚未完成須顯示未確認狀態。持久 queue 只保護已接收事件，不能補出停機時未收到的事件。
+- 網路磁碟或 watcher 無法建立時，明確降級為分批掃描並回報原因；磁碟離線不能推論所有文件已刪除。維持 Node.js／TypeScript 與現有索引格式方向。
 
 ### 46.4 `--all-terms` 混合長短詞候選縮減
 
@@ -1200,7 +1200,51 @@ docsearch doctor
 
 1. **完整掃描 profile**：用正確 shell 路徑在同一資料與硬體至少三次量測 enumerate、stat／metadata compare、parser、compression／Bloom、SQLite write／commit 及總耗時；目前只有總耗時，未取得成功 profile，不得虛構各階段比例。
 2. **背景局部更新**：在 daemon 已健康且啟動校正完成後，分別新增、修改、刪除一檔。每次不得呼叫 root scan，解析／寫入只涵蓋事件路徑或最小必要子樹，並在 15 秒內可搜尋或消失；另測 rename、連發去重、overflow 降級、ignore／roots 變更、writer contention 與重啟後完整補回。
-3. **程序關閉期間**：停止 daemon 後新增、修改、刪除，再啟動；啟動完整校正後結果必須正確。若導入任何持久事件／USN prototype，還需測 checkpoint crash、journal gap、reset、非 NTFS 與權限拒絕的完整 fallback。
+3. **程序關閉期間**：停止 daemon 後新增、修改、刪除，再啟動；背景校正完成後結果必須正確。在校正中仍可搜尋，且不能提前標示完整。持久 queue 與校正 cursor 的 crash／重播案例見 §46.10。
 4. **搜尋 benchmark**：固定相同大型 store，記錄查詢總時、候選文件、payload 解壓／精確核對數與結果雜湊。混合長短詞時，被任一必要長詞 Bloom 排除的文件不得解壓 payload；結果集合與 0.36.0 精確基線逐筆相同。至少三次回報中位數與 p95，不以縮短 timeout 或減少資料冒充改善。
-5. **migration**：日常流程調整不得改索引內容格式或要求 rebuild；舊 Bloom／舊 summary 仍可讀。若持久事件 queue 需要 schema，採可重入遷移且索引本體保持可搜尋。背景更新仍需使用者明確啟動，不在 0.37.0 偷加 service／登入自啟。
-6. **完成界線**：0.37.0 可交付既有 autoupdate 的產品化、可觀測性與 all-terms 安全 pruning；若離線快速追蹤的 USN 門檻未滿足，應留下 RFC 與全量 fallback，不得宣稱「任何時候都不需全掃」。
+5. **migration**：日常流程調整不得要求 rebuild；舊 Bloom／summary 仍可讀。新增工作狀態資料採版本化、可重入初始化；資料缺失或損壞時將來源標為未確認並排校正，不能清掉文件索引。登入啟動僅依 §46.9 由使用者明確開啟。
+6. **完成界線**：依序完成現有 watcher 基線、持久 queue、scope、分批校正、登入啟動與 status；all-terms 可獨立驗證後合入同版。0.36.1 的刪除安全是前置依賴。各階段單獨提交與回歸，不因拆提交就更改版本承諾；無法完成的項目必須回報並調整 STATUS，不可默默省略。
+
+### 46.6 既有 watcher 與事件處理契約
+
+- `watch`／`autoupdate` 已於 0.31.0 實作。先用現有 CLI 驗證：初次 index 後執行 `autoupdate start`，等啟動校正完成，再新增／修改／rename／刪除測試檔，直接搜尋驗證，不再執行 index。建立基線時記錄事件數、局部更新數、root scan 次數與搜尋可見延遲。
+- watcher 通知是「路徑可能變動」的提示，沒有正文，也未必能精確區分 rename 與 delete。處理時重新核對來源；刪除仍須 parent 可讀、root 在線及 §45 的安全條件。rename 不能假設一定收到完整 old/new pair。
+- 使用現有 debounce 合併事件，並提供可測的檔案穩定判斷：新增／修改後至少兩次 metadata 觀察相同且跨越 debounce 間隔才解析；若處理期間又變更，保留後續事件重新核對。持續寫入的檔案延後，不能卡住其他事件；穩定觀察不能保證檔案永不再變，解析錯誤仍如實保留。
+- 本次討論的第 1／5／6 項分別是事件接收、監看範圍與漏失校正，同屬變更發現；第 7 項屬 parser 工作成本，現有格式分流已存在。本版不另造輕量 parser 或變更 TEXT_PARSE_VERSION；任何此類優化另有實測才排版。
+
+### 46.7 持久事件佇列與監看 scope
+
+- 在索引資料目錄建立獨立、版本化的本機 SQLite 工作狀態庫，保存 root 身分、相對路徑、事件序號／世代、scope、dirty 原因及待辦；不保存正文。此庫獨立於索引 writer lock，讓索引忙碌時仍可接收事件。自身檔案及 sidecars 必須排除。
+- 事件落盤後才視為已接收；索引成功提交後才確認對應世代完成。兩庫無跨庫原子交易，採 at-least-once 重播與冪等更新：提交後、ack 前 crash 可以重做，不能漏做。同一路徑在處理中收到新世代，舊工作 ack 不得清掉新事件。
+- queue 有界：預設最多 10,000 個不同待辦路徑；超限先持久化涵蓋受影響路徑的 dirty scope，再合併／移除逐檔工作。落盤失敗時回報 degraded；不能靜默丟事件並保持健康。重啟一律標記 downtime gap，以覆蓋尚未落盤就 crash 的窗口。
+- 合併以「重查路徑目前狀態」為準。create 後 delete 不可無條件抵銷，因為索引可能已有同路徑舊文件；rename 前後路徑都需核對，不完整配對時校正共同可信 scope。
+- 預設以登錄 root 的非遞迴 watcher 接收直接子項事件，各直接子目錄用遞迴 watcher，維持 root 直屬文件及新目錄的完整覆蓋。新目錄先 attach 再掃該子樹；移除／改名 scope 時先排安全校正再回收 handle。新舊 watcher 交接窗口必須補掃。
+- handle 數量須有界，預設上限 128 個；超出或分割失敗時退回較粗的可覆蓋 watcher，並顯示實際 scope。連結／junction 與 0.36.1 排除規則照舊，不因拆 watcher 越界。
+- 只有能定位到某 watcher 的未知 filename／error 才局部補掃；若 Node 沒有暴露可靠 overflow 通知或無法定位範圍，就保留較粗校正與週期安全網。不得聲稱 fs.watch 一定回報所有 OS buffer overflow；本版不引入 native watcher 依賴。
+
+### 46.8 可中斷、可接續的背景校正
+
+- 初次 index 與手動 index 保持完整校正。daemon 啟動或週期校正採持久化 directory frontier、generation、已完成目錄、失敗 scopes 與 dirty 世代；每批最多檢查 500 個 entries 或約 250 ms 的發現工作，先達者於安全點讓出，再處理待辦事件。單次 parser／檔案 IO 不能硬保證此時間，須另量並回報。
+- 不以「每分鐘掃數千目錄」作固定吞吐承諾。批次之間釋放 writer lock，單文件維持交易原子性；已有事件優先處理，同時每 5 秒至少允許一批校正嘗試，避免長期飢餓。writer contention 退避且保存進度，不占著 lock 等待事件。
+- 目錄枚舉不是穩定快照；可保存 frontier，但不能把 OS iterator／排序 offset 當可靠跨程序 cursor。超大單目錄中斷後允許重列該目錄，按持久 seen generation 去重；新啟動另排 gap 世代，不能相信前次已完成目錄在停機期間未變。
+- 刪除只針對本輪成功列舉完成的 scope：以 seen generation 與事件世代檢查缺失候選，必要時重新確認 parent／path；若該 scope 掃描中又有事件，先重查或重掃再決定，避免舊批次刪掉新事件剛更新的文件。失敗／離線／尚未走完範圍全保留，不可在整輪結束時無條件 root removeMissing。
+- 搜尋可使用已提交資料。沿用既有 `SEARCH_INDEX_CHANGED` 契約，活動搜尋工作階段遇索引變動時提示重搜；不承諾持續寫入時舊分頁快照永遠有效。顯示校正中／範圍未確認，不得把分批完成數誤標為整根完整同步。
+- status 至少包含 daemon 活體狀態、watcher scope／降級原因、待辦數與最舊事件時間、最近成功局部更新、校正原因／generation／已檢查量、未確認／失敗 scope 數、上次整輪成功與下次排程。總量未知時不顯示虛假百分比；有失敗 scope 不更新整根「最後完整同步」。路徑只留本機，有界日誌不含正文。
+
+### 46.9 可選的普通使用者登入啟動
+
+- 新增 `autoupdate startup enable|disable|status`，僅 Windows 支援 enable／disable。預設關閉；index、search、一般 autoupdate start 不得順帶註冊。enable 僅註冊下次使用者登入啟動，不立即另啟 daemon；disable 只移除登錄，現存 daemon 用 stop 管理。
+- 採目前使用者 Startup 資料夾內產品專屬捷徑，固定指向驗證過的 Node executable 與編譯 CLI `autoupdate start`，綁定實際索引位置。重用既有單例／控制通道；不使用 HKLM、SYSTEM task、Service 或提權。
+- 捷徑與狀態須冪等，保存本產品擁有權；遇同名非本產品檔案拒絕覆寫，disable 不刪別人的檔案。驗證含空白、括號、中文與 shell 特殊字元的安裝路徑；不得拼接未跳脫的 shell 命令。
+- 公司政策拒絕註冊、安裝／Node 路徑搬移或目標不存在時清楚提示，可重新 enable 更新路徑；手動 start 照常可用。此為登入後啟動，不是登入前服務；不承諾離線 gap 消失。非 Windows status 回報不支援，保留手動入口。
+
+### 46.10 測試矩陣、交付與參考
+
+- 自動測試沿用 `test/autoupdate.test.ts`、`test/m11.test.ts` 與局部更新／sync 測試；新建 0.37.0 聚焦測試，使用可注入 watcher、clock、queue 與 filesystem fault。Windows 真實事件另驗，不以 fake watcher 取代。
+- 精確事件：在無 writer contention、非週期校正、已完成啟動校正下，以小型可解析文字檔至少測 20 次新增／修改／刪除，逐次記錄穩定後至搜尋可見的延遲，目標每次 15 秒內且 root scan 次數為 0。大量或慢格式不套用此硬門檻；另外測事件在掃描／parser 執行期間仍能排入與接續。
+- crash 注入：queue 落盤前／後、索引提交前／後、ack 前／後、同路徑新世代與舊 ack 競態；重啟後結果與完整校正基線一致。測 10,001 路徑 overflow、磁碟滿／queue 損壞、root 移除／重新登錄與舊工作隔離。
+- scope：兩個 sibling watcher，A 未知事件／錯誤只校正 A，B 保持事件更新；另測頂層新目錄、跨 scope rename、handle 上限退回粗 scope、連結越界、system exclusion 與無法定位事件的 root fallback。
+- 分批：批次中途 stop／kill／restart、巨型單目錄、掃描期間新增／刪除／rename、不可讀 sibling、root 離線與 writer contention。停止不能抹去進度；處理完成後與獨立完整掃描的文件集合等價。對故障 scope 不誤刪，對正常 scope 能刪。
+- 登入啟動：普通 Windows 帳號實測 enable／重複 enable／status／disable、真正登出登入、已在執行時不產生第二 daemon、路徑搬移與政策拒絕；只操作測試使用者自己的捷徑，不要求管理員。
+- 交付 `docs/0.37.0-VALIDATION.md`：列既有／新增能力、Node 22.17.0 回歸、完整 npm test、匿名各階段 profile、事件延遲、queue／scope／校正 fault 證據與公司 Windows 待驗項。README 分開教初次 index、日常 start/status/stop、可選 startup、手動完整校正與 CMD／PowerShell。
+- 參考邊界：[Paperless-ngx consumption](https://docs.paperless-ngx.com/usage/) 採受管理收件匣，不能當作任意 D 槽同步；[ripgrep Guide](https://github.com/BurntSushi/ripgrep/blob/master/GUIDE.md) 的即時純文字搜尋也不能取代 Office／PDF 索引。本版只借用通知、穩定等待與工作排程概念，不新增搬移原檔／managed library 模式。Windows 事件漏失的保守補掃依 [ReadDirectoryChangesW 文件](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-readdirectorychangesw)，但實際 Node 可見錯誤仍須測證。

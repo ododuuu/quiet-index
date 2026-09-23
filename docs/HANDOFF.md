@@ -4,7 +4,7 @@
 
 ## 待實作：0.36.1 後接 0.37.0（公司 Windows 0.36.0 後續，2026-09-23）
 
-權威規格是 [SPEC §45](SPEC.md#45-0361windows-掃描正確性與-tui-可操作性修正) 與 [SPEC §46](SPEC.md#46-0370日常變更發現與混合詞搜尋效能)，決策 D054／D055。程式 package 仍是 **0.36.0**；本次只完成規劃，沒有實作、升版或發佈。實作必須先完成 0.36.1，驗證穩定後再做 0.37.0，不要把兩版混成一個難以驗收的 patch。
+權威規格是 [SPEC §45](SPEC.md#45-0361windows-掃描正確性與-tui-可操作性修正) 與 [SPEC §46](SPEC.md#46-0370日常變更發現與混合詞搜尋效能)，決策 D054／D055／D056；D056 已取代 USN 候選安排。程式 package 仍是 **0.36.0**；本次只完成規劃，沒有實作、升版或發佈。實作必須先完成 0.36.1，驗證穩定後再做 0.37.0，不要把兩版混成一個難以驗收的 patch。
 
 給下一個 agent 的提示：
 
@@ -33,9 +33,27 @@
 
 1. 用正確 profile 路徑量 full reconciliation 各階段；CMD 用 `"%USERPROFILE%\Desktop\lds-profile.json"`，PowerShell 用 `"$env:USERPROFILE\Desktop\lds-profile.json"`。現有公司數字只有總耗時，不可先寫死根因比例。
 2. 先驗證現有 `autoupdate`：`src/live-update.ts` 的檔案事件會走 `applyPathChange()`，目錄事件才掃最小子樹；unknown filename、ignore change、queue >10,000 等才 full reconciliation。`src/autoupdate.ts` 預設 6 小時，啟動時掛 watcher 後 full sync，沒有 service／自啟，pending queue 在記憶體。
-3. 將它整理成日常主流程與 status 觀測。daemon 健康時單檔變更不可 root scan，15 秒內可搜尋；程序關閉期間仍由下次 start full reconciliation 補回。不要把 `index` 改成不安全的快速 scan。
+3. 將它整理成日常主流程與 status 觀測。小型穩定測試檔的事件至搜尋可見應在 15 秒內，非週期校正時不得 root scan。程序關閉期間由下次 start 的分批背景校正補回，未完成時顯示未確認；手動 `index` 語意不變，也不新增 `--full`。
 4. all-terms 先做 0.36.0 benchmark，再讓所有 Bloom 可表示的必要長詞以 `every` 安全淘汰 document candidate。只要含短詞，通過候選的文件仍需全文精確驗證；跨 payload 的長短詞必須命中，結果集合與基線逐筆相同。
-5. USN 只產出 RFC，除非公司普通權限、Node 介接、journal checkpoint／gap／reset、rename／delete 與非 NTFS fallback 全部證明。未達門檻就保留 watcher＋定期 full reconciliation，不得硬上 native helper。
+5. 公司電腦不能有管理員權限：USN 不再是實作或 RFC 待辦。依下方順序完成 SPEC §46.6～§46.10 的普通使用者背景更新。
+
+### 0.37.0 接手提示與分階段交付
+
+> 請先確認最新 main 已完成 SPEC §45 的 0.36.1；若尚未完成，先交付 0.36.1。接著實作 SPEC §46／D056：watcher 在 0.31.0 已存在，先用既有 autoupdate 量測事件局部更新，再擴充同一 LiveUpdateEngine。公司只能普通使用者，不研究 USN、不提權、不安裝 Service。依序實作持久事件 queue／世代與冪等 ack、watcher scopes、可接續背景分批校正、status 及可選使用者登入啟動；保留既有 parser selection 與來源／context 安全契約。all-terms 先 benchmark 再修，禁止 false negative。每階段提交有意義的故障回歸，最後交付 README、0.37.0-VALIDATION.md、STATUS／DECISIONS／HANDOFF 與公司 Windows 待驗清單；完成前不要升版或宣稱 Windows 驗收。
+
+| 階段 | 模組與工作 | 必須證明 |
+| --- | --- | --- |
+| A：既有功能基線 | `src/live-update.ts`、`src/local-update.ts`、`src/watch.ts`、`test/autoupdate.test.ts`、`test/m11.test.ts` | start 校正完成後直接新增／修改／rename／刪除再 search，不呼叫 index；記錄 root scan 次數與延遲 |
+| B：持久工作 | 新增獨立 queue 模組與版本化工作 SQLite；沿用 `src/store.ts` 的索引交易邊界 | 落盤後接受、commit 後 ack、crash 重播；舊 ack 不會清新世代；queue 超限先保存 dirty scope |
+| C：watcher scopes | 擴充 `live-update.ts`／`watch-path.ts`，共用 0.36.1 exclusions | root 直屬／新子目錄無覆蓋空洞；128 handles 上限；A 失效只補掃 A，無法定位則保守擴大 |
+| D：分批校正 | `scanner.ts`／`sync.ts` 抽出可接續枚舉與 scope 提交，共用 local update；保存 frontier／generation | 500 entries／約 250 ms 發現批次安全讓出、批次間釋放 writer；掃描中 rename／新事件不誤刪；stop／restart 可恢復 |
+| E：使用入口 | `autoupdate.ts`／`autoupdate-control.ts`／`cli.ts` 與新 startup 模組 | status 分清 watcher 健康與校正未完成；使用者 Startup enable／disable 冪等，政策拒絕仍可手動 start |
+| F：搜尋與交付 | `store.ts` 與搜尋 tests／benchmark、README／驗證文件 | mixed long＋short 候選 pruning 結果等價；全套回歸與普通 Windows 使用者人工結果分開記錄 |
+
+- 預設時間／數量與重播契約以 SPEC §46.7～§46.10 為準；大目錄不能保存 iterator offset 當可靠 cursor。工作 queue 和索引不同庫，不能宣稱跨庫原子性。
+- Node fs.watch 不提供完整 old/new rename pair 保證，也未必暴露每個 OS overflow；勿新增無證據的「所有事件零漏失」承諾。scope 分割需控制 handle 數與建立／回收競態。
+- 背景掃描與搜尋可共存，但沿用活動 SearchSession 的 `SEARCH_INDEX_CHANGED`，必要時提示重搜。完成部分 scope 不等於整根完整同步，失敗 scope 必須保留索引。
+- 本輪借用 Paperless 的事件／穩定等待想法，不搬移原檔；ripgrep 式文字優化不是變更發現，不重做已正常 parser。公司實測仍須由使用者回報。
 
 ### 不要誤修的項目
 

@@ -19,7 +19,11 @@
 - [ ] 明確文件化：`index` 是立即完整校正；`autoupdate start` 是已初次索引使用者的日常路徑。保留啟動、預設 6 小時、overflow／未知事件、ignore／roots 變更的完整校正安全網。
 - [ ] 測停止 daemon 期間的新增／修改／刪除，確認下次 start 的完整校正補回。持久事件 queue 只能保護 daemon 已觀察的事件，不得宣稱能補未執行期間。
 - [ ] 為 mixed long＋short `--all-terms` 建 benchmark；以所有 Bloom 可表示的必要長詞安全排除文件候選，候選文件仍全文精確核對。加入中英短詞、跨 block、舊／缺 Bloom、全部短詞與結果集合等價測試。
-- [ ] USN Change Journal 只寫 RFC／prototype gate：公司普通權限、Node 邊界、journal ID／USN checkpoint、rename/delete、wrap/reset/gap、非 NTFS／網路磁碟 fallback 均證明後才另排實作，0.37.0 不直接綁定 USN。
+- [ ] 按 SPEC §46.7 建獨立本機工作狀態庫：queue 世代、commit 後 ack、冪等重播、10,000 路徑上限與 dirty scope 降級；測 crash、落盤失敗、新事件與舊 ack 競態。
+- [ ] 拆分 root 直屬與子目錄 watcher scopes，handle 上限與粗 scope fallback；只對可定位的漏失做局部補掃，保留 Node 無法可靠回報 overflow 的安全網。
+- [ ] 按 §46.8 實作 directory frontier／generation、可中斷分批校正、事件優先與公平排程，釋放批次間 writer lock；測掃描與事件交錯的安全刪除、離線 gap、重啟與失敗 sibling。
+- [ ] `autoupdate startup enable|disable|status`：明確 opt-in 的目前使用者 Startup 捷徑，冪等／擁有權／路徑安全／政策拒絕；不得提權或安裝 Service。
+- [ ] 更新 README、0.37.0 驗證文件與 Windows 普通帳號驗收流程；USN 已依 D056 移出本版，勿再研究或要求管理員。parser 分流不重做，Paperless managed library 不納入。
 
 ## P0：外部環境與真實資料證據
 
@@ -42,7 +46,7 @@
 
 - [ ] 本機模型 provider（例如經核准的 Ollama／llama.cpp endpoint）需另定版本、健康檢查、模型能力與任意 URL／SSRF 邊界；不可直接開放自訂 URL。
 - [ ] 若官方未來提供適合第三方桌面程式的 OpenAI／xAI OAuth，再另案實作 PKCE、callback、token storage 與撤銷；目前不做 cookie、密碼代登或假「訂閱登入」。
-- [ ] Windows 安裝器、捷徑與開機啟動屬部署選配；需先證明免管理員可行與企業端點政策，不由 Web UI 自行安裝。
+- [ ] Windows 全套安裝器與一般應用捷徑仍屬後續部署選配；目前使用者的可選登入啟動已納入 0.37.0 §46.9，不由 Web UI 自行註冊。
 - [ ] OCR、圖片、資料夾拖曳與舊版 Office 新格式仍未納入；只有真實需求與安全 parser 方案明確時才排入，不無限擴格式。
 
 ## 明確不是缺陷

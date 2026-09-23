@@ -12,7 +12,8 @@
 - TUI 的 `[ ]` 由 `src/tui.ts` 畫出，但輸入仍是 readline `question()` 與 slash command，沒有 cursor／focus／keypress state；0.36.1 規劃補方向鍵、Space、Enter、PgUp／PgDn、Esc／左鍵與 Tab，保留命令 fallback 和 context 安全確認。
 - `--all-terms` 慢的程式根因也已找到：短於 trigram 的詞一律回 Bloom「可能」，文件層 `some()` 與 payload fallback 使一個短詞讓長詞 pruning 失效。0.37.0 先建立 benchmark，再用所有可表示的必要長詞做保守候選淘汰，最後仍完整精確核對，禁止 false negative。
 - `--profile` 失敗不是核心索引 bug：使用者在 CMD 傳入 PowerShell 的 `$env:USERPROFILE` 字面值。0.36.1 只改善父目錄／shell 提示，仍不自動建目錄、不覆寫檔案。
-- 背景索引功能已存在：`autoupdate start|status|stop` 使用局部事件引擎，活體期間檔案事件只處理事件路徑，預設每 6 小時完整校正。它不是 Windows Service、沒有登入自啟；程序關閉期間沒有事件紀錄，下一次 start 靠完整校正補回。0.37.0 先實測並把它整理為日常主流程，USN 只做有採用門檻的 RFC。
+- 背景索引功能已存在：`autoupdate start|status|stop` 使用局部事件引擎，活體期間檔案事件只處理事件路徑，預設每 6 小時完整校正。它目前沒有登入自啟；程序關閉期間沒有事件紀錄，下一次 start 靠完整校正補回。公司禁止管理員權限已納入 D056，USN 不再列為 0.37.0 工作。
+- 0.37.0 新增規劃：先驗收既有 watcher，再加入獨立持久 queue、事件世代／安全重播、有界 watcher scopes、可接續分批校正、未確認範圍 status 與普通使用者明確 opt-in 的登入啟動。細節與 fault 測試見 SPEC §46.6～§46.10；這些尚未實作，不能和現有 autoupdate 混稱已交付。第 7 項文字 parser 最佳化不在本輪，繼續用已驗證的格式分流。
 - 本機已修兩件可重現問題：TUI readline 關閉時未 settle `question()`，Ctrl+C／EOF 會變成退出 13 且不還原畫面；`document_payload_blocks` 缺 `block_id` 索引，加上先刪 block，使無關 mapping 變多時單檔替換變慢。0.36.0 先刪子表、重建 `document_payload_blocks_block_id`，外鍵與 writer lock 維持。
 - 合成基準（Linux／Node.js v22.23.2，種子 20260923，各三次）：100 萬／10 萬筆無關 mapping 的固定文件替換中位數比 0.85（1.10 ms／1.29 ms），計畫使用 `document_payload_blocks_block_id`。同一庫 0.35.0 在 100 萬筆是 58.37 ms。1 萬份小檔無變更中位數 782.39 ms，parser 0，比 0.35.0 的 801.87 ms 快 2.4%。profile 額外約 0.2%。詳細見 `docs/benchmark-0.36.0.json` 與 `docs/0.36.0-VALIDATION.md`。
 - 0.36.0 的本機 SQL mapping 熱點修正仍成立，但不是本次 2～4 分鐘 filesystem scan 的主因。公司第一次 `--profile` 在開始索引前因錯誤 shell 路徑失敗，目前只有總耗時，沒有各階段比例；0.37.0 必須用正確 CMD／PowerShell 路徑重測，不得虛構 profile 結果。
