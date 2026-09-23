@@ -1,5 +1,36 @@
 # 跨對話交接方式
 
+## 進行中：交給 Grok 實作 0.36.0（2026-09-23）
+
+使用者已指定本版處理舊索引沿用、嚴重慢速及 TUI 可用性。權威規格為 [SPEC §44](SPEC.md#44-0360-索引增量效能與-tui-可用性修正)，決策為 D053，狀態以 STATUS 首節為準；優先於下方歷史交接與 NEXT-TODO 的其他功能。本次只有規格／交接，產品仍是 **0.35.0**，不得把 0.36.0 寫成已完成或延用先前暫議的 0.35.1。
+
+### 給 Grok 的實作提示
+
+> 請實作 LocalDocSearch 0.36.0。先讀 AGENTS.md，再依序讀 docs/SPEC.md、docs/STATUS.md、docs/DECISIONS.md、docs/HANDOFF.md；只處理 SPEC §44。程式基線是 0.35.0 的 29f4776d0f16eb2b7e03a2a86c0bf008bf1c554e，從包含本次規格的最新 main 建立工作分支。先補能重現 TUI Ctrl+C／EOF 的真實 PTY 測試、索引位置／逐文件升級接續測試，再以大型既有庫量測替換成本，依證據修正熱點。保留 TEXT_PARSE_VERSION=1、既有索引與 payload、writer lock、外鍵及資料耐久性；不能靠 rebuild／刪庫／排除文件／縮短 parser timeout 解決。依規格完成原因計數、慢階段進度、本機匿名 profile、TUI 命令補全／help／尺寸適配／可靠退出。所有行為變更補自動測試，交付前後效能數字、PTY 證據、0.36.0-VALIDATION.md、README 與更新的 STATUS／DECISIONS／HANDOFF；最後才升 package／lockfile 並打包。公司文件與索引留在公司電腦，沒有使用者回報不得宣稱 Windows 或公司慢速已修復。
+
+### 已掌握的證據
+
+- 使用者原話的量測只有「10 分鐘才處理到 135 份」；未取得其升級前最後完成版本、當次命令、目前格式／大小／階段／重試數。先判斷檢查進度或實際解析，不以此計算全庫 ETA。
+- 0.29.1 公司歷史參考為 358,102 份一般檔、12,161 次 parser、約 2 小時 21 分；新增正文與一次性文字升級會改變工作量，不能直接當 0.36.0 的固定工時門檻。
+- 0.35.0 真實 PTY（macOS／Node 22.13.1）：`./help` 進搜尋，`/help` 列清單；`/quit` 退出 0 並有 `ESC[?1049l`；Ctrl+C／EOF 退出 13、unsettled top-level await、無還原碼。沒有取得公司 Windows 同樣的程序診斷。
+- 基線完整 233 項：232 通過、0 失敗、0 取消、1 Windows cmd 略過（47.23 秒）；聚焦 25 項也全綠。這些是既有測試漏測的證據，不是修正已驗證。正式目標仍是 Node 22.17.0。
+
+### 實作定位與順序
+
+1. `src/cli.ts` 的 TUI readline 介接、`src/tui.ts` 的 ask／finally：close 必須 settle pending question。既有互動 search 已使用 AbortController，可作參考；注意 context 確認與 prompt 建立競態、搜尋忙碌時取消。以編譯 CLI 的 PTY 重現，不只注入 `ask: async () => null`。
+2. `src/model.ts`／`src/sync.ts`／`src/local-update.ts`／`src/live-update.ts`：共用重新處理原因；七種文字 parse_version 保持 1，更新與標記在同一文件交易。`src/store.ts`／CLI 顯示實際資料位置、儲存／文字兩種升級狀態；唯讀舊 schema 缺欄位也需可讀。
+3. `src/store.ts` 的 `upsert()`、`writeDocumentPayloads()`、外鍵及 mapping schema：分離量測解析／壓縮／Bloom／刪除／寫入／提交。`document_payload_blocks` 有 block_id 外鍵，但現有複合索引以 document_id 起頭；查詢計畫與規模測試要證明是否造成跨庫掃描。只把這點當待驗證線索，勿直接抄成已證根因。
+4. `src/progress.ts` 與同步回報：呈現檢查／略過／更新／parser／失敗計數、原因、慢階段；新增有界匿名 profile，注意 profile 自己不能被索引，以及舊摘要欄位相容。
+5. TUI 使用命令登錄共用 help／解析／補全、固定輸入與狀態列、可完整翻閱 help／context，依 terminal 大小及中文顯示寬度排版；版本由單一來源取得。以 80×24、120×40、小視窗、resize、中文貼上及 Ctrl+C 實測。
+6. 完成 SPEC §44.7 的大型庫、無變更、取消／故障／重跑與完整回歸。比較需相同資料／Node／硬體，profile 與預設模式分開量測。若公司慢速未在本機重現，交付匿名收證能力並清楚保留該未解項。
+
+### Grok 交付清單
+
+- 程式與有意義的缺陷回歸，包含 PTY 退出碼／還原序列與大型舊庫替換案例；測試環境與略過原因明列。
+- `scripts/benchmark-0.36.0.mjs` 或等效入口、合成資料規模／種子、0.35.0 與修正後三次量測及匿名原始結果；未達 SPEC 門檻不可標記本機效能完成。
+- `docs/0.36.0-VALIDATION.md` 記錄根因、改動、測試、效能及未解項；README 提供普通 index 升級、profile、取消接續、TUI 指令與退出說明。package／lockfile 同步至 0.36.0，核對交付包與 SHA-256。
+- 公司後續只執行普通 index 與本機 profile／TUI 複驗；不要求上傳公司內容、完整索引或含路徑的 verbose 日誌，不要求刪 journal／WAL／rebuild。
+
 ## 已交付：0.35.0 本機拖曳工作台與可選 AI API（2026-09-23）
 
 權威規格為 SPEC §43，決策為 D052。`docsearch ui [--no-open]` 啟動只綁 `127.0.0.1` 的本機工作台；每次使用亂數 fragment token、Host／Origin 驗證與嚴格 CSP。介面可搜尋既有索引、人工勾選、拖曳支援格式、移除臨時檔、預覽／複製合併 context，並選配 OpenAI／xAI Responses API。
