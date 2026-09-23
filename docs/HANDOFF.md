@@ -2,11 +2,52 @@
 
 # 跨對話交接方式
 
-## 本機已實作：0.36.0 索引沿用、熱點與 TUI（2026-09-23）
+## 待實作：0.36.1 後接 0.37.0（公司 Windows 0.36.0 後續，2026-09-23）
 
-權威規格仍是 [SPEC §44](SPEC.md#44-0360-索引增量效能與-tui-可用性修正)，決策 D053。本機程式、測試、`scripts/benchmark-0.36.0.mjs` 與 `docs/0.36.0-VALIDATION.md` 已完成，package 為 **0.36.0**。公司慢速與 Windows TUI 沒有使用者回報，不得標成已修復。
+權威規格是 [SPEC §45](SPEC.md#45-0361windows-掃描正確性與-tui-可操作性修正) 與 [SPEC §46](SPEC.md#46-0370日常變更發現與混合詞搜尋效能)，決策 D054／D055。程式 package 仍是 **0.36.0**；本次只完成規劃，沒有實作、升版或發佈。實作必須先完成 0.36.1，驗證穩定後再做 0.37.0，不要把兩版混成一個難以驗收的 patch。
 
-下一任只在公司電腦做普通 `index <原根目錄> --profile <新檔>`、中斷接續、完成後無變更重跑，以及 TUI `/help`、`./help`、`/quit`、Ctrl+C。不要上傳公司內容、完整索引或含路徑的 verbose 日誌，不要刪 journal／WAL，不要要求 rebuild。
+給下一個 agent 的提示：
+
+> 請從最新 main 實作 LocalDocSearch 0.36.1。先讀 AGENTS.md，再依序完整讀 docs/SPEC.md、STATUS.md、DECISIONS.md、HANDOFF.md；0.36.1 只處理 SPEC §45。先用測試鎖住 Windows volume-root 系統目錄排除與 sibling scan failure 的刪除安全，再改 scanner／sync；接著改善 profile 父目錄與 CMD／PowerShell 提示；最後把 TUI 從 readline command loop 重構為可測的 focus／keypress 狀態機，保留 command fallback、退出清理與 context `yes` 契約。不得 rebuild／刪索引、改 parser selection、降低 durability、處理公司 parser errors 或提前實作 USN。每項行為變更補自動測試，更新 README、STATUS、DECISIONS、HANDOFF 與 0.36.1-VALIDATION.md，完整回歸後才升 package／lockfile。公司 Windows 未回報前不得宣稱 Windows 通過。
+
+### 已確認根因與模組
+
+| 問題 | 根因 | 主要模組 |
+| --- | --- | --- |
+| 日常 `index` 2～4 分鐘 | `sync()` 先 `scan(root)`，再對每個 `found.paths` 做 stat／store compare；parser 已略過，但 change discovery 仍全量 | `src/scanner.ts`、`src/sync.ts`、`src/store.ts`、`src/progress.ts` |
+| 局部 scan failure 阻止所有刪除 | scan 只有 root-global errors；`report.complete = found.errors.length === 0`，只有 complete 才 `removeMissing()` | `src/scanner.ts`、`src/sync.ts`、`src/store.ts`、同步／錯誤測試 |
+| 系統目錄污染 | `$recycle.bin`／`system volume information` 只在 hint set，不在 built-in ignore；watch ignore 也沒有 | `src/scanner.ts`、`src/watch-path.ts`、`src/local-update.ts`、`src/live-update.ts` |
+| TUI checkbox 不可操作 | `src/tui.ts` 只渲染 `[ ]`，`src/cli.ts` 仍用 readline `question()` 收整行文字，沒有 cursor／focus／raw key state | `src/tui.ts`、`src/cli.ts`、TUI／PTY 測試 |
+| mixed all-terms 慢 | `bloomMayContain()` 對 `<3` 字元回 true；document `some()` 因短詞全通過，payload candidate 也因任一短詞變 `undefined` | `src/store.ts`、搜尋與 benchmark 測試 |
+| profile 只顯示 ENOENT | `reserveNewProfile()` 直接 exclusive open，錯誤只格式化 code；CMD 收到 `$env:...` 字面路徑 | `src/profile.ts`、`src/cli.ts`、README／CLI 測試 |
+
+### 0.36.1 實作順序
+
+1. **先寫 failure-scope 模型與測試。** 讓 scanner 回傳最小不可確認 directory scopes。擴充 store removal API 接受 protected scopes；只有位於失敗 scope 的既有文件保留，正常 sibling 未發現文件刪除。root failure 保護整根；listed file 的 read/stat/parser failure 只保護該路徑。特別檢查 `rebuild` 不會先清掉失敗 subtree。
+2. **建立唯一的 Windows built-in path 判定。** 只匹配 volume／UNC root 直接子目錄的 `$RECYCLE.BIN`、`System Volume Information`，case-insensitive；scanner、watch、local update 全部共用。測相似名稱、巢狀同名、直接以系統目錄為 root 及升級後清掉舊索引紀錄。不要寫 ignore file。
+3. **改善 profile 診斷。** 保留新檔 exclusive create、先保留輸出與不建父目錄；錯誤顯示安全的 resolved parent、code 與兩種 shell 範例。疑似未展開字面值只提示，不自行展開。
+4. **重構 TUI input。** 把 key event／focus／cursor／view transition 與 render 分離，CLI 只管理 terminal lifecycle。先用注入 key stream 測 ↑↓、Space、Enter、PgUp／PgDn、Esc／←、Tab、q、Ctrl+C，再用真實 PTY 測 escape sequences、resize、中文寬度、alternate screen 還原。命令 fallback、穩定文件代碼、跨頁選取及 context 確認不得退化。
+5. 完成 0.36.1 全套後，在公司 Windows 用無機密 sibling 權限案例及 80×24／120×40 TUI 驗收；不要直接用公司整庫做破壞性 deletion 實驗。
+
+### 0.37.0 接續工作
+
+1. 用正確 profile 路徑量 full reconciliation 各階段；CMD 用 `"%USERPROFILE%\Desktop\lds-profile.json"`，PowerShell 用 `"$env:USERPROFILE\Desktop\lds-profile.json"`。現有公司數字只有總耗時，不可先寫死根因比例。
+2. 先驗證現有 `autoupdate`：`src/live-update.ts` 的檔案事件會走 `applyPathChange()`，目錄事件才掃最小子樹；unknown filename、ignore change、queue >10,000 等才 full reconciliation。`src/autoupdate.ts` 預設 6 小時，啟動時掛 watcher 後 full sync，沒有 service／自啟，pending queue 在記憶體。
+3. 將它整理成日常主流程與 status 觀測。daemon 健康時單檔變更不可 root scan，15 秒內可搜尋；程序關閉期間仍由下次 start full reconciliation 補回。不要把 `index` 改成不安全的快速 scan。
+4. all-terms 先做 0.36.0 benchmark，再讓所有 Bloom 可表示的必要長詞以 `every` 安全淘汰 document candidate。只要含短詞，通過候選的文件仍需全文精確驗證；跨 payload 的長短詞必須命中，結果集合與基線逐筆相同。
+5. USN 只產出 RFC，除非公司普通權限、Node 介接、journal checkpoint／gap／reset、rename／delete 與非 NTFS fallback 全部證明。未達門檻就保留 watcher＋定期 full reconciliation，不得硬上 native helper。
+
+### 不要誤修的項目
+
+- 不改已證明正常的未變更 parser selection：公司已確認一次性 `文字解析升級=60014` 後下一次為 0，約 299,530 份未變更會略過。
+- 暫不處理 `MSG_FORMAT_ERROR`、`OFFICE_MISSING_PART`、`PDF_CORRUPT`、`PDF_PARSE_ERROR`、`RTF_INVALID`、`TEXT_DECODE_ERROR`、`XLS_FORMAT_ERROR`、`XML_DECODE_ERROR`、`FILE_READ_FAILED`，也不把固定 202 個 error retry 併入本輪。
+- 不上傳公司文件、索引或含敏感路徑的 profile；不刪 SQLite journal／WAL，不以 rebuild、全域 ignore、關閉外鍵或 durability 換效能。
+
+## 歷史紀錄：0.36.0 本機實作與原始驗收交接（2026-09-23）
+
+權威規格仍是 [SPEC §44](SPEC.md#44-0360-索引增量效能與-tui-可用性修正)，決策 D053。本機程式、測試、`scripts/benchmark-0.36.0.mjs` 與 `docs/0.36.0-VALIDATION.md` 已完成，package 為 **0.36.0**。下列是公司回報前的原始交接，已由本文件最上方 0.36.1／0.37.0 規劃取代；不得再照此節把工作限縮為單純複驗。
+
+原規劃是下一任只在公司電腦做普通 `index <原根目錄> --profile <新檔>`、中斷接續、完成後無變更重跑，以及 TUI `/help`、`./help`、`/quit`、Ctrl+C；這些人工結果現已收到並形成 SPEC §45／§46。資料安全要求仍有效：不要上傳公司內容、完整索引或含路徑的 verbose 日誌，不要刪 journal／WAL，不要要求 rebuild。
 
 ### 當日實作提示（已執行，保留原文）
 

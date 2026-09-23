@@ -1,8 +1,8 @@
 # LocalDocSearch 產品規格
 
-- 規格基線：已交付 0.35.0；0.36.0 索引增量／效能與 TUI 修正見第 44 節
+- 規格基線：已交付 0.36.0；公司 Windows 後續修正規劃見 0.36.1（第 45 節）與 0.37.0（第 46 節）
 - 日期：2026-09-23
-- 狀態：0.36.0 已在本機實作。第 44 節的行為要求沒有改寫；實作證據見 `0.36.0-VALIDATION.md`。公司索引效能根因與 Windows TUI 仍待使用者複驗，不能以本機測試通過視為公司驗收完成。
+- 狀態：0.36.0 已在本機實作，且使用者已回報公司 Windows 的部分人工結果：舊索引沿用與未變更文件零重解析成立，但日常 `index` 仍全量掃描、局部掃描失敗會阻止整根刪除、系統目錄污染搜尋、TUI 無游標選取，混合長短詞搜尋也偏慢。第 45、46 節目前只有規劃，尚未實作或驗收。
 
 ## 版本與里程碑命名
 
@@ -1117,3 +1117,90 @@ docsearch doctor
 6. **比較與門檻**：相同硬體／Node／資料／PRAGMA／背景負載，比較 0.35.0 與 0.36.0，每情境至少三次，記錄全部數字、中位數、文件 p50／p95、各階段、RSS、容量及完整結果核對。固定替換文件而把無關 mapping 從 100,000 增到 1,000,000，修正後替換中位數應不超過 2 倍，查詢計畫不得逐 block 全掃 mapping；無變更 10,000 檔必須零解析／零內容寫入，端到端中位數不得比 0.35.0 慢超過 20%。profile 額外耗時目標 ≤10%，超出須調整或明列原因。未達門檻不得標記本機效能完成；不得靠延長測試 timeout 或減少資料量通過。
 7. **完成界線**：Grok 提交根因、修正前後證據與未解項；執行完整 `npm test`、至少正式 Node.js 22.17.0 相容回歸，保留所有既有搜尋／MCP／UI 功能。新增 `docs/0.36.0-VALIDATION.md` 與匿名效能原始報告，更新 README 的升級／進度／profile／TUI 用法；實作完成時才把 package 與 lockfile 升至 0.36.0、打包及核對雜湊。本次規劃提交不改 package、不造 tag／發佈包。
 8. **公司複驗**：在公司本機核對舊／新程式的實際索引位置、Node 版本、背景更新狀態及來源範圍；對現有索引做普通 `index D:/ --profile <新檔>`、中斷接續及完成後無變更重跑，回報匿名階段／格式／原因統計與慢檔分布。原始檔、索引與含公司路徑的 verbose 日誌留在公司。只對相同工作量作比較；0.29.1 的 358,102 份／約 2 小時 21 分是歷史參考，不是新增正文工作量的硬性期限。只有使用者回報後才標示公司慢速已修復及 Windows TUI 通過。
+
+## 45. 0.36.1：Windows 掃描正確性與 TUI 可操作性修正
+
+### 45.1 公司人工測試證據與本版界線
+
+- 公司 Windows 的 0.36.0 實測約有 299,700～299,800 份一般檔案、約 300 GB。普通 `index D:/` 分別約耗時 124、159、166、247 秒；典型一次為找到 299,741 份、來源變更 3、錯誤重試 202、未變更 299,536、parser 205 次、耗時 158,658.88 ms。
+- 已確認舊資料庫可沿用；一次性 `文字解析升級=60014` 完成後，下一次為 0；約 299,530 份未變更文件會略過且 parser 不再回到六萬份。不得重新設計這段已正確的 parser selection，亦不得以 rebuild、刪索引、降低 durability 或略過內容掩蓋後續問題。
+- 刪除測試檔後仍回報 `移除 0`；同次有 27 個 `SCAN_READ_FAILED` 且 `同步完整：否`。搜尋 `APPLICATION` 的前頁大量來自 `D:\$RECYCLE.BIN\...`。目前 checkbox 只是畫面標記，結果區無游標。這三項列為 0.36.1 correctness／UX。
+- 公司列出的 MSG／Office／PDF／RTF／文字／XLS／XML／讀檔錯誤及固定 202 個 parser error 重試，不在本版處理。沒有公司原檔證據時不得猜測 parser 根因或以合成檔宣稱修復。
+
+### 45.2 Windows 內建系統目錄排除
+
+- Windows 掃描器須把 volume root 的直接子目錄 `$RECYCLE.BIN` 與 `System Volume Information` 視為程式內建排除，名稱比對不分大小寫。它們不是使用者 ignore 規則，程式不得自動建立或修改 `.localdocsearchignore`。
+- 排除必須套用於完整 scan、局部更新、watch／autoupdate 事件與子樹校正，避免背景事件重新把這些檔案寫回索引。排除統計歸入具名的內建規則，不能偽裝為掃描錯誤。
+- 只排除磁碟或 UNC volume root 的精確直接子目錄；例如 `D:\work\$RECYCLE.BIN-notes`、`D:\archive\System Volume Information` 與名稱相近的普通資料夾不得被誤排除。若使用者直接把受排除的系統目錄當 root，命令應明確拒絕並說明原因，不能成功建立看似空白的索引。
+- 升級後第一次完整校正可從索引移除過去收錄於這兩個系統目錄的紀錄；這是新的明確來源範圍，不會刪除來源檔案。README／status 須說明此相容影響。
+
+### 45.3 子樹範圍的刪除安全
+
+- 掃描結果除整體錯誤外，須保存「無法確認的最小目錄範圍」及錯誤碼。`readdir` 在某目錄失敗時保護該目錄及其後代；根目錄本身失敗才保護整根。不得再用任何一個 scan error 把整個 root 的 deletion inference 全部關閉。
+- 一筆既有索引文件只有在下列條件皆成立時才可移除：它位於本次要求掃描的範圍、此次未再次發現，而且不位於任何失敗／未知 scope 內。正常 sibling subtree 中已刪的文件可移除；失敗 subtree 的既有索引必須保留。
+- 已列出的檔案若後續 `stat`／讀取失敗，該路徑本身仍視為存在並保留舊內容，但不能因此保護不相關 sibling。parser error 也不是 filesystem absence 的證據，不得影響其他路徑的刪除。
+- 報告可以維持 `同步完整：否`，同時清楚列出已安全移除數、因失敗 scope 而保留的數量與匿名化 scope 統計。舊 summary 欄位必須可讀；新增欄位應具相容預設。
+- `rebuild` 不得先清整根再遇到局部失敗。實作可保守地維持「有任何 scan failure 就不做整根 rebuild」，或只替換已確認 scope；不論選擇何者，都必須證明失敗 subtree 的舊資料不會被誤刪。
+
+### 45.4 `--profile` 的 Windows shell 與路徑錯誤
+
+- `--profile` 仍採新檔 exclusive create、不覆寫既有檔、不自動建立父目錄，並在索引寫入前先保留輸出檔。安全及失敗原子性不可改。
+- 建立失敗時至少顯示「profile 輸出目錄不存在或無法存取：<父目錄>」與安全處理後的錯誤碼；不得只輸出 `ENOENT`。路徑顯示不得包含文件內容或其他敏感值。
+- 文件須分開提供 CMD 與 PowerShell 範例。CMD：`--profile "%USERPROFILE%\Desktop\lds-profile.json"`；PowerShell：`--profile "$env:USERPROFILE\Desktop\lds-profile.json"`。若偵測到常見未展開的 `$env:`／`%VAR%` 字面值，可提示 shell 語法可能混用，但不能自行展開任意變數。
+
+### 45.5 結果區游標、選取與預覽
+
+- TUI 必須引入明確 focus 與 cursor 狀態，不再以逐行 `question()` 加 checkbox 外觀冒充選擇器。結果區使用 `↑`／`↓` 移動目前列、Space 切換選取、Enter 預覽、PgUp／PgDn 翻頁、`←`／Esc 從預覽返回；Tab 在搜尋輸入、結果與已選清單間循環（小視窗可用精簡焦點順序）。
+- `/` 或既有 `/search` 可回到搜尋輸入；既有 slash-command 操作保留為鍵盤不支援時的 fallback。翻頁主要操作不得要求輸入 `/next`，底部提示只顯示目前 focus 真正有效的按鍵。
+- `q` 在結果／預覽等非文字輸入狀態退出；Ctrl+C 與 `/quit` 全程退出。搜尋輸入內的普通 `q` 仍可作查詢字元，避免破壞 SPEC §44 的文字輸入契約。
+- 跨頁選取仍以穩定文件代碼核對；context 全文預覽、逐字 `yes` 才複製、來源重驗與 20 份／256 KiB 上限不變。Esc 取消預覽不得觸發複製或 OS 動作。
+- 輸入事件層須可注入測試；raw mode／keypress、resize、alternate screen、IME／貼上與 shutdown 清理需集中管理。中文全形／組合字寬度及長路徑截斷沿用 §44.6，不得以字串長度定位游標。
+
+### 45.6 重現、測試與 0.36.1 驗收
+
+1. **系統排除重現**：在 Windows volume root 或注入 win32 path semantics 的測試樹建立兩個精確系統目錄、相似名稱及巢狀普通同名目錄。完整與局部更新只排除前兩者；搜尋不再出現其舊紀錄，其他資料夾仍可搜尋；程式不寫 `.localdocsearchignore`。
+2. **局部失敗重現**：既有索引同時含 sibling A／B；下一次讓 A 的 `readdir` 回 `EACCES`，刪除 B 的文件。同步後 B 必須移除、A 必須保留，報告列出受保護 scope；根 `readdir` 失敗則兩者均保留。另測單檔 read/stat failure、parser failure、子樹 sync 與 rebuild。
+3. **profile 重現**：在 CMD 傳入 PowerShell 字面路徑、傳入不存在父目錄、唯讀父目錄及已存在目標檔；確認尚未索引、錯誤含父目錄與 CMD／PowerShell 指引，且不覆寫、不建立父目錄。正確兩種 shell 範例都能輸出有效 JSON。
+4. **TUI 自動測試**：注入 key event 驗證焦點、上下邊界、跨頁、選取、預覽返回、搜尋、resize、索引變更與 context 取消；真實 PTY 驗證方向鍵 escape sequence、Space、Enter、PgUp／PgDn、q、Ctrl+C、終端還原與無殘留程序。
+5. **Windows 人工驗收**：在 80×24 與 120×40 的 Windows Terminal 操作中文結果；使用者能不輸入命令完成移動、跨頁、選取、預覽、返回及退出。以含無權限 sibling 的無機密測試樹驗證刪除，不得直接拿整個公司索引作破壞性實驗。
+6. **交付界線**：0.36.1 不承諾縮短 30 萬檔完整 reconciliation，不改 parser retry policy，不做 USN。所有行為變更補測試；完成後才升 package／lockfile、更新驗證文件並由公司 Windows 回報，規劃提交本身不算實作完成。
+
+## 46. 0.37.0：日常變更發現與混合詞搜尋效能
+
+### 46.1 問題定義與現有架構結論
+
+- 普通 `docsearch index <root>` 現在必定 `scan(root)`，對每個發現路徑做 metadata／索引比對，才知道約 299,530 份未變更。即使 parser 只有約 205 次，約 30 萬檔的 filesystem discovery 仍使公司案例花 2～4 分鐘。把完整掃描再微幅調快不等於解決日常增量更新。
+- 0.31.0 已有真正的局部更新：`watch` 與 `autoupdate` 共用事件引擎；檔案事件只更新／刪除該路徑，目錄事件掃最小可信子樹。未知 filename、queue overflow、ignore 變更、watcher 復原或其他無法證明安全的情況才降級完整 reconciliation。
+- `autoupdate start` 是使用者明確啟動的 detached 背景程序，可在原終端關閉後存續；預設每 6 小時完整校正，可設定 15 分鐘至 24 小時。它不是 Windows Service，沒有開機／登入自啟；重新開機或程序未執行期間不會收到 `fs.watch` 事件。
+- 啟動時先掛 watcher 再做完整 reconciliation，既補回離線變更也避免啟動窗口遺漏；因此第一次啟動仍可能慢。現有 pending queue 只在記憶體，能合併活體期間事件，不能聲稱可從程序關閉期間恢復變更。
+
+### 46.2 日常主流程與完整校正角色
+
+- 對已完成初次索引的使用者，文件與 CLI 應把 `autoupdate start` 定義為日常新增／修改／刪除的主要路徑；`index` 明確稱為「立即完整校正」，不得悄悄改成可能漏失離線變更的快速命令。
+- daemon 健康且沒有降級事件時，單檔新增／修改／刪除不得呼叫 root `scan()`，也不得把 30 萬份文件列為已檢查；變更須經既有 ignore、root ownership、parser、交易、writer lock 與刪除安全流程。
+- 完整 reconciliation 保留作正確性安全網：daemon 啟動、預設每 6 小時、watcher overflow／未知事件、ignore 或 roots 變動、恢復異常，以及使用者明確執行 `index`。頻率可設定，但不得為了漂亮延遲永久關閉。
+- `autoupdate status` 應讓使用者分辨「daemon 健康／最近局部事件／上次完整校正／下一次完整校正／目前降級原因」，並顯示最近完整校正是否因 scan failure 不完整。搜尋可沿用現有不完整提示。
+- 0.37.0 必須先在公司 Windows 驗證既有 `autoupdate` 行為；若缺陷可在事件引擎／操作流程內修正，就不另造變更追蹤器。可持久化 daemon 已觀察到但尚未提交的有界事件，以改善 crash recovery；它不能補回程序未執行時根本沒觀察到的事件。
+
+### 46.3 離線變更與 USN Change Journal 研究門檻
+
+- 在不使用 OS 持久變更來源時，程序關閉期間的變更只能由下一次完整 reconciliation 安全補回。不得以「上次正常停止」或時間戳猜測取代全量確認，也不得為加速而漏掉刪除。
+- NTFS USN Change Journal 只列為 RFC 候選，不在沒有驗證前直接實作。RFC 至少要驗證：公司普通使用者權限與端點政策、Node.js 22／純 Node 或經核准 helper 的相容性、volume／journal ID 與 USN checkpoint、rename pair／delete／hard link 語意、journal wrap／reset／gap 偵測、路徑重建成本，以及索引或 checkpoint 損壞的復原。
+- 非 NTFS、網路磁碟、可移除媒體、journal 不可用／權限不足及 checkpoint 不可信時必須安全回退完整 reconciliation；不得把 USN 變成安裝或管理員必要條件。所有 journal 資料與路徑仍留在本機。
+- 只有公司環境證明能以一般權限可靠讀取、Node 邊界可維護、gap 可檢出且合成與真實重播零漏失後，才另定實作版本。否則 0.37.0 以常駐 autoupdate 加定期完整校正交付。
+
+### 46.4 `--all-terms` 混合長短詞候選縮減
+
+- 修正前先以 0.36.0 建立 benchmark／profile。現有 Bloom 對少於 3 個字元的 term 一律回「可能存在」，而 all-terms 的文件層使用任一 term 可能命中；payload 層只要出現短詞就停用候選集合。因此 `複製回本機 安裝` 中的 `安裝` 會使大量文件進入精確讀取，長且有選擇性的 `複製回本機` 無法先淘汰候選。
+- all-terms 語意要求每個詞都存在，因此文件層可先取所有 Bloom 可表示的長詞，要求每一個都通過；任一長詞確定不存在即可安全排除文件。若沒有可表示的長詞，維持完整精確掃描。缺舊 Bloom、版本不相容或資訊不足一律視為可能存在，不能產生 false negative。
+- 長詞 Bloom 只能縮小「文件候選」。含短詞的候選文件仍須讀取足以核對整份文件的正文，不能只讀長詞命中的 payload，否則長詞與短詞分處不同 block 時會漏失。最後判定、命中位置、排序、snippet 與大小寫正規化完全沿用現有精確邏輯。
+- 混合中文與英文、兩字 CJK、短 ASCII、重複詞、長短詞跨 block／payload、只有檔名命中、舊 Bloom／缺 Bloom、全部短詞及零結果都須有集合等價測試。
+
+### 46.5 量測、驗收與相容性
+
+1. **完整掃描 profile**：用正確 shell 路徑在同一資料與硬體至少三次量測 enumerate、stat／metadata compare、parser、compression／Bloom、SQLite write／commit 及總耗時；目前只有總耗時，未取得成功 profile，不得虛構各階段比例。
+2. **背景局部更新**：在 daemon 已健康且啟動校正完成後，分別新增、修改、刪除一檔。每次不得呼叫 root scan，解析／寫入只涵蓋事件路徑或最小必要子樹，並在 15 秒內可搜尋或消失；另測 rename、連發去重、overflow 降級、ignore／roots 變更、writer contention 與重啟後完整補回。
+3. **程序關閉期間**：停止 daemon 後新增、修改、刪除，再啟動；啟動完整校正後結果必須正確。若導入任何持久事件／USN prototype，還需測 checkpoint crash、journal gap、reset、非 NTFS 與權限拒絕的完整 fallback。
+4. **搜尋 benchmark**：固定相同大型 store，記錄查詢總時、候選文件、payload 解壓／精確核對數與結果雜湊。混合長短詞時，被任一必要長詞 Bloom 排除的文件不得解壓 payload；結果集合與 0.36.0 精確基線逐筆相同。至少三次回報中位數與 p95，不以縮短 timeout 或減少資料冒充改善。
+5. **migration**：日常流程調整不得改索引內容格式或要求 rebuild；舊 Bloom／舊 summary 仍可讀。若持久事件 queue 需要 schema，採可重入遷移且索引本體保持可搜尋。背景更新仍需使用者明確啟動，不在 0.37.0 偷加 service／登入自啟。
+6. **完成界線**：0.37.0 可交付既有 autoupdate 的產品化、可觀測性與 all-terms 安全 pruning；若離線快速追蹤的 USN 門檻未滿足，應留下 RFC 與全量 fallback，不得宣稱「任何時候都不需全掃」。

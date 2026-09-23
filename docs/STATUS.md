@@ -1,15 +1,23 @@
 # 專案狀態
 
-最後更新：2026-09-23（0.36.0 本機實作完成；公司慢速與 Windows TUI 未驗收）
+最後更新：2026-09-23（0.36.0 公司人工測試已定位後續問題；0.36.1／0.37.0 僅完成規劃）
 
 ## 目前狀態
 
-- **目前版本：0.36.0 索引沿用、可診斷效能與 TUI 可用性。** 權威規格 SPEC §44／D053。本機程式與 package 已升到 0.36.0。公司根因與 Windows 終端還沒有使用者回報，不能標成已修復。
+- **目前程式版本仍是 0.36.0；進行中里程碑是 0.36.1 規劃，後續為 0.37.0。** 0.36.1 權威規格為 SPEC §45／D054，處理 Windows 系統目錄排除、scope-aware deletion、profile 錯誤與可操作 TUI；0.37.0 見 §46／D055，處理日常變更發現與 all-terms 效能。兩版尚未實作，不得把文件提交視為修正完成。
+- 使用者已在公司 Windows 實測 0.36.0。已確認：舊索引可沿用；一次性 `文字解析升級=60014` 完成後第二次為 0；約 299,530 份未變更文件會直接略過；steady-state parser calls 不會再回到六萬份。0.36.0 的 parser selection 正常，不再重開此設計。
+- 新瓶頸已確定是 filesystem change discovery：普通 `index D:/` 每次仍枚舉約 299,700～299,800 份／約 300 GB，案例總耗時約 124、159、166、247 秒。典型一次只來源變更 3、錯誤重試 202、parser 205 次，卻仍檢查 299,741 份；不能把「未重 parse」誤稱為日常增量已完成。
+- 刪除測試檔後仍為 `移除 0`，同次 27 個 `SCAN_READ_FAILED` 使整根 `complete=false`，現行 `sync` 只有整根 complete 才執行 removeMissing。`System Volume Information` 等局部不可讀因而保護了所有 sibling，root cause 已定位。
+- `$RECYCLE.BIN` 與 `System Volume Information` 目前只是 scanner hint，不是 built-in ignore；前者已大量佔據 `APPLICATION` 搜尋前頁。0.36.1 規劃只排除 Windows volume root 的精確直接子目錄，且不修改使用者 ignore。
+- TUI 的 `[ ]` 由 `src/tui.ts` 畫出，但輸入仍是 readline `question()` 與 slash command，沒有 cursor／focus／keypress state；0.36.1 規劃補方向鍵、Space、Enter、PgUp／PgDn、Esc／左鍵與 Tab，保留命令 fallback 和 context 安全確認。
+- `--all-terms` 慢的程式根因也已找到：短於 trigram 的詞一律回 Bloom「可能」，文件層 `some()` 與 payload fallback 使一個短詞讓長詞 pruning 失效。0.37.0 先建立 benchmark，再用所有可表示的必要長詞做保守候選淘汰，最後仍完整精確核對，禁止 false negative。
+- `--profile` 失敗不是核心索引 bug：使用者在 CMD 傳入 PowerShell 的 `$env:USERPROFILE` 字面值。0.36.1 只改善父目錄／shell 提示，仍不自動建目錄、不覆寫檔案。
+- 背景索引功能已存在：`autoupdate start|status|stop` 使用局部事件引擎，活體期間檔案事件只處理事件路徑，預設每 6 小時完整校正。它不是 Windows Service、沒有登入自啟；程序關閉期間沒有事件紀錄，下一次 start 靠完整校正補回。0.37.0 先實測並把它整理為日常主流程，USN 只做有採用門檻的 RFC。
 - 本機已修兩件可重現問題：TUI readline 關閉時未 settle `question()`，Ctrl+C／EOF 會變成退出 13 且不還原畫面；`document_payload_blocks` 缺 `block_id` 索引，加上先刪 block，使無關 mapping 變多時單檔替換變慢。0.36.0 先刪子表、重建 `document_payload_blocks_block_id`，外鍵與 writer lock 維持。
 - 合成基準（Linux／Node.js v22.23.2，種子 20260923，各三次）：100 萬／10 萬筆無關 mapping 的固定文件替換中位數比 0.85（1.10 ms／1.29 ms），計畫使用 `document_payload_blocks_block_id`。同一庫 0.35.0 在 100 萬筆是 58.37 ms。1 萬份小檔無變更中位數 782.39 ms，parser 0，比 0.35.0 的 801.87 ms 快 2.4%。profile 額外約 0.2%。詳細見 `docs/benchmark-0.36.0.json` 與 `docs/0.36.0-VALIDATION.md`。
-- 這不是公司「10 分鐘 135 份」的驗收。沒有階段分布，不能外推全庫時間，也不能把本機熱點寫成公司根因已確認。
+- 0.36.0 的本機 SQL mapping 熱點修正仍成立，但不是本次 2～4 分鐘 filesystem scan 的主因。公司第一次 `--profile` 在開始索引前因錯誤 shell 路徑失敗，目前只有總耗時，沒有各階段比例；0.37.0 必須用正確 CMD／PowerShell 路徑重測，不得虛構 profile 結果。
 - 測試環境是 Node.js v22.23.2，不是正式最低 22.17.0 的原樣重跑。完整 `npm test` 242 項：239 通過、1 失敗、2 略過，約 58 秒。失敗是既有 M7，在非 darwin／win32 開啟文件回 `ACTION_PLATFORM_UNSUPPORTED`。略過是 M5 無法讀取目錄（root）與 Windows cmd。
-- 下一步：公司電腦對現有索引做普通 `index` 與 `--profile <新檔>`，中斷後接續，完成後再跑一次確認未變更零解析；另在 Windows Terminal 試 TUI `/help`、`./help`、`/quit` 與 Ctrl+C。不要上傳索引或刪 journal／WAL／rebuild。
+- 下一步：先依 SPEC §45 實作 0.36.1 correctness／UX，完成自動測試後由公司 Windows 複驗；再依 §46 實作 0.37.0 的 autoupdate 日常流程、觀測與 all-terms pruning。MSG／Office／PDF／RTF／文字／XLS／XML parser error 與固定 202 個 error retry 暫不處理；不要上傳索引、刪 journal／WAL 或要求 rebuild。
 
 ## 已交付基線與歷史紀錄
 

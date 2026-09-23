@@ -1,5 +1,21 @@
 # 設計決策紀錄
 
+## D055：0.37.0 以既有背景局部更新作日常主路徑，USN 先過 RFC 門檻
+
+- 日期：2026-09-23。公司 0.36.0 已證明未變更文件不再 parse，但每次普通 `index D:/` 仍發現約 30 萬檔並花 2～4 分鐘。這不是 parser regression，而是 `index` 作為完整 reconciliation 必須枚舉 filesystem 的成本；單純把 scan 微幅加速不能宣稱解決日常增量。
+- 0.31.0 已有可用基礎：watch／autoupdate 的檔案事件走精確更新，目錄事件走最小可信子樹，未知事件／overflow 才全量校正。0.37.0 先在公司 Windows 驗證、補觀測並把 `autoupdate start` 定義為初次索引後的日常路徑；`index` 保留為立即完整校正，不能改成可能漏失離線變更的假快速模式。
+- 背景程序不是 Windows Service，也沒有開機自啟；程序未執行時 `fs.watch` 沒有事件。下次 start 的完整 reconciliation 是目前正確補回方式。已觀察事件可用有界持久 queue 改善 crash recovery，但不能把它描述成 downtime change tracking。
+- NTFS USN Change Journal 僅作 RFC 候選。普通使用者權限、公司政策、Node 相容層、volume／journal checkpoint、rename／delete、wrap／reset／gap 及非 NTFS fallback 未逐項證明前不得直接實作，也不得讓管理員權限或 NTFS 成為產品必要條件。
+- `--all-terms` 的程式根因另已定位：短詞使文件 Bloom 永遠可能且停用 payload candidates，連帶浪費長詞 pruning。all-terms 可要求所有 Bloom 可表示的必要長詞皆通過以安全淘汰文件；含短詞的剩餘文件仍需全文精確核對，保持結果集合與排序語意，不接受 false negative。
+
+## D054：0.36.1 先修掃描刪除邊界、Windows 系統範圍與真正可操作的 TUI
+
+- 日期：2026-09-23。使用者完成公司 Windows 0.36.0 人工測試，確認舊索引沿用、一次性文字升級只發生一次，且約 299,530 份未變更文件零重解析。這些行為視為已驗證基線，不重新設計 parser selection。
+- 現行 scanner 只把 `$RECYCLE.BIN`／`System Volume Information` 當提示；0.36.1 將它們改為 Windows volume root 的精確內建排除，並同步套用於完整 scan 與 live update。程式不修改使用者 `.localdocsearchignore`，相似名稱與巢狀普通同名目錄仍可索引。
+- 現行 sync 以整體 `found.errors.length === 0` 決定是否推論刪除，導致一個不可讀系統 subtree 保護整根。改採最小 failed scope：失敗 subtree 保留，正常 sibling 可刪；root 不可讀仍保護整根。這是在維持「掃描錯誤不誤刪」前提下縮小保護範圍，不接受以忽略錯誤或先清索引換取刪除成功。
+- TUI 畫 checkbox 卻仍依賴 readline 命令，屬互動模型不一致。0.36.1 引入結果游標與 focus，支援方向鍵、Space、Enter、PgUp／PgDn、Esc／左鍵與 Tab；slash commands 保留 fallback，context 的來源重驗、完整預覽、逐字 `yes` 與上限不變。
+- CMD 使用 PowerShell `$env:` 造成 profile 父目錄不存在不是核心 bug；只改善 shell-specific 文件及父目錄錯誤，不自動展開任意變數、不建父目錄、不覆寫輸出。0.36.1 不承諾改善 30 萬檔完整 scan，也不處理公司 parser errors。
+
 ## D053：0.36.0 優先恢復索引增量效能與可靠的終端操作
 
 - 日期：2026-09-23。使用者回報 0.35.0 舊索引疑似重做、10 分鐘僅 135 份，以及 TUI 退出與 help 問題，指定下一版為 0.36.0；Codex 負責 SPEC §44／交接，Grok 負責實作。本次不升 package、不改程式、不發佈套件。
