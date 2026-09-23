@@ -37,6 +37,8 @@
 - TUI 畫 checkbox 卻仍依賴 readline 命令，屬互動模型不一致。0.36.1 引入結果游標與 focus，支援方向鍵、Space、Enter、PgUp／PgDn、Esc／左鍵與 Tab；slash commands 保留 fallback，context 的來源重驗、完整預覽、逐字 `yes` 與上限不變。
 - CMD 使用 PowerShell `$env:` 造成 profile 父目錄不存在不是核心 bug；只改善 shell-specific 文件及父目錄錯誤，不自動展開任意變數、不建父目錄、不覆寫輸出。0.36.1 不承諾改善 30 萬檔完整 scan，也不處理公司 parser errors。
 
+實作紀錄（2026-09-23，Codex）：scanner／store／sync 已採最小 protected scope，Windows 系統目錄判定已由完整與局部更新共用；profile 診斷保留 exclusive-create 安全邊界；TUI 已依核准稿重做首頁、三行結果、預覽、選取、context、命令與真實 status 畫面。CLI 使用可處理分段 CSI／單獨 Esc／UTF-8 的 raw input decoder、事件 queue 與集中 terminal cleanup，並保留 slash fallback／context `yes`。本機缺陷回歸、80×24／120×40 fixture 與真實 PTY 通過，package 升至 0.36.1；公司 Windows 人工驗收仍待回報。證據見 `0.36.1-VALIDATION.md`。
+
 ## D053：0.36.0 優先恢復索引增量效能與可靠的終端操作
 
 - 日期：2026-09-23。使用者回報 0.35.0 舊索引疑似重做、10 分鐘僅 135 份，以及 TUI 退出與 help 問題，指定下一版為 0.36.0；Codex 負責 SPEC §44／交接，Grok 負責實作。本次不升 package、不改程式、不發佈套件。

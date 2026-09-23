@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtemp, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -10,7 +11,10 @@ import { assertProfileIsAnonymous, reserveNewProfile } from "../src/profile.js";
 import { formatProgressLine } from "../src/progress.js";
 import { IndexStore } from "../src/store.js";
 import { sync } from "../src/sync.js";
-import { completeTuiCommand, displayWidth, parseTuiInput, runTui } from "../src/tui.js";
+import {
+  completeTuiCommand, decodeTuiKey, displayWidth, initialTuiState, parseTuiInput, reduceTuiState,
+  renderTuiScreen, runTui, TuiInputDecoder, type TuiEvent,
+} from "../src/tui.js";
 import { productVersion } from "../src/version.js";
 
 const cli = path.resolve("dist/src/cli.js");
@@ -149,6 +153,26 @@ test("0.36 profile is anonymous, refuses overwrite, and is excluded from the ind
   const profile = path.join(root, "report.json");
   reserveNewProfile(profile);
   assert.throws(() => reserveNewProfile(profile), /覆寫/);
+  const missingProfile = path.join(temp, "$env:USERPROFILE", "Desktop", "missing.json");
+  assert.throws(() => reserveNewProfile(missingProfile), error => {
+    const message = error instanceof Error ? error.message : String(error);
+    assert.match(message, /profile 輸出目錄不存在或無法存取/);
+    assert.match(message, /ENOENT/);
+    assert.match(message, /CMD：--profile "%USERPROFILE%\\Desktop\\lds-profile\.json"/);
+    assert.match(message, /PowerShell：--profile "\$env:USERPROFILE\\Desktop\\lds-profile\.json"/);
+    assert.match(message, /可能混用了 CMD 與 PowerShell/);
+    return true;
+  });
+  if (process.getuid?.() !== 0) {
+    const denied = path.join(temp, "denied");
+    await mkdir(denied);
+    await chmod(denied, 0);
+    try {
+      assert.throws(() => reserveNewProfile(path.join(denied, "report.json")), /EACCES|EPERM/);
+    } finally {
+      await chmod(denied, 0o700);
+    }
+  }
   const report = await sync(root, store, { excludePaths: [profile, `${profile}.tmp`] });
   assert.equal(store.getDocument(profile), undefined);
   const built = (await import("../src/profile.js")).buildIndexProfile({
@@ -164,6 +188,14 @@ test("0.36 profile is anonymous, refuses overwrite, and is excluded from the ind
   assert.equal(JSON.stringify(built).includes(root), false);
   const cliProfile = path.join(temp, "out.json");
   const env = { ...process.env, LOCALDOCSEARCH_DATA_DIR: path.join(temp, "data") };
+  const rejectedData = path.join(temp, "not-started-data");
+  const rejected = spawnSync(process.execPath, [cli, "index", root, "--profile", missingProfile], {
+    encoding: "utf8",
+    env: { ...process.env, LOCALDOCSEARCH_DATA_DIR: rejectedData },
+  });
+  assert.equal(rejected.status, 2);
+  assert.match(rejected.stderr, /尚未開始寫入索引/);
+  assert.equal(existsSync(path.join(rejectedData, "LocalDocSearch", "index.db")), false);
   const run = spawnSync(process.execPath, [cli, "index", root, "--profile", cliProfile], { encoding: "utf8", env });
   assert.equal(run.status, 0, run.stderr + run.stdout);
   const saved = JSON.parse(await readFile(cliProfile, "utf8")) as { status: string; productVersion: string };
@@ -214,7 +246,95 @@ test("0.36 CLI reuses one data directory and TUI quits without copying on /quit 
   assert.equal(sigint, 130);
 }));
 
-test("0.36 real PTY settles Ctrl+C and EOF", { skip: process.platform === "win32" ? "Windows PTY harness 需在本機手動複驗" : false }, async () => {
+test("0.36 TUI key events navigate, select, preview, page and restore focus", () => fixture(async (root, store) => {
+  await writeFile(path.join(root, "甲.txt"), "鍵盤導覽甲");
+  await writeFile(path.join(root, "乙.txt"), "鍵盤導覽乙");
+  await sync(root, store);
+  const events: TuiEvent[] = [
+    { type: "resize" },
+    { type: "text", text: "鍵盤" },
+    { type: "enter" },
+    { type: "page-down" },
+    { type: "page-up" },
+    { type: "space" },
+    { type: "enter" },
+    { type: "escape" },
+    { type: "tab" },
+    { type: "tab" },
+    { type: "tab" },
+    { type: "text", text: "q" },
+  ];
+  const output: string[] = [];
+  const code = await runTui(store, {
+    ansi: false,
+    write: value => output.push(value),
+    ask: async () => null,
+    nextEvent: async () => events.shift() ?? { type: "eof" },
+    size: () => ({ columns: 100, rows: 24 }),
+  }, 5);
+  assert.equal(code, 0);
+  const rendered = output.join("\n");
+  assert.match(rendered, /› \[[ x]\] 1\./);
+  assert.match(rendered, /文件預覽/);
+  assert.match(rendered, /選取籃/);
+  assert.match(rendered, /已移至第 2 頁|已是最後一頁/);
+}));
+
+test("0.36.1 TUI reducer keeps cursor, selection focus and text input semantics separate", () => {
+  const bounds = { resultCount: 3, selectedCount: 2, pageCount: 4, viewPageCount: 3, hasSession: true };
+  let state = initialTuiState();
+  state = reduceTuiState(state, { type: "text", text: "q" }, bounds);
+  state = reduceTuiState(state, { type: "space" }, bounds);
+  assert.equal(state.input, "q ");
+  state = reduceTuiState(state, { type: "tab" }, bounds);
+  assert.equal(state.focus, "results");
+  state = reduceTuiState(state, { type: "down" }, bounds);
+  assert.equal(state.cursor, 1);
+  state = reduceTuiState(state, { type: "page-down" }, bounds);
+  assert.equal(state.page, 2);
+  state = reduceTuiState(state, { type: "tab" }, bounds);
+  assert.equal(state.focus, "selected");
+  state = reduceTuiState(state, { type: "down" }, bounds);
+  assert.equal(state.selectedCursor, 1);
+  state = reduceTuiState(state, { type: "shift-tab" }, bounds);
+  assert.equal(state.focus, "results");
+});
+
+test("0.36.1 TUI key decoder and approved layouts handle escape sequences, CJK and tiny terminals", () => {
+  assert.deepEqual(decodeTuiKey("\u001b[A"), { type: "up" });
+  assert.deepEqual(decodeTuiKey("\u001b[6~"), { type: "page-down" });
+  assert.deepEqual(decodeTuiKey("\u001b[Z"), { type: "shift-tab" });
+  assert.deepEqual(decodeTuiKey("中文"), { type: "text", text: "中文" });
+  const decoder = new TuiInputDecoder();
+  assert.deepEqual(decoder.push("\u001b["), []);
+  assert.deepEqual(decoder.push("A中文"), [{ type: "up" }, { type: "text", text: "中文" }]);
+  assert.deepEqual(decoder.push("\u001b"), []);
+  assert.deepEqual(decoder.flush(), [{ type: "escape" }]);
+  const common = {
+    state: { ...initialTuiState(), view: "home" as const },
+    color: false,
+    roots: ["D:\\工作資料"],
+    documents: 12,
+    page: null,
+    conditions: [],
+    mode: "phrase" as const,
+    selected: [],
+    viewLines: [],
+    message: "本機索引已就緒",
+    confirming: false,
+  };
+  for (const dimensions of [{ columns: 80, rows: 24 }, { columns: 120, rows: 40 }]) {
+    const screen = renderTuiScreen({ ...common, ...dimensions });
+    assert.match(screen, /▌ seekah 0\.36\.1/);
+    assert.match(screen, /搜尋 ›/);
+    for (const line of screen.split("\n")) assert.ok(displayWidth(line) <= dimensions.columns, line);
+  }
+  const tiny = renderTuiScreen({ ...common, columns: 40, rows: 12 });
+  assert.match(tiny, /請放大至至少 60×16/);
+  assert.match(tiny, /\/quit 離開/);
+});
+
+test("0.36.1 real PTY handles navigation, Ctrl+C, EOF and SIGTERM with terminal cleanup", { skip: process.platform === "win32" ? "Windows PTY harness 需在本機手動複驗" : false }, async () => {
   const python = spawnSync("python3", ["-c", "import pty"], { encoding: "utf8" });
   if (python.status !== 0) return;
   const harness = path.resolve("scripts/pty-tui-check.py");
@@ -234,4 +354,15 @@ test("0.36 real PTY settles Ctrl+C and EOF", { skip: process.platform === "win32
   assert.equal(eof.status, 0, `${eof.stderr}\n${eof.stdout}`);
   assert.match(eof.stderr, /EXIT:0/);
   assert.match(eof.stdout, /\u001b\[\?1049l/);
+  const navigation = spawnSync("python3", [harness, process.execPath, cli, "nav"], { encoding: "utf8", env, timeout: 8000 });
+  assert.equal(navigation.status, 0, `${navigation.stderr}\n${navigation.stdout}`);
+  assert.match(navigation.stderr, /EXIT:0/);
+  assert.match(navigation.stdout, /搜尋結果/);
+  assert.match(navigation.stdout, /文件預覽/);
+  assert.match(navigation.stdout, /\[x\]/);
+  assert.match(navigation.stdout, /\u001b\[\?1049l/);
+  const terminated = spawnSync("python3", [harness, process.execPath, cli, "term"], { encoding: "utf8", env, timeout: 8000 });
+  assert.equal(terminated.status, 0, `${terminated.stderr}\n${terminated.stdout}`);
+  assert.match(terminated.stderr, /EXIT:143/);
+  assert.match(terminated.stdout, /\u001b\[\?1049l/);
 });

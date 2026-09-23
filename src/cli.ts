@@ -18,7 +18,8 @@ import { ClipboardError } from "./clipboard.js";
 import { existsSync } from "node:fs";
 import { createProgressReporter, OperationCancelledError } from "./progress.js";
 import { createInterface } from "node:readline/promises";
-import { completeTuiCommand, runTui, type TuiStopReason } from "./tui.js";
+import { runTui, TuiInputDecoder, type TuiEvent, type TuiStopReason } from "./tui.js";
+import { StringDecoder } from "node:string_decoder";
 import { buildIndexProfile, profilePaths, reserveNewProfile, writeIndexProfile } from "./profile.js";
 import type { SyncReport } from "./sync.js";
 import { productVersion } from "./version.js";
@@ -150,6 +151,9 @@ function printSummary(summary: SyncSummary): void {
   console.log(`本次處理狀態：${Object.entries(summary.statuses).map(([status, count]) => `${status}=${count}`).join("、")}`);
   console.log(`略過項目（不計已排除目錄的內部文件）：內建規則 ${summary.skipped.builtin}、使用者規則 ${summary.skipped.user}、連結 ${summary.skipped.link}。${summary.skipped.unsupported ? ` 舊版未登錄格式 ${summary.skipped.unsupported}。` : ""}`);
   console.log(`掃描／讀取錯誤 ${summary.readErrors}；同步耗時 ${summary.elapsedMs} ms。`);
+  if (summary.protectedByScanFailure !== undefined) {
+    console.log(`掃描失敗範圍保留 ${summary.protectedByScanFailure} 份既有索引。`);
+  }
 }
 
 function printSearchResults(results: readonly SearchResult[], verbose: boolean, write: (text: string) => void = console.log): void {
@@ -483,46 +487,91 @@ export async function main(args: readonly string[]): Promise<number> {
     const indexStore = store;
     const roots = indexStore.roots();
     if (command === "tui") {
-      const readline = createInterface({
-        input: process.stdin, output: process.stdout, terminal: true,
-        completer: (line: string): [string[], string] => [completeTuiCommand(line), line],
-      });
       let stopReason: TuiStopReason = "eof";
-      let settled = false;
-      const pending = { abort: null as AbortController | null };
-      const mark = (reason: TuiStopReason) => {
-        if (reason !== "eof") stopReason = reason;
-        pending.abort?.abort();
-        if (!settled) { settled = true; readline.close(); }
+      const queued: TuiEvent[] = [];
+      let waiter: ((event: TuiEvent) => void) | null = null;
+      const push = (event: TuiEvent) => {
+        const pending = waiter;
+        if (pending) {
+          waiter = null;
+          pending(event);
+        } else {
+          queued.push(event);
+        }
       };
-      readline.on("close", () => { settled = true; pending.abort?.abort(); });
-      readline.on("SIGINT", () => mark("sigint"));
-      const onInt = () => mark("sigint");
-      const onTerm = () => mark("sigterm");
+      const nextEvent = async (): Promise<TuiEvent> => {
+        const event = queued.shift();
+        if (event) return event;
+        return await new Promise<TuiEvent>(resolve => { waiter = resolve; });
+      };
+      const inputDecoder = new TuiInputDecoder();
+      const utf8Decoder = new StringDecoder("utf8");
+      let escapeTimer: NodeJS.Timeout | undefined;
+      const emitEvents = (events: readonly TuiEvent[]) => {
+        for (const event of events) {
+          if (event.type === "interrupt") stopReason = "sigint";
+          push(event);
+        }
+      };
+      const onData = (chunk: Buffer) => {
+        clearTimeout(escapeTimer);
+        emitEvents(inputDecoder.push(utf8Decoder.write(chunk)));
+        escapeTimer = inputDecoder.pending ? setTimeout(() => emitEvents(inputDecoder.flush()), 80) : undefined;
+      };
+      const onResize = () => push({ type: "resize" });
+      const onEnd = () => {
+        clearTimeout(escapeTimer);
+        emitEvents(inputDecoder.push(utf8Decoder.end()));
+        emitEvents(inputDecoder.flush());
+        push({ type: "eof" });
+      };
+      const onInt = () => { stopReason = "sigint"; push({ type: "interrupt" }); };
+      const onTerm = () => { stopReason = "sigterm"; push({ type: "terminate" }); };
+      const wasRaw = process.stdin.isRaw;
+      if (process.stdin.isTTY) process.stdin.setRawMode(true);
+      process.stdin.resume();
+      process.stdin.on("data", onData);
+      process.stdin.on("end", onEnd);
+      process.stdout.on("resize", onResize);
       process.on("SIGINT", onInt);
       process.on("SIGTERM", onTerm);
       try {
         return await runTui(store, {
           ansi: true,
+          color: process.env.NO_COLOR === undefined,
           write: text => process.stdout.write(text),
           stopReason: () => stopReason,
           size: () => ({ columns: process.stdout.columns || 80, rows: process.stdout.rows || 24 }),
+          nextEvent,
           ask: async prompt => {
-            if (settled) return null;
-            const abort = new AbortController();
-            pending.abort = abort;
-            if (settled) return null;
-            const stop = () => abort.abort();
-            readline.once("close", stop);
-            try { return await readline.question(prompt, { signal: abort.signal }); }
-            catch { return null; }
-            finally { readline.off("close", stop); if (pending.abort === abort) pending.abort = null; }
+            process.stdout.write(prompt);
+            let value = "";
+            while (true) {
+              const event = await nextEvent();
+              if (event.type === "eof" || event.type === "interrupt" || event.type === "terminate") return null;
+              if (event.type === "escape") return "\u001b";
+              if (event.type === "page-up" || event.type === "page-down") return event.type === "page-down" ? "n" : "p";
+              if (event.type === "text") { value += event.text; process.stdout.write(event.text); }
+              else if (event.type === "space") { value += " "; process.stdout.write(" "); }
+              else if (event.type === "backspace" && value) {
+                value = [...value].slice(0, -1).join("");
+                process.stdout.write("\b \b");
+              } else if (event.type === "enter") {
+                process.stdout.write("\n");
+                return value;
+              }
+            }
           },
         });
       } finally {
+        clearTimeout(escapeTimer);
+        process.stdin.off("data", onData);
+        process.stdin.off("end", onEnd);
+        process.stdout.off("resize", onResize);
         process.off("SIGINT", onInt);
         process.off("SIGTERM", onTerm);
-        if (!settled) readline.close();
+        if (process.stdin.isTTY) process.stdin.setRawMode(wasRaw);
+        if (!wasRaw) process.stdin.pause();
       }
     }
     const registeredRoot = (value: string) => {

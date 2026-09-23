@@ -4,24 +4,23 @@ import { loadIgnoreRules, type IgnoreRules } from "./ignore.js";
 import { canonicalizeRootInput, coversPath, RootError } from "./root-plan.js";
 import type { Diagnostic, SkippedCounts } from "./model.js";
 import { throwIfAborted, type ProgressUpdate } from "./progress.js";
+import { isWindowsVolumeSystemPath, isWindowsVolumeSystemRoot } from "./builtin-paths.js";
 
-const ignoredDirectories = new Set([".git", "node_modules", ".localdocsearch"]);
-export const SYSTEM_HINT_DIRECTORIES = new Set(["$recycle.bin", "system volume information"]);
-export const SYSTEM_DIRECTORY_HINT = "遇到資源回收筒或系統目錄；可自行在 .localdocsearchignore 加入 /$RECYCLE.BIN/ 與 /System Volume Information/，本程式不會自動寫入排除規則。";
-
-export function isSystemHintDirectory(name: string): boolean {
-  return SYSTEM_HINT_DIRECTORIES.has(name.toLowerCase());
-}
+const ignoredDirectories: Record<string, true> = {
+  ".git": true,
+  node_modules: true,
+  ".localdocsearch": true,
+};
 
 export interface ScanResult {
   paths: string[];
   errors: string[];
   diagnostics: Diagnostic[];
+  protectedScopes: string[];
   skipped: SkippedCounts;
   ignoreFile: string | null;
   ignorePatterns: string[];
   extraIgnoreFiles: string[];
-  hints: string[];
 }
 
 export interface ScanOptions {
@@ -41,12 +40,11 @@ export async function scan(root: string, options: ScanOptions = {}): Promise<Sca
     if (rules.sourcePath) extraIgnoreFiles.push(rules.sourcePath);
   }
   const start = options.start ?? root;
-  const result: ScanResult = { paths: [], errors: [], diagnostics: [],
+  const result: ScanResult = { paths: [], errors: [], diagnostics: [], protectedScopes: [],
     skipped: { builtin: 0, user: 0, unsupported: 0, link: 0 },
     ignoreFile: ignoreRules.sourcePath, ignorePatterns: [...ignoreRules.patterns, ...extraRules.flatMap(item => item.rules.patterns)],
-    extraIgnoreFiles, hints: [] };
+    extraIgnoreFiles };
   const pending = [start];
-  let hintedSystemDirectory = false;
   while (pending.length > 0) {
     throwIfAborted(options.signal);
     const directory = pending.pop()!;
@@ -58,17 +56,15 @@ export async function scan(root: string, options: ScanOptions = {}): Promise<Sca
       const diagnostic: Diagnostic = { stage: "scan", path: directory, code: "SCAN_READ_FAILED", message: "無法讀取目錄" };
       result.diagnostics.push(diagnostic);
       result.errors.push(`${directory}: ${diagnostic.message}`);
+      result.protectedScopes.push(directory);
       continue;
     }
     for (const entry of entries) {
       const fullPath = path.join(directory, entry.name);
       const relativePath = path.relative(root, fullPath);
       const ignoredByExtra = extraRules.some(item => coversPath(item.base, fullPath) && item.rules.matches(path.relative(item.base, fullPath), entry.isDirectory()));
-      if (entry.isDirectory() && isSystemHintDirectory(entry.name) && !hintedSystemDirectory) {
-        result.hints.push(SYSTEM_DIRECTORY_HINT);
-        hintedSystemDirectory = true;
-      }
-      if ((entry.isDirectory() && ignoredDirectories.has(entry.name.toLowerCase())) || (entry.isFile() && entry.name.startsWith("~$"))) {
+      if ((entry.isDirectory() && (ignoredDirectories[entry.name.toLowerCase()] === true || isWindowsVolumeSystemPath(fullPath)))
+        || (entry.isFile() && entry.name.startsWith("~$"))) {
         result.skipped.builtin++;
       } else if (ignoreRules.matches(relativePath, entry.isDirectory()) || ignoredByExtra) {
         result.skipped.user++;
@@ -89,6 +85,9 @@ export async function scan(root: string, options: ScanOptions = {}): Promise<Sca
 export async function validateRoot(input: string): Promise<string> {
   const candidate = process.platform === "win32" ? canonicalizeRootInput(input, "win32").path : input;
   const root = path.resolve(candidate);
+  if (isWindowsVolumeSystemRoot(root)) {
+    throw new RootError(`不能將 Windows 系統目錄設為索引根目錄：${root}`);
+  }
   let info;
   try {
     info = await stat(root);

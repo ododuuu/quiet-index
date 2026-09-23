@@ -44,9 +44,18 @@ while time.time() < deadline and b"docsearch" not in buf and b"\x1b[?1049h" not 
 if code is None:
     try:
         if mode == "int":
-            os.write(master, b"/help\n")
+            os.write(master, b"/help\r")
             time.sleep(0.2)
             os.write(master, b"\x03")
+        elif mode == "term":
+            os.kill(pid, 15)
+        elif mode == "nav":
+            os.write(master, b"pty\r")
+            time.sleep(0.3)
+            for sequence in (b"\x1b[6~", b"\x1b[5~", b" ", b"\r", b"\x1b"):
+                os.write(master, sequence)
+                time.sleep(0.65 if sequence == b"\x1b" else 0.15)
+            os.write(master, b"q")
         else:
             os.write(master, b"\x04")
     except OSError:
@@ -60,6 +69,7 @@ if code is None:
 if code is None:
     os.kill(pid, 9)
     sys.stderr.write("TIMEOUT")
+    sys.stdout.buffer.write(buf)
     raise SystemExit(1)
 sys.stdout.buffer.write(buf)
 sys.stderr.write(f"EXIT:{code}")

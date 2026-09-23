@@ -114,7 +114,7 @@ test("0.32 formats flow through sync/search and TUI supports search/refine/statu
     const output: string[] = [];
     assert.equal(await runTui(store, { ansi: false, write: value => output.push(value), ask: async () => answers.shift() ?? null }, 1), 0);
     const rendered = output.join("\n");
-    assert.match(rendered, new RegExp(`Seekah ${productVersion.replaceAll(".", "\\.")}`)); assert.match(rendered, /條件：共同字 → 特別字/u);
-    assert.match(rendered, /索引狀態：/u);
+    assert.match(rendered, /共同字 → 特別字/u);
+    assert.match(rendered, /目前索引文件狀態[\s\S]*indexed: 2/u);
   } finally { store.close(); await rm(temp, { recursive: true, force: true }); }
 });

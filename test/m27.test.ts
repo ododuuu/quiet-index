@@ -11,7 +11,8 @@ import { createProgressReporter, formatPercent, OperationCancelledError, throwIf
 import { search } from "../src/search.js";
 import { collectIndexStorage, IndexStore } from "../src/store.js";
 import { TEXT_PARSE_VERSION } from "../src/model.js";
-import { isSystemHintDirectory, SYSTEM_DIRECTORY_HINT, scan } from "../src/scanner.js";
+import { scan } from "../src/scanner.js";
+import { isWindowsVolumeSystemPath, isWindowsVolumeSystemRoot } from "../src/builtin-paths.js";
 import { sync } from "../src/sync.js";
 
 async function fixture(run: (root: string, store: IndexStore, temp: string) => Promise<void>) {
@@ -323,20 +324,16 @@ test("M27 schema adds parse_version on existing documents table", async () => {
   } finally { await rm(temp, { recursive: true, force: true }); }
 });
 
-test("M27 recycle bin hint is once per scan and does not auto-ignore", () => fixture(async (root, store) => {
-  assert.equal(isSystemHintDirectory("$RECYCLE.BIN"), true);
-  assert.equal(isSystemHintDirectory("System Volume Information"), true);
-  await mkdir(path.join(root, "$RECYCLE.BIN"));
-  await mkdir(path.join(root, "System Volume Information"));
-  await writeFile(path.join(root, "$RECYCLE.BIN", "trash.txt"), "recycle-needle");
-  const found = await scan(root);
-  assert.equal(found.hints.length, 1);
-  assert.equal(found.hints[0], SYSTEM_DIRECTORY_HINT);
-  assert.ok(found.paths.some(item => item.endsWith("trash.txt")));
-  const report = await sync(root, store);
-  assert.ok(report.notices.includes(SYSTEM_DIRECTORY_HINT));
-  assert.equal(search(store, "recycle-needle").length, 1);
-}));
+test("0.36.1 Windows system exclusions match only exact volume-root children", () => {
+  assert.equal(isWindowsVolumeSystemPath("D:\\$RECYCLE.BIN", "win32"), true);
+  assert.equal(isWindowsVolumeSystemPath("d:\\system volume information\\tracking.log", "win32"), true);
+  assert.equal(isWindowsVolumeSystemPath("\\\\server\\share\\$Recycle.Bin\\item", "win32"), true);
+  assert.equal(isWindowsVolumeSystemRoot("D:\\System Volume Information", "win32"), true);
+  assert.equal(isWindowsVolumeSystemRoot("\\\\server\\share\\$RECYCLE.BIN", "win32"), true);
+  assert.equal(isWindowsVolumeSystemPath("D:\\work\\$RECYCLE.BIN-notes", "win32"), false);
+  assert.equal(isWindowsVolumeSystemPath("D:\\archive\\System Volume Information", "win32"), false);
+  assert.equal(isWindowsVolumeSystemPath("/tmp/$RECYCLE.BIN", "posix"), false);
+});
 
 test("M27 verbose still lists diagnostics while default index stays quiet", () => fixture(async (root, _store, temp) => {
   await writeFile(path.join(root, "broken.pdf"), "x");

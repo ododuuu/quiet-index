@@ -2,9 +2,9 @@
 
 正式品牌為 **Seekah**（CLI／package：`seekah`），原名 LocalDocSearch／quiet-index。更名相容性見 §45.7；核准的下一版 TUI 見 §45.8。歷史章節的舊名稱、路徑及發布檔名保留原意。
 
-- 規格基線：已交付 0.36.0；公司 Windows 後續修正規劃見 0.36.1（第 45 節）與 0.37.0（第 46 節）
+- 規格基線：0.36.1 已完成本機實作；公司 Windows 人工驗收待回報；後續規劃見 0.37.0（第 46 節）
 - 日期：2026-09-23
-- 狀態：0.36.0 已在本機實作，且使用者已回報公司 Windows 的部分人工結果：舊索引沿用與未變更文件零重解析成立，但日常 `index` 仍全量掃描、局部掃描失敗會阻止整根刪除、系統目錄污染搜尋、TUI 無游標選取，混合長短詞搜尋也偏慢。第 45、46 節目前只有規劃，尚未實作或驗收。
+- 狀態：0.36.1 已依第 45 節完成 scope-aware deletion、Windows volume-root 系統目錄排除、profile 診斷與可操作 TUI；本機缺陷回歸與真實 PTY 通過。第 46 節仍是 0.37.0 規劃，尚未實作。不得把 macOS 測試冒充公司 Windows 驗收。
 
 ## 版本與里程碑命名
 
@@ -1183,6 +1183,7 @@ docsearch doctor
 - 支援 80×24／120×40、resize、中文 cell width、NO_COLOR、極小終端退化；不可輸出來源控制字元。補 reducer／decoder／render／PTY 測試，提供實際畫面對照。
 - 真實 status 才能顯示監看中；尚未實作的 0.37.0 queue／dirty scope／startup 不可偽造。預覽及 clipboard 保留原有精確內容、上限、來源安全與 yes 確認。
 - 固定交接中心為 docs/handoff/，CURRENT.md 指向目前里程碑；每版本保留獨立交接。公司 Windows 人工驗收與本機測試結果分別記錄。
+實作紀錄（2026-09-23）：第 45 節程式、測試、文件與 0.36.1 版本更新已完成；本機證據見 `0.36.1-VALIDATION.md`。Windows 人工項目仍未完成，交付狀態不包含公司整庫或 Windows Terminal 已通過。
 
 ## 46. 0.37.0：日常變更發現與混合詞搜尋效能
 

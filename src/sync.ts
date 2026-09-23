@@ -18,6 +18,8 @@ export interface SyncReport extends SyncSummary {
   ignoreFile: string | null;
   ignorePatterns: string[];
   complete: boolean;
+  protectedScopes: string[];
+  protectedByScanFailure: number;
   operation: RootOperationKind;
   mergedRoots: string[];
   retainedDocuments: number;
@@ -123,19 +125,18 @@ async function syncLocked(rootInput: string, store: IndexStore, options: SyncOpt
     notices.push(`已包含於上層索引：${plan.subtree} 屬於 ${root}；僅同步指定子樹，不新增重疊登錄。`);
   }
   for (const file of found.extraIgnoreFiles ?? []) notices.push(`沿用排除作用域：${file}`);
-  for (const hint of found.hints ?? []) notices.push(hint);
   const report: SyncReport = { root, found: found.paths.length, updated: 0, added: 0, reprocessed: 0,
     unchanged: 0, removed: 0, parserCalls: 0, statuses: emptyStatusCounts(), skipped: found.skipped,
     readErrors: found.diagnostics.length, elapsedMs: 0, diagnostics: [...found.diagnostics],
     ignoreFile: found.ignoreFile, ignorePatterns: found.ignorePatterns,
     errors: [...found.errors], notices, complete: found.errors.length === 0,
+    protectedScopes: [...found.protectedScopes], protectedByScanFailure: 0,
     operation: plan.kind, mergedRoots: plan.mergedRoots, retainedDocuments,
     coveringRoot: plan.kind === "subtree" ? root : null, scanStart,
     checked: 0, failedDocuments: 0, reasonsAttempted: emptyReasonCounts(), reasonsCommitted: emptyReasonCounts(),
     phasesMs: {}, formats: {}, sourceBytes: 0, peakRssBytes: process.memoryUsage().rss,
     sample: createTimingReservoir(), slowest: [] };
   if (plan.kind !== "subtree") store.registerRoot(root);
-  if (options.rebuild && found.errors.length === 0) store.clearDocuments(root);
   const knownPaths = new Set(found.paths);
   let processed = 0;
   let phase = "檢查 metadata";
@@ -274,25 +275,31 @@ async function syncLocked(rootInput: string, store: IndexStore, options: SyncOpt
     }
     throw error;
   }
-  if (report.complete) {
-    try {
-      throwIfAborted(options.signal);
-    } catch (error) {
-      if (error instanceof OperationCancelledError) {
-        report.elapsedMs = Math.round((performance.now() - started) * 100) / 100;
-        error.partial = report;
-      }
-      throw error;
+  try {
+    throwIfAborted(options.signal);
+  } catch (error) {
+    if (error instanceof OperationCancelledError) {
+      report.elapsedMs = Math.round((performance.now() - started) * 100) / 100;
+      error.partial = report;
     }
-    notePhase("刪除校正");
-    const removeStarted = performance.now();
-    report.removed = store.removeMissing(knownPaths, root, plan.kind === "subtree" ? scanStart : undefined);
-    addPhase("remove", performance.now() - removeStarted);
+    throw error;
   }
+  notePhase("刪除校正");
+  const removeStarted = performance.now();
+  const removal = store.removeMissing(
+    knownPaths,
+    root,
+    plan.kind === "subtree" ? scanStart : undefined,
+    found.protectedScopes,
+  );
+  report.removed = removal.removed;
+  report.protectedByScanFailure = removal.protected;
+  addPhase("remove", performance.now() - removeStarted);
   report.elapsedMs = Math.round((performance.now() - started) * 100) / 100;
   if (plan.kind !== "subtree") {
     const { root: _root, errors, notices: _notices, complete, diagnostics, ignoreFile: _ignoreFile, ignorePatterns: _ignorePatterns,
       operation: _operation, mergedRoots: _mergedRoots, retainedDocuments: _retainedDocuments, coveringRoot: _coveringRoot, scanStart: _scanStart,
+      protectedScopes: _protectedScopes,
       phasesMs: _phasesMs, formats: _formats, sourceBytes: _sourceBytes, peakRssBytes: _peakRssBytes, sample: _sample, slowest: _slowest, ...summary } = report;
     store.recordSync(root, complete, errors, report.notices, summary, diagnostics);
   }

@@ -90,7 +90,7 @@ async function loadRootIgnore(root: string, store: IndexStore): Promise<{ match(
   for (const base of store.ignoreBases(root)) extra.push({ base, rules: await loadIgnoreRules(base) });
   return {
     match(filePath, isDirectory) {
-      if (shouldIgnoreWatchPath(filePath)) return true;
+      if (shouldIgnoreWatchPath(filePath, root)) return true;
       if (rules.matches(path.relative(root, filePath), isDirectory)) return true;
       return extra.some(item => coversPath(item.base, filePath) && item.rules.matches(path.relative(item.base, filePath), isDirectory));
     },
@@ -317,10 +317,10 @@ async function applyPathDeleteLocked(
     });
     return result;
   }
-  const removed = store.removeMissing(new Set(), root, filePath);
-  result.removed = removed;
-  result.kind = removed > 1 || (removed === 1 && !store.getDocument(filePath) && !samePath(filePath, root))
-    ? (removed > 1 ? "subtree-delete" : "file-delete")
+  const removal = store.removeMissing(new Set(), root, filePath);
+  result.removed = removal.removed;
+  result.kind = removal.removed > 1 || (removal.removed === 1 && !store.getDocument(filePath) && !samePath(filePath, root))
+    ? (removal.removed > 1 ? "subtree-delete" : "file-delete")
     : "file-delete";
   return result;
 }

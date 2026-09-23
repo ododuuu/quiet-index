@@ -81,12 +81,31 @@ test("M8 incomplete rebuild retains unknown files and per-root successful time",
     await sync(a, store); await sync(b, store);
     const time = store.getLastSyncReport(a).successfulAt;
     const incomplete: typeof scan = async root => ({ ...await scan(root), paths: [], errors: ["read failure"],
+      protectedScopes: [root],
       diagnostics: [{ stage: "scan", path: root, code: "SCAN_READ_FAILED", message: "無法讀取" }] });
     assert.equal((await sync(a, store, { rebuild: true, scan: incomplete })).complete, false);
     assert.equal(search(store, "內容").length, 2);
     assert.equal(store.getLastSyncReport(a).successfulAt, time);
     assert.equal(store.getLastSyncReport(a).complete, false);
     assert.equal(store.getLastSyncReport(b).complete, true);
+  } finally { store.close(); }
+}));
+
+test("M8 rebuild retains a listed file that disappears after scanning", () => fixture(async (a, _b, temp) => {
+  const store = new IndexStore(path.join(temp, "index.db"));
+  try {
+    const file = path.join(a, "稍後消失.txt");
+    await writeFile(file, "既有內容");
+    await sync(a, store);
+    const disappearing: typeof scan = async root => {
+      const result = await scan(root);
+      await rm(file);
+      return result;
+    };
+    const report = await sync(a, store, { rebuild: true, scan: disappearing });
+    assert.equal(report.complete, false);
+    assert.equal(report.removed, 0);
+    assert.equal(search(store, "既有內容").length, 1);
   } finally { store.close(); }
 }));
 

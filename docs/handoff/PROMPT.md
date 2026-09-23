@@ -1,19 +1,15 @@
-# 給下一個 AI 的開發 prompt
+# 給下一個 AI 的驗收 prompt
 
 以下內容可直接複製貼上：
 
 ```text
-請在 ododuuu/quiet-index 的最新 main 基礎上，開 codex/ 前綴分支實作 Seekah 0.36.1。產品已更名 Seekah，GitHub 倉庫網址仍沿用 quiet-index。
+請接手 ododuuu/quiet-index 的 codex/seekah-0.36.1 分支，驗收已完成的 Seekah 0.36.1。產品名稱已更名 Seekah，GitHub 倉庫網址仍沿用 quiet-index。
 
-先完整閱讀 AGENTS.md，再依序讀 docs/SPEC.md、docs/STATUS.md、docs/DECISIONS.md、docs/handoff/README.md、docs/handoff/CURRENT.md 及 CURRENT 指定的版本交接文件。
+先完整閱讀 AGENTS.md，再依序讀 docs/SPEC.md、docs/STATUS.md、docs/DECISIONS.md、docs/handoff/README.md、docs/handoff/CURRENT.md、docs/handoff/0.36.1.md、docs/0.36.1-VALIDATION.md、docs/design/SEEKAH-TUI.md。
 
-本次只實作 SPEC §45 的 0.36.1：Windows 系統目錄內建排除、scope-aware deletion、profile 錯誤 UX，以及已核准的新 TUI。TUI 請逐項依 docs/design/SEEKAH-TUI.md，並對照 docs/design/seekah-tui.html，不要重新設計另一版。
+目前只做 0.36.1 驗收、重現後的缺陷修正及交付核對；不要重新設計 TUI，不要實作 SPEC §46／0.37.0。Windows 系統目錄排除、scope-aware deletion、profile 錯誤 UX 與核准 TUI 已完成本機實作。任何修改都必須維持舊索引路徑、LOCALDOCSEARCH_DATA_DIR、.localdocsearchignore、docsearch 相容入口與既有 IPC/MCP 識別；不得刪庫、刪 WAL/journal、要求 rebuild、降低安全性、上傳公司資料或改 parser selection。
 
-TUI 要真正支援方向鍵移動、Space 勾選、Enter 預覽、PgUp/PgDn 翻頁、Esc 返回、Tab 切換區域、情境快捷鍵與安全退出；保留低噪音灰階＋青綠重點色、固定底部搜尋列、獨立游標與 checkbox。不能只換顏色或仍靠 /select、/next 操作。示範的 status 不能硬編成真實狀態；context 必須保留明確 yes 確認。
+在公司 Windows 普通使用者帳號，以無機密測試樹驗證：不可讀 sibling 與正常 sibling 刪除、drive／UNC root 系統目錄精確排除、CMD／PowerShell profile 路徑，以及 Windows Terminal 80×24／120×40 的方向鍵、Space、Enter、PgUp/PgDn、Esc、Tab、q、Ctrl+C、resize 與 context yes。不要對公司整庫做破壞性 deletion 實驗。
 
-保留舊索引路徑、LOCALDOCSEARCH_DATA_DIR、.localdocsearchignore、docsearch 相容入口與既有 IPC/MCP 識別。不得刪庫、刪 WAL/journal、要求 rebuild、降低安全性、上傳公司資料、改已正常的 parser selection。不要做 0.37.0 watcher/queue/startup/all-terms 優化，不修尚未現場診斷的 parser errors，不提權、不做 USN 或 Service。
-
-每項行為變更先補測試。完成 reducer、鍵盤解析、80×24/120×40、中文寬度、resize、跨頁選取、context 確認、PTY 退出清理與 scope deletion 安全測試，再跑完整 npm test 與 npm run package。提供實際終端畫面對照核准稿；公司 Windows 未實測不得宣稱通過。
-
-只有全部 0.36.1 實作完成後才升 package/lockfile 版本。更新 README、STATUS、NEXT-TODO、DECISIONS、0.36.1-VALIDATION.md 與 docs/handoff/ 下的 CURRENT 和版本交接，保持固定交接位置。最後提交並 push 開發分支，回報 commit、測試結果、未完成項目及公司 Windows 人工驗收步驟；不要混入下一版。
+只有使用者實際回報 Windows 結果，才能更新公司 Windows 驗收狀態。若發現缺陷，先用無機密最小重現補回歸測試，再修根因並重跑完整 npm test 與 npm run package。更新 STATUS、0.36.1-VALIDATION.md、CURRENT 與 0.36.1.md；不要混入 0.37.0。
 ```

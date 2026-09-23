@@ -1,4 +1,5 @@
 import { closeSync, openSync, renameSync, writeFileSync, constants } from "node:fs";
+import path from "node:path";
 import { reprocessReasons, type ReprocessReason } from "./model.js";
 import { productVersion } from "./version.js";
 
@@ -74,13 +75,24 @@ export function percentileNearestRank(samples: readonly number[], fraction: numb
 
 export function reserveNewProfile(filePath: string): void {
   if (!filePath.trim() || filePath.startsWith("--")) throw new Error("--profile 需要一個新的檔案路徑。");
+  const resolved = path.resolve(filePath);
+  const parent = path.dirname(resolved).replace(/[\u0000-\u001f\u007f]/gu, "�");
   let fd: number;
   try {
-    fd = openSync(filePath, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY, 0o600);
+    fd = openSync(resolved, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY, 0o600);
   } catch (error) {
-    const code = error instanceof Error && "code" in error ? String((error as NodeJS.ErrnoException).code) : "";
-    if (code === "EEXIST") throw new Error("--profile 拒絕覆寫既有檔案；請改用新路徑。");
-    throw new Error(`--profile 無法建立輸出（${code || "未知錯誤"}）；尚未開始寫入索引。`);
+    const code = error instanceof Error && "code" in error ? String((error as NodeJS.ErrnoException).code) : "未知錯誤";
+    const shellHelp = [
+      'CMD：--profile "%USERPROFILE%\\Desktop\\lds-profile.json"',
+      'PowerShell：--profile "$env:USERPROFILE\\Desktop\\lds-profile.json"',
+    ].join("\n");
+    const literalHint = /(?:\$env:[^/\\]+|%[^%/\\]+%)/iu.test(filePath)
+      ? "\n偵測到未展開的環境變數字面值；可能混用了 CMD 與 PowerShell 語法，程式不會自行展開。"
+      : "";
+    if (code === "EEXIST") {
+      throw new Error(`--profile 拒絕覆寫既有檔案；請改用新路徑。輸出父目錄：${parent}（${code}）。\n${shellHelp}${literalHint}`);
+    }
+    throw new Error(`profile 輸出目錄不存在或無法存取：${parent}（${code}）；尚未開始寫入索引。\n${shellHelp}${literalHint}`);
   }
   closeSync(fd);
 }
@@ -171,14 +183,24 @@ export function profilePaths(filePath: string): string[] {
   return [filePath, `${filePath}.tmp`];
 }
 
-const FORBIDDEN_PROFILE_KEYS = new Set(["path", "filename", "content", "snippet", "query", "env", "secret", "token", "password"]);
+const FORBIDDEN_PROFILE_KEYS: Record<string, true> = {
+  path: true,
+  filename: true,
+  content: true,
+  snippet: true,
+  query: true,
+  env: true,
+  secret: true,
+  token: true,
+  password: true,
+};
 
 export function assertProfileIsAnonymous(value: unknown): void {
   const visit = (node: unknown): void => {
     if (!node || typeof node !== "object") return;
     if (Array.isArray(node)) { for (const item of node) visit(item); return; }
     for (const [key, child] of Object.entries(node)) {
-      if (FORBIDDEN_PROFILE_KEYS.has(key)) throw new Error(`profile 含禁止欄位 ${key}`);
+      if (FORBIDDEN_PROFILE_KEYS[key] === true) throw new Error(`profile 含禁止欄位 ${key}`);
       visit(child);
     }
   };

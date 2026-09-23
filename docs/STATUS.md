@@ -1,28 +1,18 @@
 # 專案狀態
 
-最後更新：2026-09-23（0.36.0 公司人工測試已定位後續問題；0.36.1／0.37.0 僅完成規劃）
+最後更新：2026-09-23（0.36.1 本機實作完成；公司 Windows 人工驗收待回報）
 
 ## 目前狀態
 
-- 本次更名驗證：macOS／Node.js 22.13.1（低於正式最低 22.17.0），完整 npm test 245 項：243 通過、0 失敗、2 項 Windows launcher 專屬略過，約 51.64 秒。包含新增 Seekah alias／lockfile／舊儲存路徑／MCP URI 相容性測試；兩個 context 標題預期已更新。npm run package 逐檔核對通過；HTML script 語法與交接文件相對連結檢查通過，未執行瀏覽器畫面驗收。這不是新 TUI 或公司 Windows 的驗收結果。
-
-- **2026-09-23 Seekah 更名／核准設計交接**：package 名稱、可見品牌與封裝改名，新增 seekah／seekah.cmd，保留 docsearch、原資料路徑與 IPC／MCP 識別。版本仍為 0.36.0；0.36.1 功能未實作。下一個 AI 依 SPEC §45.7～45.8／D057 與 docs/design/SEEKAH-TUI.md 實作核准畫面；交接固定 docs/handoff/CURRENT.md，0.37.0 不提前開工。
-
-- **目前程式版本仍是 0.36.0；進行中里程碑是 0.36.1 規劃，後續為 0.37.0。** 0.36.1 權威規格為 SPEC §45／D054，處理 Windows 系統目錄排除、scope-aware deletion、profile 錯誤與可操作 TUI；0.37.0 見 §46／D055，處理日常變更發現與 all-terms 效能。兩版尚未實作，不得把文件提交視為修正完成。
-- 使用者已在公司 Windows 實測 0.36.0。已確認：舊索引可沿用；一次性 `文字解析升級=60014` 完成後第二次為 0；約 299,530 份未變更文件會直接略過；steady-state parser calls 不會再回到六萬份。0.36.0 的 parser selection 正常，不再重開此設計。
-- 新瓶頸已確定是 filesystem change discovery：普通 `index D:/` 每次仍枚舉約 299,700～299,800 份／約 300 GB，案例總耗時約 124、159、166、247 秒。典型一次只來源變更 3、錯誤重試 202、parser 205 次，卻仍檢查 299,741 份；不能把「未重 parse」誤稱為日常增量已完成。
-- 刪除測試檔後仍為 `移除 0`，同次 27 個 `SCAN_READ_FAILED` 使整根 `complete=false`，現行 `sync` 只有整根 complete 才執行 removeMissing。`System Volume Information` 等局部不可讀因而保護了所有 sibling，root cause 已定位。
-- `$RECYCLE.BIN` 與 `System Volume Information` 目前只是 scanner hint，不是 built-in ignore；前者已大量佔據 `APPLICATION` 搜尋前頁。0.36.1 規劃只排除 Windows volume root 的精確直接子目錄，且不修改使用者 ignore。
-- TUI 的 `[ ]` 由 `src/tui.ts` 畫出，但輸入仍是 readline `question()` 與 slash command，沒有 cursor／focus／keypress state；0.36.1 規劃補方向鍵、Space、Enter、PgUp／PgDn、Esc／左鍵與 Tab，保留命令 fallback 和 context 安全確認。
-- `--all-terms` 慢的程式根因也已找到：短於 trigram 的詞一律回 Bloom「可能」，文件層 `some()` 與 payload fallback 使一個短詞讓長詞 pruning 失效。0.37.0 先建立 benchmark，再用所有可表示的必要長詞做保守候選淘汰，最後仍完整精確核對，禁止 false negative。
-- `--profile` 失敗不是核心索引 bug：使用者在 CMD 傳入 PowerShell 的 `$env:USERPROFILE` 字面值。0.36.1 只改善父目錄／shell 提示，仍不自動建目錄、不覆寫檔案。
-- 背景索引功能已存在：`autoupdate start|status|stop` 使用局部事件引擎，活體期間檔案事件只處理事件路徑，預設每 6 小時完整校正。它目前沒有登入自啟；程序關閉期間沒有事件紀錄，下一次 start 靠完整校正補回。公司禁止管理員權限已納入 D056，USN 不再列為 0.37.0 工作。
-- 0.37.0 新增規劃：先驗收既有 watcher，再加入獨立持久 queue、事件世代／安全重播、有界 watcher scopes、可接續分批校正、未確認範圍 status 與普通使用者明確 opt-in 的登入啟動。細節與 fault 測試見 SPEC §46.6～§46.10；這些尚未實作，不能和現有 autoupdate 混稱已交付。第 7 項文字 parser 最佳化不在本輪，繼續用已驗證的格式分流。
-- 本機已修兩件可重現問題：TUI readline 關閉時未 settle `question()`，Ctrl+C／EOF 會變成退出 13 且不還原畫面；`document_payload_blocks` 缺 `block_id` 索引，加上先刪 block，使無關 mapping 變多時單檔替換變慢。0.36.0 先刪子表、重建 `document_payload_blocks_block_id`，外鍵與 writer lock 維持。
-- 合成基準（Linux／Node.js v22.23.2，種子 20260923，各三次）：100 萬／10 萬筆無關 mapping 的固定文件替換中位數比 0.85（1.10 ms／1.29 ms），計畫使用 `document_payload_blocks_block_id`。同一庫 0.35.0 在 100 萬筆是 58.37 ms。1 萬份小檔無變更中位數 782.39 ms，parser 0，比 0.35.0 的 801.87 ms 快 2.4%。profile 額外約 0.2%。詳細見 `docs/benchmark-0.36.0.json` 與 `docs/0.36.0-VALIDATION.md`。
-- 0.36.0 的本機 SQL mapping 熱點修正仍成立，但不是本次 2～4 分鐘 filesystem scan 的主因。公司第一次 `--profile` 在開始索引前因錯誤 shell 路徑失敗，目前只有總耗時，沒有各階段比例；0.37.0 必須用正確 CMD／PowerShell 路徑重測，不得虛構 profile 結果。
-- 測試環境是 Node.js v22.23.2，不是正式最低 22.17.0 的原樣重跑。完整 `npm test` 242 項：239 通過、1 失敗、2 略過，約 58 秒。失敗是既有 M7，在非 darwin／win32 開啟文件回 `ACTION_PLATFORM_UNSUPPORTED`。略過是 M5 無法讀取目錄（root）與 Windows cmd。
-- 下一步：先依 SPEC §45 實作 0.36.1 correctness／UX，完成自動測試後由公司 Windows 複驗；再依 §46 實作 0.37.0 的 autoupdate 日常流程、觀測與 all-terms pruning。MSG／Office／PDF／RTF／文字／XLS／XML parser error 與固定 202 個 error retry 暫不處理；不要上傳索引、刪 journal／WAL 或要求 rebuild。
+- **目前程式版本為 0.36.1；權威規格為 SPEC §45／D054。** 已完成 Windows 系統目錄排除、scope-aware deletion、profile 路徑診斷與可操作 TUI。0.37.0 仍依 §46／D055／D056 處理日常變更發現及 all-terms 效能，未提前實作。
+- Scanner 現在回報最小 `protectedScopes`。`removeMissing()` 只保留位於失敗 scope 的舊文件；正常 sibling 的已刪文件仍移除。root `readdir` 失敗保護整根，rebuild 也不會先清掉失敗 subtree；同步摘要顯示受掃描失敗保護的數量。
+- `$RECYCLE.BIN` 與 `System Volume Information` 改用唯一的 Windows path 判定，僅排除 drive／UNC share root 的精確直接子目錄及其後代，case-insensitive。完整掃描、watch 與局部更新共用；相似名稱、一般子目錄內同名路徑及非 Windows 路徑不排除。
+- `--profile` 仍以 exclusive create 拒絕覆寫，也不建立父目錄。失敗診斷顯示 resolved parent、錯誤碼、CMD `%USERPROFILE%` 與 PowerShell `$env:USERPROFILE` 範例；疑似傳入另一 shell 的字面變數只提示，不自動展開。失敗發生在索引寫入前。
+- TUI 已依核准稿改為低噪音鍵盤介面：首頁、三行結果、內部 preview、已選清單、context 確認、命令與真實索引狀態共用固定 composer／footer。raw decoder 支援分段 CSI、單獨 Esc 與 UTF-8；↑／↓、Space、Enter、PgUp／PgDn、Esc／←、Tab／Shift+Tab、`/`、q、Ctrl+C、EOF、resize 均有 reducer／render／PTY 證據。輸入焦點中的 q 是文字，context 仍逐字 `yes` 才複製。
+- 聚焦回歸 58 項全數通過。短 `TMPDIR=/tmp` 的完整套件在 Node.js 26.7.0 與正式最低 22.17.0 都是 250 項、248 通過、0 失敗、2 項 Windows CMD launcher 略過；真實 80×24 PTY 已完成翻頁、選取、preview、Esc 返回與 q 退出。公司 Windows 尚未驗收，不能以 macOS path semantics／PTY 代替。
+- 使用者已在公司 Windows 實測 0.36.0：舊索引沿用；一次性 `文字解析升級=60014` 完成後第二次為 0；約 299,530 份未變更文件會直接略過。0.36.1 不更改此 parser selection，也不處理固定 parser errors。
+- 普通 `index D:/` 仍是完整 reconciliation，約 30 萬檔的 2～4 分鐘枚舉成本不屬 0.36.1。0.37.0 將驗收並擴充既有 `autoupdate` 日常路徑、持久 queue、可接續校正與 mixed all-terms pruning；不使用 USN、不要求管理員權限。
+- 下一步：在公司 Windows 以無機密測試樹驗證 sibling 權限失敗、系統目錄排除與 80×24／120×40 TUI；不得直接用公司整庫做破壞性刪除實驗。其後依 SPEC §46 實作 0.37.0。
 
 ## 已交付基線與歷史紀錄
 

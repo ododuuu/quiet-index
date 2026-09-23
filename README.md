@@ -7,19 +7,20 @@
 .\seekah.cmd search "安裝手冊"
 ```
 
-package 仍為 **0.36.0**。下一版 **0.36.1** 的全新鍵盤 TUI 已核准、尚未實作：[設計規格](docs/design/SEEKAH-TUI.md)／[互動設計稿](docs/design/seekah-tui.html)。此 HTML 是本機示範，不是實際索引介面。
 
 AI 接手固定入口：[docs/handoff/CURRENT.md](docs/handoff/CURRENT.md)；完整 [SPEC](docs/SPEC.md)、[狀態](docs/STATUS.md)。GitHub 倉庫網址仍沿用 quiet-index；新的封裝名稱為 Seekah-VERSION.zip，包含新舊入口。
 
-目前版本為 **0.36.0**。升級後沿用原來的索引，安裝目錄或版本號改變不會清空資料，也不必 rebuild。普通 `index` 會先說明索引位置、這是既有索引還是新庫，以及這次是增量還是明確重建。已成功且檔案沒變的文件不會再解析；必要的舊文字升級、新格式補解析與錯誤重試各自計數，只做一次。
+目前版本為 **0.36.1**。升級後沿用原索引，不必 rebuild。局部目錄掃描失敗只保護該失敗範圍；可確認的 sibling 刪除仍會從索引移除，根目錄本身無法讀取時則保護整根。Windows volume／UNC root 直接子目錄 `$RECYCLE.BIN` 與 `System Volume Information` 會由完整掃描、watch 與局部更新一致排除；相似名稱及一般子目錄中的同名資料夾不受影響。
 
-若索引很慢，用 `index <根目錄> --profile <新檔案>` 寫一份只留在本機的診斷。檔案必須是新的，拒絕覆寫，不含路徑、檔名或正文。取消不會顯示 100% 或「同步完整」，已提交的文件保留，下次普通 index 接續。
+若索引很慢，用 `index <根目錄> --profile <新檔案>` 寫一份只留在本機的診斷。檔案必須是新的，拒絕覆寫，不含路徑、檔名或正文；父目錄不存在或無法存取時，錯誤會顯示 resolved parent、錯誤碼與 CMD／PowerShell 各自的安全範例，但不自動建目錄或展開字面環境變數。取消不會顯示 100% 或「同步完整」，已提交的文件保留。
 
-`docsearch tui` 底部固定 `/help`、`/quit`、Ctrl+C 與 Tab 補全。`/help` 可翻頁；`./help`、`./quit`、`./q`、`./exit` 會改成對應命令並提示要加斜線。其他 `./` 以及裸的 `help`、`q`、`exit` 仍是搜尋。`/quit`、`/q`、`/exit` 與 EOF 退出 0，Ctrl+C 退出 130。context 預覽只有輸入 `yes` 才複製。
+`seekah tui` 現在是核准的低噪音全螢幕介面：首頁、三行結果、內部預覽、已選清單、context 確認、命令與真實索引狀態共用固定底部搜尋列。搜尋後以 ↑／↓ 移動結果、Space 選取、Enter 預覽、PgUp／PgDn 翻頁、Esc／← 返回、Tab／Shift+Tab 切換焦點；游標 `›` 與 checkbox 分離。q 只在非文字焦點退出，輸入欄中的 q 是查詢文字。slash command 保留為 fallback；context 預覽仍只有逐字輸入 `yes` 才複製。EOF／q／`/quit` 退出 0，Ctrl+C 退出 130，並還原終端畫面。
 
-本機合成測試已修好「無關索引對應很多時，替換一份小文件會變慢」，也修好 TUI 按 Ctrl+C 出不來。公司環境約 10 分鐘只處理 135 份的原因還沒有現場診斷，不能當成已經解決。0.35.0 的本機工作台、MCP 與 TUI 都保留。
+0.36.1 不縮短約 30 萬檔的完整 filesystem reconciliation，也不修改 parser selection 或 error retry policy；日常變更發現與 mixed all-terms 效能仍屬 0.37.0。公司 Windows 的 0.36.1 人工驗收尚未回報。
 
-## 0.36.0 怎麼用
+## 0.36.1 怎麼用
+
+PowerShell：
 
 ```powershell
 node dist/src/cli.js index "D:/" --profile "$env:USERPROFILE\Desktop\lds-profile.json"
@@ -27,8 +28,11 @@ node dist/src/cli.js status
 node dist/src/cli.js tui
 ```
 
-- 第二次 index 若檔案沒變，解析器呼叫應是 0。`status` 會分開顯示儲存格式是否已升級，以及還有多少文字解析升級待處理；後者是索引裡的 metadata，不是目前磁碟的精確剩餘工作量。
-- profile 與索引如果在同一個掃描根目錄裡，該報告檔會被排除，不會把自己索引進去。寫報告失敗時，索引仍保留。
+CMD：
+
+```bat
+node dist\src\cli.js index "D:\" --profile "%USERPROFILE%\Desktop\lds-profile.json"
+```
 - 進度稱為「檢查進度」。分母包含未變更與只更新 metadata 的檔案。某份超過 5 秒會提示慢檔與階段，預設不印完整路徑；`--verbose` 才印路徑，仍不印正文。
 
 LocalDocSearch 0.35.0 新增 `docsearch ui` 本機工作台，把既有索引搜尋、人工勾選、拖曳臨時文件、精確上下文預覽與可選 OpenAI／xAI API 放在同一介面。服務只綁 `127.0.0.1` 並使用每次啟動的亂數 token；拖曳原檔解析後立即刪除，擷取文字與 UI 輸入的 API Key 只留在目前程序記憶體。真正傳送前必須預覽、勾選同意並使用綁定 provider／model／問題／內容的確認碼。公司 Windows、真實 MCP Apps Host 及真實 Provider 尚未驗收。
@@ -101,7 +105,7 @@ node dist/src/cli.js rebuild --verbose
 ```
 
 - `index`：新增、重新處理修改文件、重試解析錯誤、略過未變更文件，並移除已確認刪除的索引。可登錄多個根目錄；若新路徑涵蓋既有子根，會合併歸屬而不刪文件。已包含於上層的子目錄只同步該子樹。不帶路徑則更新全部已登錄位置。
-- `tui`：啟動鍵盤導向的本機終端介面。`/help` 可翻頁，Tab 補全命令；`./help` 只是說明的容錯寫法。除搜尋、翻頁、縮小、open／reveal 外，可用 `/select`、`/unselect`、`/selected`、`/clear` 管理最多 20 份文件，再以 `/context [1～10]` 完整預覽；只有輸入 `yes` 才複製到本機剪貼簿。`/quit` 與 Ctrl+C 隨時有效，退出碼分別是 0 與 130。TUI 不開網路連接埠，非互動 CLI 行為保持不變。
+- `tui`：啟動核准的鍵盤導向本機終端介面。結果區以 ↑／↓、Space、Enter、PgUp／PgDn 操作，Esc／← 返回，Tab／Shift+Tab 在輸入、結果與已選清單間切換；80×24 與 120×40 均保留固定搜尋列和操作提示。`/help` 顯示完整命令，`/select`、`/unselect`、`/selected`、`/clear` 等 slash command 是 fallback。最多選 20 份文件，再以 `/context [1～10]` 完整預覽；只有輸入 `yes` 才複製到本機剪貼簿。非文字焦點 q、`/quit` 與 EOF 退出 0，Ctrl+C 退出 130。TUI 不開網路連接埠，非互動 CLI 行為保持不變。
 - `ui`：啟動只綁 `127.0.0.1` 的瀏覽器工作台。可搜尋索引，也可拖曳目前支援格式作一次性上下文；拖入檔案不加入永久索引。預覽與複製可完全離線。要直接詢問 AI 時，可用 `OPENAI_API_KEY`／`XAI_API_KEY` 環境變數，或把 Key 輸入 UI 供本次程序使用；兩者都不寫入專案或索引。`--no-open` 只顯示帶亂數 token 的本機 URL，不自動啟動瀏覽器；Ctrl+C 關閉並清除臨時資料。
 - `search`：只搜尋現有索引。互動終端每頁預設 20 份，可輸入 `n` 下一頁、`p` 上一頁、`/ 關鍵字` 縮小目前全部命中、`back` 撤回、`reset` 重設、`q` 結束；即使只有一頁或零結果也可操作。非互動輸出只顯示指定頁並提示下一頁命令。`--page-size` 為 1～100，`--page` 從 1 起算；舊 `--limit` 保留為單次輸出，不能與分頁參數併用。每次都會顯示總命中數，避免把前 20 筆誤認為全部。`--type` 接受逗號分隔格式，可有前導點且忽略大小寫；例如 `.PDF,DocX,xml`。
 - `.xlsm`／`.odt`／`.rtf`／`.csv`：XLSM 沿用安全 OOXML 儲存格解析且忽略巨集；ODT 擷取標題、段落、清單、表格與連結；RTF 使用與 MSG 共用的受限解析核心；CSV 支援引號、逗號、quoted newline、UTF-8／Big5 與 BOM。既有 metadata-only 紀錄下一次普通 `index` 會自動重試，不必 rebuild。

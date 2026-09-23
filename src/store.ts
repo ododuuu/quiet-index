@@ -13,6 +13,10 @@ import { coversPath, resolveUserRootPath, samePath } from "./root-plan.js";
 import { RootError } from "./scanner.js";
 
 export type DataDirSource = "LOCALDOCSEARCH_DATA_DIR" | "LOCALAPPDATA" | "XDG_DATA_HOME" | "home-fallback";
+export interface RemovalResult {
+  removed: number;
+  protected: number;
+}
 
 export function describeDatabaseLocation(
   env: NodeJS.ProcessEnv = process.env,
@@ -783,25 +787,34 @@ export class IndexStore {
     }
   }
 
-  removeMissing(knownPaths: Set<string>, root?: string, subtree?: string): number {
+  removeMissing(
+    knownPaths: Set<string>,
+    root?: string,
+    subtree?: string,
+    protectedScopes: readonly string[] = [],
+  ): RemovalResult {
     let removed = 0;
+    let protectedCount = 0;
     const rows = (root ? this.db.prepare("SELECT path FROM documents WHERE id IN (SELECT document_id FROM document_roots WHERE root_path = ?)").all(root) : this.db.prepare("SELECT path FROM documents").all()) as { path: string }[];
     const remove = this.db.prepare("DELETE FROM documents WHERE path = ?");
     this.db.exec("BEGIN IMMEDIATE");
     try {
       for (const row of rows) {
         if (subtree && !coversPath(subtree, row.path)) continue;
-        if (!knownPaths.has(row.path)) {
-          remove.run(row.path);
-          removed++;
+        if (knownPaths.has(row.path)) continue;
+        if (protectedScopes.some(scope => coversPath(scope, row.path))) {
+          protectedCount++;
+          continue;
         }
+        remove.run(row.path);
+        removed++;
       }
       this.db.exec("COMMIT");
     } catch (error) {
       this.db.exec("ROLLBACK");
       throw error;
     }
-    return removed;
+    return { removed, protected: protectedCount };
   }
 
   removeDocument(filePath: string): boolean {

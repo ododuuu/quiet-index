@@ -65,6 +65,14 @@
 - [ ] Windows Terminal／PowerShell／CMD 試 `docsearch tui`：`/help` 有清單，`./help` 應改去說明並提示標準寫法，`/quit` 退出 0，Ctrl+C 退出 130，之後終端還能輸入。
 - [ ] 沒有上述回報前，不得把公司慢速或 Windows TUI 標成已通過。
 
+## H. 0.36.1 掃描邊界、profile 與鍵盤 TUI
+
+- [ ] 只用無機密測試樹：建立 sibling A／B、先索引，讓 A ACL 不可讀並刪除 B 文件；普通 index 後 A 保留、B 移除，摘要列受保護 scope。不要直接以公司整庫作刪除實驗。
+- [ ] 在 drive root 與可用的 UNC share 核對 `$RECYCLE.BIN`／`System Volume Information` 不進搜尋；相似名稱與一般子目錄同名仍可搜尋。
+- [ ] CMD 使用 `\"%USERPROFILE%\\Desktop\\lds-profile.json\"`，PowerShell 使用 `\"$env:USERPROFILE\\Desktop\\lds-profile.json\"`；另測不存在父目錄與既有檔，確認不建目錄、不覆寫、未先改索引。
+- [ ] Windows Terminal 80×24／120×40：中文結果以 ↑↓ 移動、Space 選取、Enter 預覽、PgUp／PgDn 跨頁、Esc／← 返回、Tab 切 focus、結果區 q 與 Ctrl+C 退出；resize 後畫面可繼續操作。
+- [ ] context 預覽按 Esc 不改剪貼簿，只有逐字 `yes` 才複製。公司 Windows 回報前只標示本機測試完成。
+
 ## 回報模板
 
 ```text

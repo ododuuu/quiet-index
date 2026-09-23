@@ -17,6 +17,10 @@ test("M11 ignore rules skip editor and VCS noise", () => {
   assert.equal(shouldIgnoreWatchPath(".localdocsearch/tmp"), true);
   assert.equal(shouldIgnoreWatchPath("~$草稿.docx"), true);
   assert.equal(shouldIgnoreWatchPath("合約.docx"), false);
+  assert.equal(shouldIgnoreWatchPath("$RECYCLE.BIN/item", "D:\\", "win32"), true);
+  assert.equal(shouldIgnoreWatchPath("System Volume Information/item", "\\\\server\\share", "win32"), true);
+  assert.equal(shouldIgnoreWatchPath("$RECYCLE.BIN-notes/item", "D:\\", "win32"), false);
+  assert.equal(shouldIgnoreWatchPath("archive/System Volume Information/item", "D:\\", "win32"), false);
 });
 
 test("M11 debounce bounds", () => {

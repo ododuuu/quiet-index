@@ -2,21 +2,20 @@
 
 - [x] 產品更名 Seekah；新舊 CLI 入口共用同一索引與設定，保留儲存／協定識別。
 - [x] 核准 TUI 規格與互動稿存入 [design/](design/SEEKAH-TUI.md)，交接集中 [handoff/CURRENT.md](handoff/CURRENT.md)。
-- [ ] 在 0.36.1 落地核准的整體排版與完整焦點／鍵盤操作，不只增加 /select 或 /next；依設計驗收實際終端畫面。
+- [x] 在 0.36.1 落地核准的整體排版與完整焦點／鍵盤操作，不只增加 /select 或 /next；已以 80×24、120×40 render fixture 與真實 PTY 終端轉錄驗收。
 
-更新：2026-09-23。0.36.0 公司 Windows 人工測試已證明 parser selection 正常，也暴露 filesystem discovery、刪除範圍、Windows 系統目錄、TUI 與混合詞搜尋問題。實作順序以 SPEC §45（0.36.1）再 §46（0.37.0）為準。
+更新：2026-09-23。0.36.1 已完成本機實作與版本更新；公司 Windows 人工驗收待回報。接續依 SPEC §46 實作 0.37.0。
 
-## 當前優先：0.36.1 correctness／UX
+## 已完成：0.36.1 correctness／UX
 
-以下全部尚未實作。不得改 parser selection、要求 rebuild 或自動修改使用者 ignore。
+- [x] 完整 scan、watch／local update 共用 exact Windows volume-root exclusions；相似名稱與巢狀普通目錄不誤排除。
+- [x] scan 回報最小失敗 scope；不可讀 subtree 保留，正常 sibling 已刪文件移除；root failure 與 rebuild 保留既有資料。
+- [x] `--profile` 保留 exclusive create／不建父目錄，錯誤提供安全 parent、code 與 CMD／PowerShell 範例。
+- [x] TUI 建立 focus／cursor／key event 層，支援方向鍵、選取、預覽、翻頁、返回、focus 切換、q、Ctrl+C／EOF；slash fallback 與 context `yes` 保留。
+- [x] README、STATUS、DECISIONS、HANDOFF 與 `0.36.1-VALIDATION.md` 已更新；package／lockfile 升至 0.36.1。
+- [ ] 公司 Windows 以無機密測試樹驗證 sibling 權限失敗、系統目錄排除及 80×24／120×40 TUI；不得以本機 PTY 代替。
 
-- [ ] 在 `scanner`、watch／local update 共用 exact Windows volume-root exclusions：`$RECYCLE.BIN`、`System Volume Information`；相似／巢狀普通目錄不可誤排除，且不寫 `.localdocsearchignore`。
-- [ ] 讓 scan 回報最小失敗 scope；同步刪除改為 scope-aware：不可讀 subtree 保留，正常 sibling 已刪文件移除。另覆蓋 root failure、單檔 read/stat failure、parser failure、子樹 sync 與 rebuild。
-- [ ] `--profile` 保留 exclusive create／不自動建父目錄，錯誤增加父目錄及 CMD／PowerShell 語法提示；補不存在、無權限、已存在與正確兩種 shell 案例。
-- [ ] TUI 建立 focus／cursor／key event 層；實作 ↑↓、Space、Enter、PgUp／PgDn、Esc／←、Tab、結果區 q 與全程 Ctrl+C，保留 slash-command fallback、中文寬度、resize 與 context `yes` 安全契約。
-- [ ] 更新 README 與 `0.36.1-VALIDATION.md`，完整回歸後才升 package／lockfile；公司 Windows 以無機密測試樹驗證，不把本機 PTY 當成 Windows 通過。
-
-## 接續優先：0.37.0 performance／daily incremental
+## 當前優先：0.37.0 performance／daily incremental
 
 - [ ] 以正確 CMD／PowerShell profile 路徑取得 full reconciliation 的 enumerate、stat／compare、parser、compression／Bloom、write／commit 成本；相同資料至少三次，不以目前總耗時猜各階段比例。
 - [ ] 驗證並產品化既有 `autoupdate`：啟動校正完成後，單檔新增／修改／刪除只走事件路徑或最小子樹，不掃 30 萬檔；status 顯示 daemon 健康、最近局部事件、上次／下次完整校正與降級原因。

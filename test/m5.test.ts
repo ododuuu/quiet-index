@@ -171,6 +171,7 @@ test("M5 incomplete scan retains documents; M8 preserves independent root freshn
     await sync(root, store);
     const successful = store.getLastSyncReport().successfulAt;
     const incomplete: typeof scan = async input => ({ ...await scan(input), paths: [], errors: ["無法讀取目錄"],
+      protectedScopes: [input],
       diagnostics: [{ stage: "scan", path: input, code: "SCAN_READ_FAILED", message: "無法讀取目錄" }] });
     const report = await sync(root, store, { scan: incomplete });
     assert.equal(report.complete, false);
@@ -182,6 +183,42 @@ test("M5 incomplete scan retains documents; M8 preserves independent root freshn
     assert.equal(search(store, "existing").length, 1);
     assert.equal(store.getLastSyncReport(root).successfulAt, successful);
     assert.equal(store.getLastSyncReport(nextRoot).successfulAt, null);
+  } finally { store.close(); await rm(temp, { recursive: true, force: true }); }
+});
+
+test("0.36.1 removes deleted sibling files while retaining a failed subtree", async () => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), "lds-scope-delete-"));
+  const root = path.join(temp, "root");
+  const failed = path.join(root, "failed");
+  const healthy = path.join(root, "healthy");
+  const retained = path.join(failed, "retained.txt");
+  const deleted = path.join(healthy, "deleted.txt");
+  const store = new IndexStore(path.join(temp, "index.db"));
+  try {
+    await mkdir(failed, { recursive: true });
+    await mkdir(healthy, { recursive: true });
+    await writeFile(retained, "保留內容");
+    await writeFile(deleted, "刪除內容");
+    await sync(root, store);
+    await rm(deleted);
+    const partial: typeof scan = async input => {
+      const result = await scan(input);
+      return {
+        ...result,
+        paths: result.paths.filter(filePath => !filePath.startsWith(`${failed}${path.sep}`)),
+        errors: [`${failed}: 無法讀取目錄`],
+        protectedScopes: [failed],
+        diagnostics: [{ stage: "scan", path: failed, code: "SCAN_READ_FAILED", message: "無法讀取目錄" }],
+      };
+    };
+    const report = await sync(root, store, { scan: partial });
+    assert.equal(report.complete, false);
+    assert.equal(report.removed, 1);
+    assert.equal(report.protectedByScanFailure, 1);
+    assert.deepEqual(report.protectedScopes, [failed]);
+    assert.equal(search(store, "保留內容").length, 1);
+    assert.equal(search(store, "刪除內容").length, 0);
+    assert.equal(store.getLastSyncReport(root).summary?.protectedByScanFailure, 1);
   } finally { store.close(); await rm(temp, { recursive: true, force: true }); }
 });
 
@@ -228,7 +265,7 @@ test("M5 CLI searches a moved-away source, validates types and prints persisted 
   } finally { await rm(temp, { recursive: true, force: true }); }
 });
 
-test("M5 read failures preserve unconfirmed files and still process readable siblings", async () => {
+test("0.36.1 file read failures preserve that file without blocking sibling deletion", async () => {
   const temp = await mkdtemp(path.join(os.tmpdir(), "lds-m5-read-"));
   const root = path.join(temp, "docs");
   const store = new IndexStore(path.join(temp, "index.db"));
@@ -246,8 +283,8 @@ test("M5 read failures preserve unconfirmed files and still process readable sib
     assert.equal(report.complete, false);
     assert.equal(report.readErrors, 1);
     assert.equal(report.diagnostics[0]?.stage, "read");
-    assert.equal(report.removed, 0);
-    assert.equal(search(store, "retain-until-confirmed").length, 1);
+    assert.equal(report.removed, 1);
+    assert.equal(search(store, "retain-until-confirmed").length, 0);
     assert.equal(search(store, "readable").length, 1);
     assert.ok(!JSON.stringify(report).includes("sensitive-parser-error"));
   } finally { store.close(); await rm(temp, { recursive: true, force: true }); }

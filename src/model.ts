@@ -116,6 +116,7 @@ export interface SyncSummary {
   failedDocuments?: number;
   reasonsAttempted?: Record<ReprocessReason, number>;
   reasonsCommitted?: Record<ReprocessReason, number>;
+  protectedByScanFailure?: number;
 }
 
 export function emptyStatusCounts(): Record<DocumentStatus, number> {

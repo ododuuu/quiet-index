@@ -516,7 +516,7 @@ export class LiveUpdateEngine {
 
   private handleEvent(state: RootState, filename: string | Buffer | null | undefined): void {
     const label = filename ? String(filename) : "";
-    if (label && shouldIgnoreWatchPath(label)) return;
+    if (label && shouldIgnoreWatchPath(label, state.root)) return;
     const at = new Date(this.now()).toISOString();
     state.lastEventAt = at;
     this.lastEvent = { at, root: state.root };

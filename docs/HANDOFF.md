@@ -4,36 +4,23 @@
 
 > **交接入口已固定搬至 [docs/handoff/README.md](handoff/README.md)。請先讀 [CURRENT.md](handoff/CURRENT.md) 與 [0.36.1.md](handoff/0.36.1.md)。**
 >
-> 品牌已更名 Seekah，下一版需依核准的 [TUI 設計](design/SEEKAH-TUI.md) 實作。以下內容只保留歷史根因／舊連結，不再作為目前開工 prompt；歷史版本名稱與測試結果不能當作 0.36.1 已完成。
+> 品牌已更名 Seekah；以下內容只保留歷史根因／舊連結，不再作為目前開工 prompt。0.36.1 本機實作狀態與公司 Windows 待驗項以固定交接中心及 STATUS 為準。
 
-## 待實作：0.36.1 後接 0.37.0（公司 Windows 0.36.0 後續，2026-09-23）
+## 已實作：0.36.1；目前只做驗收（2026-09-23）
 
-權威規格是 [SPEC §45](SPEC.md#45-0361windows-掃描正確性與-tui-可操作性修正) 與 [SPEC §46](SPEC.md#46-0370日常變更發現與混合詞搜尋效能)，決策 D054／D055／D056；D056 已取代 USN 候選安排。程式 package 仍是 **0.36.0**；本次只完成規劃，沒有實作、升版或發佈。實作必須先完成 0.36.1，驗證穩定後再做 0.37.0，不要把兩版混成一個難以驗收的 patch。
+0.36.1 已依 [SPEC §45](SPEC.md#45-0361windows-掃描正確性與-tui-可操作性修正)／D054 完成本機實作、缺陷回歸與版本更新。公司 Windows 人工驗收尚未回報；不得將 macOS 測試寫成 Windows 通過。驗證證據見 `0.36.1-VALIDATION.md`。
 
-給下一個 agent 的提示：
+完成項目：
 
-> 請從最新 main 實作 LocalDocSearch 0.36.1。先讀 AGENTS.md，再依序完整讀 docs/SPEC.md、STATUS.md、DECISIONS.md、HANDOFF.md；0.36.1 只處理 SPEC §45。先用測試鎖住 Windows volume-root 系統目錄排除與 sibling scan failure 的刪除安全，再改 scanner／sync；接著改善 profile 父目錄與 CMD／PowerShell 提示；最後把 TUI 從 readline command loop 重構為可測的 focus／keypress 狀態機，保留 command fallback、退出清理與 context `yes` 契約。不得 rebuild／刪索引、改 parser selection、降低 durability、處理公司 parser errors 或提前實作 USN。每項行為變更補自動測試，更新 README、STATUS、DECISIONS、HANDOFF 與 0.36.1-VALIDATION.md，完整回歸後才升 package／lockfile。公司 Windows 未回報前不得宣稱 Windows 通過。
+1. scanner 回傳最小 `protectedScopes`；store 刪除只跳過失敗 scope，正常 sibling 可移除，root failure 與 rebuild 保留既有資料。同步報告另列保護數。
+2. `src/builtin-paths.ts` 是 Windows volume-root 系統目錄的唯一判定；完整 scan、watch、local/live update 共用。只匹配 drive／UNC share root 直接子目錄 `$RECYCLE.BIN`、`System Volume Information` 及其後代。
+3. profile 保留 exclusive create、不建父目錄、不展開字面變數；錯誤顯示安全 resolved parent、code、CMD 與 PowerShell 範例，且在索引寫入前失敗。
+4. TUI 改用 raw key event queue與 focus／cursor／view state。↑↓、Space、Enter、PgUp／PgDn、Esc／←、Tab、結果區 q、Ctrl+C／Ctrl+D 與 resize 已接到真實 CLI；slash command fallback、穩定文件代碼與 context `yes` 重驗契約保留。
+5. package／lockfile 已升 0.36.1。公司後續只用無機密 sibling 權限測試樹及 80×24／120×40 Windows Terminal 驗收；不可拿整個公司索引作破壞性 deletion 實驗。
 
-### 已確認根因與模組
+目前不得直接實作 0.37.0。先完成固定交接中心列出的公司 Windows 0.36.1 人工驗收；只有 `docs/handoff/CURRENT.md` 明確前進後，才可依 SPEC §46、D055／D056 開始後續版本。下列 0.37.0 內容僅保留歷史規劃。
 
-| 問題 | 根因 | 主要模組 |
-| --- | --- | --- |
-| 日常 `index` 2～4 分鐘 | `sync()` 先 `scan(root)`，再對每個 `found.paths` 做 stat／store compare；parser 已略過，但 change discovery 仍全量 | `src/scanner.ts`、`src/sync.ts`、`src/store.ts`、`src/progress.ts` |
-| 局部 scan failure 阻止所有刪除 | scan 只有 root-global errors；`report.complete = found.errors.length === 0`，只有 complete 才 `removeMissing()` | `src/scanner.ts`、`src/sync.ts`、`src/store.ts`、同步／錯誤測試 |
-| 系統目錄污染 | `$recycle.bin`／`system volume information` 只在 hint set，不在 built-in ignore；watch ignore 也沒有 | `src/scanner.ts`、`src/watch-path.ts`、`src/local-update.ts`、`src/live-update.ts` |
-| TUI checkbox 不可操作 | `src/tui.ts` 只渲染 `[ ]`，`src/cli.ts` 仍用 readline `question()` 收整行文字，沒有 cursor／focus／raw key state | `src/tui.ts`、`src/cli.ts`、TUI／PTY 測試 |
-| mixed all-terms 慢 | `bloomMayContain()` 對 `<3` 字元回 true；document `some()` 因短詞全通過，payload candidate 也因任一短詞變 `undefined` | `src/store.ts`、搜尋與 benchmark 測試 |
-| profile 只顯示 ENOENT | `reserveNewProfile()` 直接 exclusive open，錯誤只格式化 code；CMD 收到 `$env:...` 字面路徑 | `src/profile.ts`、`src/cli.ts`、README／CLI 測試 |
-
-### 0.36.1 實作順序
-
-1. **先寫 failure-scope 模型與測試。** 讓 scanner 回傳最小不可確認 directory scopes。擴充 store removal API 接受 protected scopes；只有位於失敗 scope 的既有文件保留，正常 sibling 未發現文件刪除。root failure 保護整根；listed file 的 read/stat/parser failure 只保護該路徑。特別檢查 `rebuild` 不會先清掉失敗 subtree。
-2. **建立唯一的 Windows built-in path 判定。** 只匹配 volume／UNC root 直接子目錄的 `$RECYCLE.BIN`、`System Volume Information`，case-insensitive；scanner、watch、local update 全部共用。測相似名稱、巢狀同名、直接以系統目錄為 root 及升級後清掉舊索引紀錄。不要寫 ignore file。
-3. **改善 profile 診斷。** 保留新檔 exclusive create、先保留輸出與不建父目錄；錯誤顯示安全的 resolved parent、code 與兩種 shell 範例。疑似未展開字面值只提示，不自行展開。
-4. **重構 TUI input。** 把 key event／focus／cursor／view transition 與 render 分離，CLI 只管理 terminal lifecycle。先用注入 key stream 測 ↑↓、Space、Enter、PgUp／PgDn、Esc／←、Tab、q、Ctrl+C，再用真實 PTY 測 escape sequences、resize、中文寬度、alternate screen 還原。命令 fallback、穩定文件代碼、跨頁選取及 context 確認不得退化。
-5. 完成 0.36.1 全套後，在公司 Windows 用無機密 sibling 權限案例及 80×24／120×40 TUI 驗收；不要直接用公司整庫做破壞性 deletion 實驗。
-
-### 0.37.0 接續工作
+### 歷史規劃：0.37.0 接續工作
 
 1. 用正確 profile 路徑量 full reconciliation 各階段；CMD 用 `"%USERPROFILE%\Desktop\lds-profile.json"`，PowerShell 用 `"$env:USERPROFILE\Desktop\lds-profile.json"`。現有公司數字只有總耗時，不可先寫死根因比例。
 2. 先驗證現有 `autoupdate`：`src/live-update.ts` 的檔案事件會走 `applyPathChange()`，目錄事件才掃最小子樹；unknown filename、ignore change、queue >10,000 等才 full reconciliation。`src/autoupdate.ts` 預設 6 小時，啟動時掛 watcher 後 full sync，沒有 service／自啟，pending queue 在記憶體。
@@ -41,7 +28,7 @@
 4. all-terms 先做 0.36.0 benchmark，再讓所有 Bloom 可表示的必要長詞以 `every` 安全淘汰 document candidate。只要含短詞，通過候選的文件仍需全文精確驗證；跨 payload 的長短詞必須命中，結果集合與基線逐筆相同。
 5. 公司電腦不能有管理員權限：USN 不再是實作或 RFC 待辦。依下方順序完成 SPEC §46.6～§46.10 的普通使用者背景更新。
 
-### 0.37.0 接手提示與分階段交付
+### 歷史規劃：0.37.0 分階段交付
 
 > 請先確認最新 main 已完成 SPEC §45 的 0.36.1；若尚未完成，先交付 0.36.1。接著實作 SPEC §46／D056：watcher 在 0.31.0 已存在，先用既有 autoupdate 量測事件局部更新，再擴充同一 LiveUpdateEngine。公司只能普通使用者，不研究 USN、不提權、不安裝 Service。依序實作持久事件 queue／世代與冪等 ack、watcher scopes、可接續背景分批校正、status 及可選使用者登入啟動；保留既有 parser selection 與來源／context 安全契約。all-terms 先 benchmark 再修，禁止 false negative。每階段提交有意義的故障回歸，最後交付 README、0.37.0-VALIDATION.md、STATUS／DECISIONS／HANDOFF 與公司 Windows 待驗清單；完成前不要升版或宣稱 Windows 驗收。
 
