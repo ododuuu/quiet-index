@@ -65,7 +65,7 @@ test("0.34 stdio publishes one UI resource and four decoupled tools", async () =
     assert.equal(resources[0]?.mimeType, MCP_APP_MIME_TYPE);
     const contents = responses.find(item => item.id === 3)?.result?.contents as Array<Record<string, unknown>>;
     assert.equal(contents[0]?.mimeType, MCP_APP_MIME_TYPE);
-    assert.match(String(contents[0]?.text), /LocalDocSearch 搜尋工作台/u);
+    assert.match(String(contents[0]?.text), /Seekah 搜尋工作台/u);
     const tools = responses.find(item => item.id === 4)?.result?.tools as Array<{ name: string; _meta?: Record<string, unknown> }>;
     assert.deepEqual(tools.map(tool => tool.name), ["search_documents", "prepare_context", "index_status", "open_search_app"]);
     const renderTool = tools.find(tool => tool.name === "open_search_app");

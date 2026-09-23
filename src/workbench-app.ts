@@ -4,7 +4,7 @@ export function workbenchHtml(nonce: string): string {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>LocalDocSearch 本機工作台</title>
+  <title>Seekah 本機工作台</title>
   <style nonce="${nonce}">
     :root{color-scheme:light dark;--bg:#f5f7fb;--panel:#fff;--text:#172033;--muted:#667085;--line:#d7dce5;--accent:#3157d5;--danger:#b42318;--ok:#067647} @media(prefers-color-scheme:dark){:root{--bg:#111827;--panel:#1f2937;--text:#f3f4f6;--muted:#a8b0bd;--line:#425066;--accent:#7595ff;--danger:#ff8a80;--ok:#6ce9a6}}
     *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 ui-sans-serif,system-ui,sans-serif} main{max-width:1180px;margin:auto;padding:18px} h1{font-size:22px;margin:0} h2{font-size:17px;margin:0 0 10px}.subtitle,.meta{color:var(--muted)}.subtitle{margin:3px 0 16px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;min-width:0}.wide{grid-column:1/-1}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.row>*{min-width:0}input,select,textarea,button{font:inherit;color:inherit}input,select,textarea{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:9px}input[type=search],input[type=text],input[type=password]{flex:1 1 180px}textarea{width:100%;min-height:85px;resize:vertical}button{border:1px solid var(--line);border-radius:8px;background:var(--panel);padding:8px 11px;cursor:pointer}button.primary{background:var(--accent);border-color:var(--accent);color:white}button.danger{color:var(--danger)}button:disabled{opacity:.48;cursor:not-allowed}.status{min-height:22px;margin:8px 0;color:var(--muted)}.status.error{color:var(--danger)}.status.ok{color:var(--ok)}.list{display:grid;gap:7px;max-height:330px;overflow:auto}.item{display:grid;grid-template-columns:auto 1fr auto;gap:9px;align-items:start;border:1px solid var(--line);border-radius:9px;padding:9px}.item .title{font-weight:650;overflow-wrap:anywhere}.snippet{white-space:pre-wrap;overflow-wrap:anywhere;color:var(--muted);margin-top:4px}.drop{border:2px dashed var(--line);border-radius:10px;padding:24px;text-align:center;cursor:pointer}.drop.active{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,transparent)}pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:360px;overflow:auto;background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:11px}.notice{border-left:4px solid var(--accent);padding:8px 10px;background:var(--bg);margin:9px 0}.confirm{display:flex;gap:8px;align-items:flex-start;margin:10px 0}@media(max-width:800px){.grid{grid-template-columns:1fr}.wide{grid-column:auto}}
@@ -12,7 +12,7 @@ export function workbenchHtml(nonce: string): string {
 </head>
 <body>
 <main>
-  <h1>LocalDocSearch 本機工作台</h1>
+  <h1>Seekah 本機工作台</h1>
   <p class="subtitle">搜尋索引、拖曳臨時文件、預覽精確上下文；只有你確認後才會送至選定的 AI API。</p>
   <div class="grid">
     <section class="panel">

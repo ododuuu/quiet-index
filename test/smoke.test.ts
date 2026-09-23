@@ -6,7 +6,7 @@ import { buildHelpText, main } from "../src/cli.js";
 test("help text names the product and planned index command", () => {
   const help = buildHelpText();
 
-  assert.match(help, /LocalDocSearch/);
+  assert.match(help, /Seekah/);
   assert.match(help, /docsearch index \[root\]/);
 });
 

@@ -1,4 +1,8 @@
-# LocalDocSearch 後續優化清單
+# Seekah 後續優化清單
+
+- [x] 產品更名 Seekah；新舊 CLI 入口共用同一索引與設定，保留儲存／協定識別。
+- [x] 核准 TUI 規格與互動稿存入 [design/](design/SEEKAH-TUI.md)，交接集中 [handoff/CURRENT.md](handoff/CURRENT.md)。
+- [ ] 在 0.36.1 落地核准的整體排版與完整焦點／鍵盤操作，不只增加 /select 或 /next；依設計驗收實際終端畫面。
 
 更新：2026-09-23。0.36.0 公司 Windows 人工測試已證明 parser selection 正常，也暴露 filesystem discovery、刪除範圍、Windows 系統目錄、TUI 與混合詞搜尋問題。實作順序以 SPEC §45（0.36.1）再 §46（0.37.0）為準。
 

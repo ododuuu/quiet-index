@@ -1,4 +1,6 @@
-# LocalDocSearch 產品規格
+# Seekah 產品規格
+
+正式品牌為 **Seekah**（CLI／package：`seekah`），原名 LocalDocSearch／quiet-index。更名相容性見 §45.7；核准的下一版 TUI 見 §45.8。歷史章節的舊名稱、路徑及發布檔名保留原意。
 
 - 規格基線：已交付 0.36.0；公司 Windows 後續修正規劃見 0.36.1（第 45 節）與 0.37.0（第 46 節）
 - 日期：2026-09-23
@@ -1164,6 +1166,23 @@ docsearch doctor
 4. **TUI 自動測試**：注入 key event 驗證焦點、上下邊界、跨頁、選取、預覽返回、搜尋、resize、索引變更與 context 取消；真實 PTY 驗證方向鍵 escape sequence、Space、Enter、PgUp／PgDn、q、Ctrl+C、終端還原與無殘留程序。
 5. **Windows 人工驗收**：在 80×24 與 120×40 的 Windows Terminal 操作中文結果；使用者能不輸入命令完成移動、跨頁、選取、預覽、返回及退出。以含無權限 sibling 的無機密測試樹驗證刪除，不得直接拿整個公司索引作破壞性實驗。
 6. **交付界線**：0.36.1 不承諾縮短 30 萬檔完整 reconciliation，不改 parser retry policy，不做 USN。所有行為變更補測試；完成後才升 package／lockfile、更新驗證文件並由公司 Windows 回報，規劃提交本身不算實作完成。
+
+### 45.7 Seekah 更名與升級相容性（D057）
+
+- 產品顯示名 Seekah，終端字標 seekah；package 改為 seekah，新增 seekah bin／seekah.cmd，保留 docsearch／docsearch.cmd 且指向同一 CLI。
+- 此次更名不升版本，package 維持 0.36.0；只有完成本節全部 0.36.1 修正後才升為 0.36.1。不得把已改標題稱作新 TUI 已交付。
+- 不遷移索引、不改資料庫 schema／parse version。原 LocalDocSearch 儲存路徑、LOCALDOCSEARCH_DATA_DIR、.localdocsearchignore、.localdocsearch、MCP／IPC 識別、認證 header 均保留，避免開出新庫或兩個 daemon。
+- 新交付檔名 Seekah-VERSION.zip、內層 Seekah/，包含新舊 CMD launcher；歷史包 checksum 不改寫。GitHub 倉庫網址暫沿用 quiet-index，產品更名不等於 repository slug 已改。
+- context／workbench／MCP 的可見產品標題改名，不變更既有安全或資料傳輸契約。新名稱不授權新增外部傳輸。
+
+### 45.8 核准的 TUI 視覺與交付契約
+
+- 以 [Seekah TUI 設計](design/SEEKAH-TUI.md) 及 [互動稿](design/seekah-tui.html) 為核准畫面：低噪音石墨／灰階、青綠重點色、低對比游標列、分離游標與勾選、固定底部搜尋 composer／情境快捷鍵。
+- 首頁、搜尋結果、文件預覽、已選清單、命令入口與 context 明確確認都要完成。保留 §45.5 的鍵盤行為；文字 focus 不攔 q／Space，非文字 q 與全程 Ctrl+C 可退出。不可只改色彩或仍要求輸入 /next 才翻頁。
+- 採 Node.js／TypeScript 純終端，狀態機與 terminal lifecycle 分離；不移植 OpenCode runtime，也不新增 GUI。HTML 只是設計示範，不能作為實作完成證據。
+- 支援 80×24／120×40、resize、中文 cell width、NO_COLOR、極小終端退化；不可輸出來源控制字元。補 reducer／decoder／render／PTY 測試，提供實際畫面對照。
+- 真實 status 才能顯示監看中；尚未實作的 0.37.0 queue／dirty scope／startup 不可偽造。預覽及 clipboard 保留原有精確內容、上限、來源安全與 yes 確認。
+- 固定交接中心為 docs/handoff/，CURRENT.md 指向目前里程碑；每版本保留獨立交接。公司 Windows 人工驗收與本機測試結果分別記錄。
 
 ## 46. 0.37.0：日常變更發現與混合詞搜尋效能
 

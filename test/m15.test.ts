@@ -30,7 +30,7 @@ test("M15 copies confirmed Markdown to an injected clipboard writer", () => fixt
   const copied: string[] = [];
   assert.equal(await runContext(store, { query: "付款批次", clipboard: true }, harness.io, async text => { copied.push(text); }), true);
   assert.equal(copied.length, 1);
-  assert.match(copied[0]!, /^# LocalDocSearch 上下文/m);
+  assert.match(copied[0]!, /^# Seekah 上下文/m);
   assert.match(copied[0]!, /中文規格/);
   assert.ok(harness.output.some(value => value.includes("剪貼簿歷程")));
   assert.ok(harness.output.some(value => value.includes("未傳送至外部服務")));

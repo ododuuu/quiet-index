@@ -187,7 +187,7 @@ async function bundle(store: IndexStore, options: ContextOptions, picked: readon
 
 function renderMarkdown(data: Awaited<ReturnType<typeof bundle>>): string {
   const lines = [
-    "# LocalDocSearch 上下文",
+    "# Seekah 上下文",
     "",
     `- 查詢：${data.queries.join("；")}`,
     `- 搜尋模式：${data.matchMode === "all-terms" ? "全部關鍵字" : "精確片語"}`,

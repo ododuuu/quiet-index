@@ -77,7 +77,7 @@ test("0.33 TUI selection requires explicit yes and rejects mixed search modes", 
   assert.match(rendered, /不可混用片語與全部詞模式/u);
   assert.match(rendered, /已取消，未改動剪貼簿/u);
   assert.equal(clipboard.length, 1);
-  assert.match(clipboard[0]!, /LocalDocSearch 上下文|共同詞/u);
+  assert.match(clipboard[0]!, /Seekah 上下文|共同詞/u);
 }));
 
 test("0.33 stdio MCP initializes, lists tools and calls search without stdout noise", async () => {

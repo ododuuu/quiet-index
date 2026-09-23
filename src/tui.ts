@@ -200,9 +200,9 @@ export async function runTui(
     const counts = store.counts();
     const documents = Object.values(counts).reduce((sum, count) => sum + count, 0);
     const header = compact
-      ? [`LDS ${productVersion}`, clipWidth(`根 ${store.roots().length} · 文件 ${documents}`, columns)]
+      ? [`Seekah ${productVersion}`, clipWidth(`根 ${store.roots().length} · 文件 ${documents}`, columns)]
       : [
-        clipWidth(`LocalDocSearch ${productVersion} · 本機文件搜尋與上下文`, columns),
+        clipWidth(`Seekah ${productVersion} · 本機文件搜尋與上下文`, columns),
         "─".repeat(Math.min(columns, 72)),
         clipWidth(`根目錄 ${store.roots().length} · 文件 ${documents} · 全程離線`, columns),
       ];

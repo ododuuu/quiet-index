@@ -1,15 +1,15 @@
-# LocalDocSearch AI 協作指示
+# Seekah AI 協作指示
 
 修改程式碼前，依序閱讀下列文件：
 
 1. `docs/SPEC.md`
 2. `docs/STATUS.md`
 3. `docs/DECISIONS.md`
-4. `docs/HANDOFF.md`
+4. `docs/handoff/README.md` 與 `docs/handoff/CURRENT.md`，再讀入口指定的版本交接文件。
 
 ## 工作規則
 
-- 本儲存庫是正式的 LocalDocSearch 產品，不得與上層工作區的教材網站混用。
+- 本儲存庫是正式的 Seekah（原 LocalDocSearch）產品，不得與上層工作區的教材網站混用。
 - 除非使用者明確變更，否則維持已決定的 Node.js 與 TypeScript 技術方向。
 - 所有文件處理都必須留在本機，不得將文件內容上傳至外部服務。
 - 核心 CLI 穩定前，不得加入 MCP、AI、embedding、OCR、GUI 或舊版 Office 格式。
@@ -19,3 +19,6 @@
 - 所有專案說明文件、規格、狀態與決策紀錄都使用繁體中文；程式識別字、命令與通用技術名稱可保留英文。
 - 每次工作結束時更新 `docs/STATUS.md`，並將重要決策加入 `docs/DECISIONS.md`。
 - 除非使用者確實在公司 Windows 電腦完成驗收並回報，否則不得宣稱已通過 Windows 驗證。
+
+- 交接文件固定放在 `docs/handoff/`；同步維護 `CURRENT.md` 與版本文件。`docs/HANDOFF.md` 僅保留舊連結與歷史。
+- 更名不代表資料遷移：保留 LocalDocSearch 資料目錄、LOCALDOCSEARCH_DATA_DIR、.localdocsearchignore、既有 IPC／MCP 識別與 docsearch 相容入口。

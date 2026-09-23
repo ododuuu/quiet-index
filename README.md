@@ -1,4 +1,15 @@
-# LocalDocSearch
+# Seekah
+
+原名 LocalDocSearch／quiet-index，現在正式更名 **Seekah**。新增 `seekah`／`seekah.cmd`；既有 `docsearch`／`docsearch.cmd` 完全保留，以下舊命令可直接換成新入口。索引仍使用原 LocalDocSearch 資料目錄，不搬移、不清空，不必 rebuild。
+
+```powershell
+.\seekah.cmd tui
+.\seekah.cmd search "安裝手冊"
+```
+
+package 仍為 **0.36.0**。下一版 **0.36.1** 的全新鍵盤 TUI 已核准、尚未實作：[設計規格](docs/design/SEEKAH-TUI.md)／[互動設計稿](docs/design/seekah-tui.html)。此 HTML 是本機示範，不是實際索引介面。
+
+AI 接手固定入口：[docs/handoff/CURRENT.md](docs/handoff/CURRENT.md)；完整 [SPEC](docs/SPEC.md)、[狀態](docs/STATUS.md)。GitHub 倉庫網址仍沿用 quiet-index；新的封裝名稱為 Seekah-VERSION.zip，包含新舊入口。
 
 目前版本為 **0.36.0**。升級後沿用原來的索引，安裝目錄或版本號改變不會清空資料，也不必 rebuild。普通 `index` 會先說明索引位置、這是既有索引還是新庫，以及這次是增量還是明確重建。已成功且檔案沒變的文件不會再解析；必要的舊文字升級、新格式補解析與錯誤重試各自計數，只做一次。
 

@@ -53,7 +53,7 @@ test("M10 markdown export is paste-friendly and omits unselected files", () => f
   const index = search(store, "共同詞").findIndex(result => result.path.endsWith("甲.txt")) + 1;
   assert.equal(await runContext(store, { query: "共同詞", output, format: "md" }, scripted([String(index), "done", "yes"]).io), true);
   const markdown = await readFile(output, "utf8");
-  assert.match(markdown, /^# LocalDocSearch 上下文/m);
+  assert.match(markdown, /^# Seekah 上下文/m);
   assert.match(markdown, /要留下/);
   assert.match(markdown, /文件代碼：`/);
   assert.doesNotMatch(markdown, /不該出現的私密|乙\.txt/);

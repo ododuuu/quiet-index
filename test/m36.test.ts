@@ -202,7 +202,7 @@ test("0.36 CLI reuses one data directory and TUI quits without copying on /quit 
   }, 5, async value => { copied.push(value); });
   assert.equal(code, 0);
   assert.equal(copied.length, 0);
-  assert.match(output.join("\n"), /LocalDocSearch/);
+  assert.match(output.join("\n"), /Seekah/);
   const smallOut: string[] = [];
   assert.equal(await runTui(store, {
     ansi: false, write: value => smallOut.push(value), ask: async () => "/quit", size: () => ({ columns: 40, rows: 12 }),

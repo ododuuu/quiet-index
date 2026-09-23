@@ -10,15 +10,15 @@ async function add(relative) {
   for (const item of await readdir(path.join(project, relative), { withFileTypes: true })) {
     const child = path.posix.join(relative, item.name);
     if (item.isDirectory()) await add(child);
-    else if (item.isFile()) entries[`LocalDocSearch/${child}`] = await readFile(path.join(project, child));
+    else if (item.isFile()) entries[`Seekah/${child}`] = await readFile(path.join(project, child));
   }
 }
 for (const folder of ['src', 'test', 'dist', 'docs', 'scripts', 'vendor']) await add(folder);
-for (const file of ['README.md', 'docsearch.cmd', 'AGENTS.md', 'package.json', 'package-lock.json', 'tsconfig.json', '.gitignore']) {
-  entries[`LocalDocSearch/${file}`] = await readFile(path.join(project, file));
+for (const file of ['README.md', 'seekah.cmd', 'docsearch.cmd', 'AGENTS.md', 'package.json', 'package-lock.json', 'tsconfig.json', '.gitignore']) {
+  entries[`Seekah/${file}`] = await readFile(path.join(project, file));
 }
 const metadata = JSON.parse(await readFile(path.join(project, "package.json"), "utf8"));
-const destination = path.join(project, `LocalDocSearch-${metadata.version}.zip`);
+const destination = path.join(project, `Seekah-${metadata.version}.zip`);
 const archive = zipSync(entries, { level: 6 });
 const unpacked = unzipSync(archive);
 for (const [name, contents] of Object.entries(entries)) {

@@ -1,5 +1,14 @@
 # 設計決策紀錄
 
+## D057：Seekah 品牌、核准 TUI 與固定交接中心
+
+- 日期：2026-09-23。使用者正式選定 Seekah，並核准先前 OpenCode 風格的低噪音 TUI 設計；要求下一版規格及固定位置的 AI handoff。
+- 產品／可見標題改名 Seekah，package／新命令 seekah；保留 docsearch 入口。儲存路徑、環境變數、ignore、IPC、MCP URI／註冊與認證 header 保留舊識別，不為品牌搬庫或更動資料格式。
+- 0.36.1 納入完整核准 TUI，設計固定 docs/design/SEEKAH-TUI.md 與 seekah-tui.html；HTML 僅示範，新增標題不算 UI 完成。沿用 Node.js／TypeScript，不引進 OpenCode runtime。
+- 0.36.1 correctness／profile 範圍不變；0.37.0 watcher／all-terms 依 D055／D056，不能為 UI 偷提前實作或顯示假 daemon 狀態。
+- 交接統一 docs/handoff/：README 為永久中心，CURRENT 指向進行中版本，版本檔保留。docs/HANDOFF.md 只作舊連結與歷史，AGENTS 隨之更新。
+- 本次不升 package 版本、不發布新版本；GitHub repository slug 仍為 quiet-index，產品更名不聲稱已改遠端網址。新封裝使用 Seekah-VERSION.zip，歷史包不重命名。
+
 ## D056：0.37.0 在普通權限下擴充既有 watcher，持久化工作並分批校正
 
 - 日期：2026-09-23。使用者明確確認公司電腦不能有管理員權限，並要求將 watcher 討論寫入規格與交接。本決策取代 D055 的 USN RFC 候選安排；0.37.0 不採 USN／raw volume、Service 或提權。SPEC §46.6～§46.10 定義實作細節。

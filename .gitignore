@@ -9,6 +9,9 @@ coverage/
 .DS_Store
 LocalDocSearch-*.zip
 
+Seekah-*.zip
+Seekah-*.zip.sha256
+Seekah/
 LocalDocSearch-*.zip.sha256
 
 # 舊版打包解壓留下的巢狀副本，不屬於目前根目錄專案

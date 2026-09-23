@@ -76,7 +76,8 @@ function sqliteExtendedCode(error: unknown): number | undefined {
 
 export function buildHelpText(): string {
   return [
-    "LocalDocSearch — 本機文件搜尋",
+    "Seekah — 本機文件搜尋",
+    "主要入口：seekah／seekah.cmd；下列 docsearch 命令保留相容，參數完全相同。",
     "",
     "  docsearch index [root] [--verbose] [--profile <新檔案>]",
     "  docsearch search <query> [--all-terms] [--page <正整數>] [--page-size <1～100>] [--limit <正整數>] [--type <格式清單>] [--root <路徑>] [--verbose]",

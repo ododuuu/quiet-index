@@ -4,6 +4,10 @@
 
 ## 目前狀態
 
+- 本次更名驗證：macOS／Node.js 22.13.1（低於正式最低 22.17.0），完整 npm test 245 項：243 通過、0 失敗、2 項 Windows launcher 專屬略過，約 51.64 秒。包含新增 Seekah alias／lockfile／舊儲存路徑／MCP URI 相容性測試；兩個 context 標題預期已更新。npm run package 逐檔核對通過；HTML script 語法與交接文件相對連結檢查通過，未執行瀏覽器畫面驗收。這不是新 TUI 或公司 Windows 的驗收結果。
+
+- **2026-09-23 Seekah 更名／核准設計交接**：package 名稱、可見品牌與封裝改名，新增 seekah／seekah.cmd，保留 docsearch、原資料路徑與 IPC／MCP 識別。版本仍為 0.36.0；0.36.1 功能未實作。下一個 AI 依 SPEC §45.7～45.8／D057 與 docs/design/SEEKAH-TUI.md 實作核准畫面；交接固定 docs/handoff/CURRENT.md，0.37.0 不提前開工。
+
 - **目前程式版本仍是 0.36.0；進行中里程碑是 0.36.1 規劃，後續為 0.37.0。** 0.36.1 權威規格為 SPEC §45／D054，處理 Windows 系統目錄排除、scope-aware deletion、profile 錯誤與可操作 TUI；0.37.0 見 §46／D055，處理日常變更發現與 all-terms 效能。兩版尚未實作，不得把文件提交視為修正完成。
 - 使用者已在公司 Windows 實測 0.36.0。已確認：舊索引可沿用；一次性 `文字解析升級=60014` 完成後第二次為 0；約 299,530 份未變更文件會直接略過；steady-state parser calls 不會再回到六萬份。0.36.0 的 parser selection 正常，不再重開此設計。
 - 新瓶頸已確定是 filesystem change discovery：普通 `index D:/` 每次仍枚舉約 299,700～299,800 份／約 300 GB，案例總耗時約 124、159、166、247 秒。典型一次只來源變更 3、錯誤重試 202、parser 205 次，卻仍檢查 299,741 份；不能把「未重 parse」誤稱為日常增量已完成。

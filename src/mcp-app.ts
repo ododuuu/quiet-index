@@ -8,7 +8,7 @@ export const MCP_APP_HTML = `<!doctype html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>LocalDocSearch 搜尋工作台</title>
+  <title>Seekah 搜尋工作台</title>
   <style>
     :root { color-scheme: light dark; --bg: var(--color-background-primary, Canvas); --panel: var(--color-background-secondary, color-mix(in srgb, Canvas 94%, CanvasText 6%)); --text: var(--color-text-primary, CanvasText); --muted: var(--color-text-secondary, color-mix(in srgb, CanvasText 66%, transparent)); --accent: var(--color-accent, #3157d5); --line: var(--color-border, color-mix(in srgb, CanvasText 18%, transparent)); --danger: #b42318; }
     * { box-sizing: border-box; }
@@ -38,7 +38,7 @@ export const MCP_APP_HTML = `<!doctype html>
 </head>
 <body>
 <main>
-  <h1>LocalDocSearch 搜尋工作台</h1>
+  <h1>Seekah 搜尋工作台</h1>
   <p class="subtitle">所有搜尋都在已建立的本機索引內；只有你勾選的片段會加入目前 AI 對話。</p>
   <form id="search-form" class="toolbar">
     <input id="query" type="search" maxlength="1000" autocomplete="off" placeholder="輸入文件中的文字" aria-label="搜尋文字" required>
@@ -183,7 +183,7 @@ export const MCP_APP_HTML = `<!doctype html>
     if (result && result.isError) {
       const content = Array.isArray(result.content) ? result.content : [];
       const text = content.map(item => item && item.type === 'text' ? item.text : '').filter(Boolean).join('\n');
-      throw new Error(text || 'LocalDocSearch 工具回報錯誤。');
+      throw new Error(text || 'Seekah 工具回報錯誤。');
     }
     return result || {};
   }

@@ -281,7 +281,7 @@ export function launchBrowser(url: string): void {
 export async function runWorkbenchCommand(databasePath: string, options: { openBrowser?: boolean; launcher?: BrowserLauncher; write?: (text: string) => void } = {}): Promise<number> {
   const handle = await createWorkbench({ databasePath });
   const write = options.write ?? console.log;
-  write(`LocalDocSearch ${productVersion} 本機工作台：${handle.url}`);
+  write(`Seekah ${productVersion} 本機工作台：${handle.url}`);
   write("只接受這台電腦的瀏覽器連線；按 Ctrl+C 關閉並清除臨時文件與工作階段 API Key。");
   if (options.openBrowser !== false) (options.launcher ?? launchBrowser)(handle.url);
   await new Promise<void>(resolve => {

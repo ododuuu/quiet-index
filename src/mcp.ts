@@ -56,7 +56,7 @@ export function createMcpServer(databasePath: string): McpServer {
     "localdocsearch-search-context",
     MCP_APP_RESOURCE_URI,
     {
-      title: "LocalDocSearch 搜尋與上下文工作台",
+      title: "Seekah 搜尋與上下文工作台",
       description: "在已建立的本機索引中搜尋、人工勾選，並把已選片段加入 AI 上下文。",
       mimeType: MCP_APP_MIME_TYPE,
       _meta: {
@@ -85,7 +85,7 @@ export function createMcpServer(databasePath: string): McpServer {
     "search_documents",
     {
       title: "搜尋本機文件",
-      description: "唯讀搜尋 LocalDocSearch 既有索引，回傳有界片段與穩定文件代碼。先讓使用者選擇代碼，再呼叫 prepare_context。",
+      description: "唯讀搜尋 Seekah 既有索引，回傳有界片段與穩定文件代碼。先讓使用者選擇代碼，再呼叫 prepare_context。",
       inputSchema: z.object({
         query: z.string().min(1).max(1000),
         mode: modeSchema.optional(),
@@ -150,7 +150,7 @@ export function createMcpServer(databasePath: string): McpServer {
     "index_status",
     {
       title: "查看本機索引狀態",
-      description: "唯讀查看 LocalDocSearch 索引格式、文件狀態數與已登錄根目錄；不掃描來源或啟動更新。",
+      description: "唯讀查看 Seekah 索引格式、文件狀態數與已登錄根目錄；不掃描來源或啟動更新。",
       inputSchema: z.object({}),
       annotations: readOnlyAnnotations,
       _meta: { ui: { visibility: ["model", "app"] } },
@@ -167,7 +167,7 @@ export function createMcpServer(databasePath: string): McpServer {
   server.registerTool(
     "open_search_app",
     {
-      title: "開啟 LocalDocSearch 搜尋工作台",
+      title: "開啟 Seekah 搜尋工作台",
       description: "顯示本機文件搜尋、人工勾選與加入 AI 上下文的互動介面。此工具只展示介面；不支援 MCP Apps 時，請直接使用 search_documents 與 prepare_context。",
       inputSchema: z.object({
         query: z.string().max(1000).optional(),
@@ -184,7 +184,7 @@ export function createMcpServer(databasePath: string): McpServer {
     async input => {
       const result = { query: input.query?.trim() ?? "", mode: input.mode ?? "phrase", selectionLimit: 20 };
       return {
-        content: [{ type: "text", text: "已顯示 LocalDocSearch 搜尋工作台。若 Host 未顯示互動介面，請改用 search_documents 搜尋，再讓使用者選定文件代碼後呼叫 prepare_context。" }],
+        content: [{ type: "text", text: "已顯示 Seekah 搜尋工作台。若 Host 未顯示互動介面，請改用 search_documents 搜尋，再讓使用者選定文件代碼後呼叫 prepare_context。" }],
         structuredContent: result,
         _meta: { ui: { resourceUri: MCP_APP_RESOURCE_URI } },
       };
@@ -196,8 +196,8 @@ export function createMcpServer(databasePath: string): McpServer {
 
 export async function runMcpServer(databasePath: string): Promise<number> {
   serveStdio(() => createMcpServer(databasePath), {
-    onerror: () => console.error("LocalDocSearch MCP transport error."),
+    onerror: () => console.error("Seekah MCP transport error."),
   });
-  console.error(`LocalDocSearch MCP ${productVersion} running on stdio.`);
+  console.error(`Seekah MCP ${productVersion} running on stdio.`);
   return 0;
 }

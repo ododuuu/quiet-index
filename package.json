@@ -1,10 +1,11 @@
 {
-  "name": "localdocsearch",
+  "name": "seekah",
   "version": "0.36.0",
   "private": true,
   "description": "Local-first document search, context selection, MCP and optional AI workbench",
   "type": "module",
   "bin": {
+    "seekah": "dist/src/cli.js",
     "docsearch": "dist/src/cli.js"
   },
   "engines": {

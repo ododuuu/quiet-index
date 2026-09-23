@@ -156,8 +156,9 @@ test("M9 CLI validates options and refuses piped consent", () => fixture(async (
   await absent(output);
 }));
 
-test("M9 Windows cmd launcher runs help without changing working directory", { skip: process.platform !== "win32" }, async () => {
-  const command = path.resolve("docsearch.cmd");
+for (const launcher of ["docsearch.cmd", "seekah.cmd"]) {
+test(`M9 Windows ${launcher} runs help without changing working directory`, { skip: process.platform !== "win32" }, async () => {
+  const command = path.resolve(launcher);
   const env = { ...process.env, LOCALDOCSEARCH_CMD_TEST: command };
   const temp = await mkdtemp(path.join(os.tmpdir(), "lds-cmd-"));
   const wrapper = path.join(temp, "run.cmd");
@@ -169,6 +170,7 @@ test("M9 Windows cmd launcher runs help without changing working directory", { s
       { encoding: "utf8", cwd: os.tmpdir(), env, timeout: 5000 });
     assert.equal(result.error, undefined, `cmd 啟動不應失敗或逾時：${result.error?.message ?? ""}`);
     assert.equal(result.status, 0, `cmd launcher status=${result.status ?? "null"}, signal=${result.signal ?? "none"}`);
-    assert.match(result.stdout, /LocalDocSearch/);
+    assert.match(result.stdout, /Seekah/);
   } finally { await rm(temp, { recursive: true, force: true }); }
 });
+}
