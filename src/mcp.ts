@@ -45,7 +45,7 @@ const typesSchema = z.array(z.string().min(1).max(254)).max(50).optional();
 
 export function createMcpServer(databasePath: string): McpServer {
   const server = new McpServer(
-    { name: "localdocsearch", version: "0.34.0" },
+    { name: "localdocsearch", version: "0.35.0" },
     {
       instructions: "Search the existing local index first. Show document references to the user and call prepare_context only for references the user selected. Never imply that a snippet is the full document.",
     },
@@ -197,6 +197,6 @@ export async function runMcpServer(databasePath: string): Promise<number> {
   serveStdio(() => createMcpServer(databasePath), {
     onerror: () => console.error("LocalDocSearch MCP transport error."),
   });
-  console.error("LocalDocSearch MCP 0.34.0 running on stdio.");
+  console.error("LocalDocSearch MCP 0.35.0 running on stdio.");
   return 0;
 }

@@ -73,7 +73,7 @@ test("0.34 stdio publishes one UI resource and four decoupled tools", async () =
     assert.match(JSON.stringify(responses.find(item => item.id === 5)), /selectionLimit/u);
     assert.match(JSON.stringify(responses.find(item => item.id === 6)), /mcp-app-protocol-needle/u);
     assert.ok(lines.every(line => line.startsWith("{")), child.stdout);
-    assert.match(child.stderr, /0\.34\.0 running on stdio/u);
+    assert.match(child.stderr, /0\.35\.0 running on stdio/u);
   } finally {
     try { store.close(); } catch {}
     if (oldData === undefined) delete process.env.LOCALDOCSEARCH_DATA_DIR;

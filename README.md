@@ -1,6 +1,6 @@
 # LocalDocSearch
 
-目前版本為 **0.34.0**：在 0.33.0 唯讀本機 stdio MCP 上加入標準 MCP App 搜尋工作台。相容 Host 可直接搜尋、跨頁勾選最多 20 份文件、把重新驗證後的片段加入模型上下文，並只在使用者明確按鍵後送出問題；不支援 UI 的 Host 仍可使用四個 headless 工具或 `docsearch tui`。另提供安全冪等的 Codex 註冊與唯讀 doctor。MCP 不提供 index、刪除、open／reveal 或整庫匯入；文件解析與索引仍全部留在本機。公司 Windows 0.31.0～0.34.0 驗收尚待回報。
+目前版本為 **0.35.0**：新增 `docsearch ui` 本機工作台，把既有索引搜尋、人工勾選、拖曳臨時文件、精確上下文預覽與可選 OpenAI／xAI API 放在同一介面。服務只綁 `127.0.0.1` 並使用每次啟動的亂數 token；拖曳原檔解析後立即刪除，擷取文字與 UI 輸入的 API Key 只留在目前程序記憶體。真正傳送前必須預覽、勾選同意並使用綁定 provider／model／問題／內容的確認碼。0.34.0 的 stdio MCP／MCP App 與 TUI 都保留。公司 Windows、真實 MCP Apps Host 及真實 Provider 尚未驗收。
 
 LocalDocSearch 0.26.2 是純本機 CLI，目前以 macOS 作為主要可執行與迭代環境，並保留 Windows 相容方向。它支援原有六種格式，並新增 `.doc`、`.xls`、`.mht`／`.mhtml`、`.html`／`.htm`／`.xhtml`、`.adoc`、`.msg` 與 `.vsd`，搜尋檔名、標題及內容。其他格式與無副檔名檔案會進入本機清冊，可依檔名及副檔名找到。文件留在原位置，索引與搜尋不需要網路或外部 AI。
 
@@ -57,6 +57,8 @@ node dist/src/cli.js autoupdate start
 node dist/src/cli.js autoupdate status
 node dist/src/cli.js autoupdate stop
 node dist/src/cli.js tui
+node dist/src/cli.js ui
+node dist/src/cli.js ui --no-open
 node dist/src/cli.js mcp
 node dist/src/cli.js setup codex --dry-run
 node dist/src/cli.js setup codex
@@ -69,6 +71,7 @@ node dist/src/cli.js rebuild --verbose
 
 - `index`：新增、重新處理修改文件、重試解析錯誤、略過未變更文件，並移除已確認刪除的索引。可登錄多個根目錄；若新路徑涵蓋既有子根，會合併歸屬而不刪文件。已包含於上層的子目錄只同步該子樹。不帶路徑則更新全部已登錄位置。
 - `tui`：啟動鍵盤導向的本機終端介面。除搜尋、翻頁、縮小、open／reveal 外，可用 `/select`、`/unselect`、`/selected`、`/clear` 管理最多 20 份文件，再以 `/context [1～10]` 完整預覽；只有輸入 `yes` 才複製到本機剪貼簿。TUI 不開網路連接埠，非互動 CLI 行為保持不變。
+- `ui`：啟動只綁 `127.0.0.1` 的瀏覽器工作台。可搜尋索引，也可拖曳目前支援格式作一次性上下文；拖入檔案不加入永久索引。預覽與複製可完全離線。要直接詢問 AI 時，可用 `OPENAI_API_KEY`／`XAI_API_KEY` 環境變數，或把 Key 輸入 UI 供本次程序使用；兩者都不寫入專案或索引。`--no-open` 只顯示帶亂數 token 的本機 URL，不自動啟動瀏覽器；Ctrl+C 關閉並清除臨時資料。
 - `search`：只搜尋現有索引。互動終端每頁預設 20 份，可輸入 `n` 下一頁、`p` 上一頁、`/ 關鍵字` 縮小目前全部命中、`back` 撤回、`reset` 重設、`q` 結束；即使只有一頁或零結果也可操作。非互動輸出只顯示指定頁並提示下一頁命令。`--page-size` 為 1～100，`--page` 從 1 起算；舊 `--limit` 保留為單次輸出，不能與分頁參數併用。每次都會顯示總命中數，避免把前 20 筆誤認為全部。`--type` 接受逗號分隔格式，可有前導點且忽略大小寫；例如 `.PDF,DocX,xml`。
 - `.xlsm`／`.odt`／`.rtf`／`.csv`：XLSM 沿用安全 OOXML 儲存格解析且忽略巨集；ODT 擷取標題、段落、清單、表格與連結；RTF 使用與 MSG 共用的受限解析核心；CSV 支援引號、逗號、quoted newline、UTF-8／Big5 與 BOM。既有 metadata-only 紀錄下一次普通 `index` 會自動重試，不必 rebuild。
 - `.xml`：依來源行保存原文，搜尋包含標籤、屬性和值；支援 UTF-8、UTF-16 BOM／XML 起始位元組，以及目前 Node.js `TextDecoder` 支援且由 XML declaration 宣告的編碼。格式不完整仍可作原文搜尋，不解析 DTD 或展開外部實體。
@@ -90,13 +93,13 @@ node dist/src/cli.js rebuild --verbose
 
 如果先用 search 找過文件，可加 `--select "文件代碼1,文件代碼2"` 預選，再調整並確認；省略 query 則先提示輸入關鍵字。預選代碼需出現在本次候選中。
 
-匯出是路徑、各自選取查詢、命中片段及來源資訊的 JSON／Markdown，只有選取內容，不含完整文件或未選文件。CLI `context` 本身仍不接模型，內容留在本機供你手動帶入允許的討論通道；0.34.0 的可選 MCP App 則只在相容 Host 內、經你按鍵後更新該 Host 的模型上下文。若來源或索引已變更，先重新 index 再選取。既有輸出檔案不覆寫，請改用新檔名。
+匯出是路徑、各自選取查詢、命中片段及來源資訊的 JSON／Markdown，只有選取內容，不含完整文件或未選文件。CLI `context` 本身仍不接模型；0.34.0 MCP App 只在相容 Host 內經按鍵更新上下文；0.35.0 `ui` 則另提供有預覽與確認的 OpenAI／xAI API 選配。若來源或索引已變更，先重新 index 再選取。既有輸出檔案不覆寫，請改用新檔名。
 
 Windows 所有命令皆可用 `.\docsearch.cmd` 代替 `node dist/src/cli.js`；不需要全域安裝或修改 PATH。此入口需 Node.js 已可從終端執行。
 
 ## 連接 Codex／MCP Host
 
-0.34.0 提供四個唯讀工具：`search_documents`、`prepare_context`、`index_status`、`open_search_app`。最後一個工具會在支援 MCP Apps 的 Host 顯示搜尋／勾選工作台；資料工具仍可脫離介面使用。完成 `npm ci` 後可先唯讀診斷並預覽註冊內容：
+0.35.0 保留四個唯讀工具：`search_documents`、`prepare_context`、`index_status`、`open_search_app`。最後一個工具會在支援 MCP Apps 的 Host 顯示搜尋／勾選工作台；資料工具仍可脫離介面使用。完成 `npm ci` 後可先唯讀診斷並預覽註冊內容：
 
 ```powershell
 node dist/src/cli.js doctor

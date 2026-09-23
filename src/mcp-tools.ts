@@ -85,6 +85,7 @@ export interface PrepareContextInput {
   types?: readonly string[];
   root?: string;
   passages?: number;
+  createdAt?: string;
 }
 
 export async function prepareContextTool(store: IndexStore, input: PrepareContextInput) {
@@ -104,7 +105,7 @@ export async function prepareContextTool(store: IndexStore, input: PrepareContex
       ...(scope.root ? { root: scope.root } : {}),
       ...(scope.subtree ? { subtree: scope.subtree } : {}),
       ...(mode === "all-terms" ? { allTerms: true } : {}),
-    });
+    }, input.createdAt);
   } catch (error) {
     if (error instanceof ContextError) throw new McpToolError(error.code, error.message);
     throw error;

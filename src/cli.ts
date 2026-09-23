@@ -88,6 +88,7 @@ export function buildHelpText(): string {
     "  docsearch autoupdate status",
     "  docsearch autoupdate stop",
     "  docsearch tui",
+    "  docsearch ui [--no-open]",
     "  docsearch mcp",
     "  docsearch setup codex [--dry-run]",
     "  docsearch doctor",
@@ -104,6 +105,7 @@ export function buildHelpText(): string {
     "status 預設顯示容量與問題彙總；--issues 列出文件問題與各根同步診斷，--types 依副檔名統計。",
     "autoupdate start 在關閉原終端後繼續更新；不安裝服務、不開機自啟。重開機後 status 會顯示已停止。",
     "mcp 以本機 stdio 提供唯讀搜尋、已選上下文與索引狀態；stdout 專供 MCP 協定。",
+    "ui 只綁定 127.0.0.1，提供索引搜尋、拖曳臨時文件、預覽與可選 OpenAI／xAI API；Ctrl+C 關閉並清除臨時資料。",
     "setup codex 安全註冊目前安裝的本機 MCP；同名異設定不覆寫。doctor 只讀檢查 Node、CLI、索引與 MCP App。",
   ].join("\n");
 }
@@ -142,6 +144,11 @@ export async function main(args: readonly string[]): Promise<number> {
     if (args.length !== 1) { console.error("用法：docsearch mcp"); return 2; }
     const { runMcpServer } = await import("./mcp.js");
     return runMcpServer(defaultDatabasePath());
+  }
+  if (command === "ui") {
+    if (args.length > 2 || (args[1] !== undefined && args[1] !== "--no-open")) { console.error("用法：docsearch ui [--no-open]"); return 2; }
+    const { runWorkbenchCommand } = await import("./workbench.js");
+    return runWorkbenchCommand(defaultDatabasePath(), { openBrowser: args[1] !== "--no-open" });
   }
   if (command === "setup") {
     if (args[1] !== "codex" || args.length > 3 || (args[2] !== undefined && args[2] !== "--dry-run")) {

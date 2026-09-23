@@ -1,5 +1,13 @@
 # 跨對話交接方式
 
+## 已交付：0.35.0 本機拖曳工作台與可選 AI API（2026-09-23）
+
+權威規格為 SPEC §43，決策為 D052。`docsearch ui [--no-open]` 啟動只綁 `127.0.0.1` 的本機工作台；每次使用亂數 fragment token、Host／Origin 驗證與嚴格 CSP。介面可搜尋既有索引、人工勾選、拖曳支援格式、移除臨時檔、預覽／複製合併 context，並選配 OpenAI／xAI Responses API。
+
+拖曳檔沿用正式 parser，暫存原檔解析後立即刪除；文字、回答與 UI Key 不持久化。索引與拖曳合計最多 20 份、context 最高 256 KiB。外部呼叫前 preview id 以 HMAC 綁定 provider、model、問題與實際內容；改任何欄位都需重新預覽與同意。endpoint 固定，不做任意 proxy、cookie／密碼代登或消費訂閱假登入。
+
+本機 Node.js 22.13.1 完整 233 項為 232 通過、0 失敗、1 項 Windows cmd 專屬略過；Provider 測試使用假 fetch，沒有真實 API 呼叫。交付包 258 個檔案，SHA-256 `a7be696053bcdd1473decacb061099a94d93fe9ea8b1722b624a394b96aaff53`。公司 Windows、真實 Provider、MCP Apps Host 仍未驗收。驗證見 `0.35.0-VALIDATION.md`；下一步與刻意不做項目見 `NEXT-TODO.md`。真實 PDF／PPTX／XLS 問題仍只在公司電腦依 `COMPANY-WINDOWS-DIAGNOSTICS.md` 處理。
+
 ## 已交付：0.34.0 MCP App 搜尋工作台與本機接入（2026-09-23）
 
 權威規格為 SPEC §42，決策為 D051。`open_search_app` 透過 `ui://localdocsearch/search-context-v1.html` 與 `text/html;profile=mcp-app` 發布自足介面；UI 使用標準 `tools/call`、`ui/update-model-context`、`ui/message`，可搜尋、分頁、人工勾選最多 20 份、更新模型上下文，並只在使用者另填問題及按鍵後送出。沒有外部 URL、fetch、WebSocket、CDN 或 localhost port。

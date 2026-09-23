@@ -1,8 +1,8 @@
 # LocalDocSearch 產品規格
 
-- 規格基線：0.31.0；下一版 0.32.0 格式擴充規劃見第 40 節
-- 日期：2026-09-22
-- 狀態：0.31.0 已實作 `autoupdate start|status|stop`、局部更新引擎、本機單例控制與 6 小時完整校正。0.32.0 已確認加入 XLSM／ODT／RTF／CSV 正文解析，尚未實作。公司 Windows 人工驗收尚待回報。
+- 規格基線：0.35.0；本機拖曳工作台與可選 AI API 見第 43 節
+- 日期：2026-09-23
+- 狀態：0.31.0～0.35.0 本機實作完成；公司 Windows、真實 MCP Apps Host 與真實 Provider 人工驗收尚待回報。
 
 ## 版本與里程碑命名
 
@@ -1001,3 +1001,34 @@ docsearch doctor
 3. setup 測試涵蓋 dry-run、Codex 不存在、全新註冊、相同設定冪等、同名異設定拒絕及含特殊字元路徑；doctor 涵蓋版本不足、索引缺少、健康索引與唯讀不升級。
 4. 完整回歸 0.33.0 headless MCP、TUI 選取、既有 CLI 與全部 parser。UI 不是搜尋真相來源，不能改動排序、代碼、passage 或 256 KiB 上限。
 5. 公司 Windows 以解壓後路徑執行 doctor、setup dry-run、實際註冊及 Host 內搜尋／勾選／加入上下文。只有使用者在公司電腦回報後才能標示 Windows／真實 Host 驗收通過。
+
+## 43. 0.35.0 本機拖曳工作台與可選 AI API
+
+### 43.1 目標與邊界
+
+- 新增 `docsearch ui [--no-open]`，提供只綁定 `127.0.0.1` 的本機工作台。介面整合既有索引搜尋、人工勾選、拖曳臨時文件、上下文預覽、複製及可選 AI API；不取代 stdio MCP／MCP App／TUI。
+- 每次啟動使用作業系統亂數 token。token 只放在 URL fragment，瀏覽器以自訂 header 傳給本機 API；伺服器驗證 Host、Origin 與 token，不接受 LAN、無 token 或跨來源請求。HTML／CSS／JavaScript 自足，不載入 CDN、分析服務、遠端圖片或字型。
+- 拖曳文件沿用既有 parser、100 MiB 單檔上限與格式安全政策，不執行巨集、公式、物件或外部資源。原始檔只寫入權限受限的暫存目錄供本機解析，解析後立即刪除；擷取文字只存在目前 Node.js 程序記憶體，關閉工作台即清除，不寫入索引。
+- 一次最多保留 20 份拖曳文件；只接受既有 `supportedExtensions`。`no_text`、`encrypted`、`unsupported`、`too_large` 或 `error` 必須明示，不能冒稱已有可用正文。
+
+### 43.2 上下文與確認
+
+- 索引搜尋仍呼叫既有 `searchDocuments`；勾選的穩定文件代碼仍以 `prepareContextTool` 重新驗證來源。拖曳文件以檔名、格式、位置與依原順序擷取的文字建立 Markdown，清楚標示這是參考資料而非操作指令。
+- 索引與拖曳內容合併後仍以 UTF-8 256 KiB 為上限。拖曳內容可在邊界安全截短並加上明確標記；既有索引 context 不改 schema 或搜尋語意。介面可只複製預覽到本機剪貼簿，不需要設定 AI Provider。
+- 遠端送出採兩步驟：先預覽「provider、model、問題、實際上下文與 bytes」，伺服器用工作階段 HMAC 綁定該組資料；只有使用者勾選確認並送回同一 preview id 才可呼叫遠端 API。任一欄位或選取改變後舊確認立即失效。
+- 不提供整庫全選、自動 RAG、自動上傳、背景傳送或未預覽的 API 呼叫。日誌不得記錄 API Key、文件正文、問題或模型回答。
+
+### 43.3 Provider 與帳務真相
+
+- 0.35.0 支援 OpenAI Responses API `https://api.openai.com/v1/responses` 與 xAI Responses API `https://api.x.ai/v1/responses`；endpoint 固定，不接受使用者輸入任意 URL。預設模型分別為 `gpt-5.6-terra` 與 `grok-4.7`，介面允許改成帳戶可用的安全 model id。
+- 金鑰優先讀取 `OPENAI_API_KEY`／`XAI_API_KEY`；也可在 UI 輸入供本次程序使用。工作階段金鑰只存記憶體、輸入後清空欄位、API 不回傳原值，停止程序即遺失；不寫 `.env`、資料庫、瀏覽器儲存或日誌。
+- ChatGPT 消費訂閱與 OpenAI API 分開計費；Grok 與 xAI API 可共用帳號，但訂閱與 API 仍分開計費。產品不得提供 cookie 擷取、密碼代登、假 OAuth 或聲稱可消耗 ChatGPT Plus／Pro、SuperGrok／X Premium 額度。若官方未提供適用第三方程式的訂閱 OAuth，就只支援 API Key。
+- 呼叫使用 server-side Bearer token、固定 endpoint、60 秒期限與 2 MiB 回應上限。錯誤只顯示有界 provider 訊息，不回顯 request header、API Key 或完整 request body；OpenAI 請求設定 `store: false`，但介面仍須提醒外部服務的資料政策由供應商與帳戶設定決定。
+
+### 43.4 測試與交付門檻
+
+1. 純函式測試覆蓋檔名清理、支援格式、拖曳解析、20 份限制、256 KiB 截短、合併 context 與 preview 綁定。
+2. HTTP 測試使用 loopback ephemeral port，覆蓋 Host／Origin／token、body 上限、搜尋、上傳、移除、provider 狀態、預覽及確認失效；不得連線真實 AI API或改動真實瀏覽器設定。
+3. Provider 測試注入假的 fetch，驗證固定 endpoint、Bearer header、model、`store: false` 差異、文字擷取、timeout／HTTP／超大回應與金鑰不外洩。
+4. 靜態 UI 測試確認 drag/drop、DOM `textContent`、無外部 resource、無 `localStorage`／`sessionStorage`／cookie，且變更資料會清除確認。
+5. 完整回歸既有 CLI、parser、TUI、MCP 與 MCP App。公司 Windows 尚未執行 `docsearch ui`、瀏覽器啟動、拖曳或真實 API 前，不得宣稱 Windows／Provider 驗收通過。

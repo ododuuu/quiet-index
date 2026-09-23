@@ -288,7 +288,7 @@ export const MCP_APP_HTML = `<!doctype html>
 
   request('ui/initialize', {
     protocolVersion: '2026-01-26',
-    appInfo: { name: 'localdocsearch-search-app', version: '0.34.0' },
+    appInfo: { name: 'localdocsearch-search-app', version: '0.35.0' },
     appCapabilities: { availableDisplayModes: ['inline', 'fullscreen'] }
   }).then(() => {
     ready = true;

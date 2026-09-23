@@ -1,5 +1,13 @@
 # 設計決策紀錄
 
+## D052：0.35.0 以受保護的 localhost 工作台補足拖曳與 Provider 連線
+
+- 日期：2026-09-23。使用者指出 0.34.0 尚缺拖曳檔案及 AI 帳戶／API 操作面。MCP App sandbox 適合已索引內容，但不應為大型任意檔案新增 base64 MCP 工具；因此另加只綁 `127.0.0.1`、亂數 token、嚴格 Origin／Host 與 CSP 的 `docsearch ui`，和既有 TUI／MCP 並存。
+- 拖曳檔案沿用正式 parser，原檔只在權限受限暫存目錄短暫存在，正文只留在程序記憶體且不自動加入永久索引。工作台同時重用 `searchDocuments`／`prepareContextTool`，不建立第二套搜尋語意。
+- API Key 可由環境變數或本次 UI 工作階段輸入；都只在 server-side 記憶體使用，不持久化、不回傳。遠端 endpoint 固定為 OpenAI／xAI Responses API，不做任意 proxy。送出前以 HMAC preview id 綁定 provider、model、問題與實際 context，避免使用者確認後內容被悄悄替換。
+- 官方帳務文件已確認 ChatGPT 與 OpenAI API 分開，Grok 與 xAI API 也分開。第三方程式沒有可合法重用消費訂閱的通用登入流程，因此本版不做 cookie／密碼代登或假 OAuth；UI 明確說明必須使用各平台 API Key 與 API billing。
+- 遠端 AI 是選配；搜尋、拖曳解析、預覽與複製仍可完全離線。只有明確按下確認送出才傳遞預覽中的文字，且公司文件仍受公司政策限制。
+
 ## D051：0.34.0 以標準 MCP App 把按鈕化選取接到既有唯讀工具
 
 - 日期：2026-09-23。使用者要求 0.34.0 成為朝最終目的的大版本：AI Host 內可直接搜尋、勾選並把選定片段加入上下文。MCP 與按鈕介面不衝突；MCP 是能力與資料邊界，MCP App resource 是同一能力上的人機操作面。

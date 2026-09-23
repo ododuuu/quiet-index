@@ -1,9 +1,13 @@
 # 專案狀態
 
-最後更新：2026-09-23（0.34.0 MCP App 搜尋工作台與本機接入已完成本機實作）
+最後更新：2026-09-23（0.35.0 本機拖曳工作台與可選 AI API 已完成本機實作）
 
 ## 目前狀態
 
+- 目前版本：**0.35.0 本機拖曳工作台與可選 AI API**，規格見 SPEC §43、D052；本機實作完成。`docsearch ui` 只綁 `127.0.0.1`，整合既有索引搜尋、人工勾選、拖曳臨時文件、256 KiB 精確預覽／複製，以及經 HMAC preview 與明確同意後的 OpenAI／xAI Responses API 選配。
+- 拖曳原檔在權限受限暫存目錄解析後立即刪除；正文與 UI 輸入的 Key 只留在目前程序記憶體。API endpoint 固定，不提供任意 proxy、cookie 擷取或消費訂閱代登入。ChatGPT 與 OpenAI API、Grok 與 xAI API 分別計費。
+- 0.35.0 本機 Node.js 22.13.1 完整 `npm test` 共 233 項：232 通過、0 失敗、1 項 Windows cmd 專屬略過；正式最低仍為 22.17.0。真實 Provider 未呼叫，公司 Windows 尚未驗收；驗證見 `docs/0.35.0-VALIDATION.md`，剩餘優化見 `docs/NEXT-TODO.md`。
+- 交付包逐檔核對 258 個檔案：`LocalDocSearch-0.35.0.zip`，SHA-256 `a7be696053bcdd1473decacb061099a94d93fe9ea8b1722b624a394b96aaff53`。
 - 目前版本：**0.34.0 MCP App 搜尋工作台與本機接入**，規格見 SPEC §42、D051；本機實作完成。相容 Host 可透過標準 MCP App 搜尋、跨頁勾選、更新模型上下文與明確送出問題；另有安全冪等的 Codex 註冊及唯讀 doctor。不支援 UI 時維持四個 headless 工具與 TUI 備援。
 - 0.34.0 本機 Node.js 22.13.1 完整 `npm test` 共 228 項：227 通過、0 失敗、1 項 Windows cmd 專屬略過；正式最低仍為 22.17.0，公司 Windows 與真實 MCP Apps Host 尚未驗收。驗證見 `docs/0.34.0-VALIDATION.md`。
 - 交付包逐檔核對 246 個檔案：`LocalDocSearch-0.34.0.zip`，SHA-256 `779cf31e00ce3c1513131c3d72fa2c7326e2fd3d83e6d2a2c6a760f5e1df8c6e`。
