@@ -539,6 +539,7 @@ export async function main(args: readonly string[]): Promise<number> {
         return await runTui(store, {
           ansi: true,
           color: process.env.NO_COLOR === undefined,
+          colorDepth: process.stdout.getColorDepth(),
           write: text => process.stdout.write(text),
           stopReason: () => stopReason,
           size: () => ({ columns: process.stdout.columns || 80, rows: process.stdout.rows || 24 }),

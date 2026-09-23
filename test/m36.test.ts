@@ -234,7 +234,7 @@ test("0.36 CLI reuses one data directory and TUI quits without copying on /quit 
   }, 5, async value => { copied.push(value); });
   assert.equal(code, 0);
   assert.equal(copied.length, 0);
-  assert.match(output.join("\n"), /Seekah/);
+  assert.match(output.join("\n"), /seekah|Seekah/);
   const smallOut: string[] = [];
   assert.equal(await runTui(store, {
     ansi: false, write: value => smallOut.push(value), ask: async () => "/quit", size: () => ({ columns: 40, rows: 12 }),
@@ -274,9 +274,10 @@ test("0.36 TUI key events navigate, select, preview, page and restore focus", ()
   }, 5);
   assert.equal(code, 0);
   const rendered = output.join("\n");
-  assert.match(rendered, /› \[[ x]\] 1\./);
+  assert.match(rendered, /›/);
+  assert.match(rendered, /\[[ x]\]/);
   assert.match(rendered, /文件預覽/);
-  assert.match(rendered, /選取籃/);
+  assert.match(rendered, /已選文件/);
   assert.match(rendered, /已移至第 2 頁|已是最後一頁/);
 }));
 
@@ -326,8 +327,34 @@ test("0.36.1 TUI key decoder and approved layouts handle escape sequences, CJK a
   for (const dimensions of [{ columns: 80, rows: 24 }, { columns: 120, rows: 40 }]) {
     const screen = renderTuiScreen({ ...common, ...dimensions });
     assert.match(screen, /▌ seekah 0\.36\.1/);
+    assert.match(screen, /首頁/);
+    assert.match(screen, /搜尋結果/);
+    assert.match(screen, /已選文件 0/);
+    assert.match(screen, /\/ 命令/);
+    assert.match(screen, /seekah/);
     assert.match(screen, /搜尋 ›/);
+    assert.match(screen, /本機搜尋/);
     for (const line of screen.split("\n")) assert.ok(displayWidth(line) <= dimensions.columns, line);
+    const results = renderTuiScreen({
+      ...common, ...dimensions, color: true, colorDepth: 24,
+      state: { ...common.state, view: "results", focus: "results" },
+      conditions: ["複製回本機", "安裝"],
+      mode: "all-terms",
+      selected: [{ query: "複製回本機 安裝", reference: "1-aaaaaaaaaaaaaaaa", path: "D:\\工作資料\\安裝指引\\用戶端安裝手冊.docx", mode: "all-terms", snippet: "將安裝檔複製回本機後，執行安裝程式。", location: "第 2 段" }],
+      page: {
+        page: 1, pageSize: 4, total: 4, pageCount: 1, start: 1, end: 4,
+        results: [
+          { reference: "1-aaaaaaaaaaaaaaaa", path: "D:\\工作資料\\安裝指引\\用戶端安裝手冊.docx", extension: ".docx", modifiedAtMs: 0, heading: null, location: "第 2 段", snippet: "將安裝檔複製回本機後，執行安裝程式。", rank: 1, reason: "內容", filenameOnly: false, status: "indexed", snippetTruncated: false },
+          { reference: "2-bbbbbbbbbbbbbbbb", path: "D:\\工作資料\\技術筆記\\系統部署筆記.md", extension: ".md", modifiedAtMs: 0, heading: null, location: "第 18 行", snippet: "部署前先複製回本機，核對版本後再開始安裝。", rank: 2, reason: "內容", filenameOnly: false, status: "indexed", snippetTruncated: false },
+        ],
+      },
+    });
+    assert.match(results, /▎/);
+    assert.match(results, /\[x\]/);
+    assert.match(results, /用戶端安裝手冊\.docx/);
+    assert.match(results, /搜尋 ›/);
+    assert.match(results, /全部關鍵字/);
+    for (const line of results.split("\n")) assert.ok(displayWidth(line) <= dimensions.columns, line);
   }
   const tiny = renderTuiScreen({ ...common, columns: 40, rows: 12 });
   assert.match(tiny, /請放大至至少 60×16/);
