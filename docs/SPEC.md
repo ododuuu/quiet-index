@@ -1172,18 +1172,19 @@ docsearch doctor
 - 產品顯示名 Seekah，終端字標 seekah；package 改為 seekah，新增 seekah bin／seekah.cmd，保留 docsearch／docsearch.cmd 且指向同一 CLI。
 - 此次更名不升版本，package 維持 0.36.0；只有完成本節全部 0.36.1 修正後才升為 0.36.1。不得把已改標題稱作新 TUI 已交付。
 - 不遷移索引、不改資料庫 schema／parse version。原 LocalDocSearch 儲存路徑、LOCALDOCSEARCH_DATA_DIR、.localdocsearchignore、.localdocsearch、MCP／IPC 識別、認證 header 均保留，避免開出新庫或兩個 daemon。
-- 新交付檔名 Seekah-VERSION.zip、內層 Seekah/，包含新舊 CMD launcher；歷史包 checksum 不改寫。GitHub 倉庫網址暫沿用 quiet-index，產品更名不等於 repository slug 已改。
+- 新交付檔名 Seekah-VERSION.zip、內層 Seekah/，包含新舊 CMD launcher；歷史包 checksum 不改寫。GitHub 儲存庫為 [`ododuuu/seekah`](https://github.com/ododuuu/seekah)；更名不遷移 LocalDocSearch 相容識別或資料。
 - context／workbench／MCP 的可見產品標題改名，不變更既有安全或資料傳輸契約。新名稱不授權新增外部傳輸。
 
 ### 45.8 核准的 TUI 視覺與交付契約
 
-- 以 [Seekah TUI 設計](design/SEEKAH-TUI.md) 及 [互動稿](design/seekah-tui.html) 為核准畫面：低噪音石墨／灰階、青綠重點色、低對比游標列、分離游標與勾選、固定底部搜尋 composer／情境快捷鍵。
-- 首頁、搜尋結果、文件預覽、已選清單、命令入口與 context 明確確認都要完成。保留 §45.5 的鍵盤行為；文字 focus 不攔 q／Space，非文字 q 與全程 Ctrl+C 可退出。不可只改色彩或仍要求輸入 /next 才翻頁。
-- 採 Node.js／TypeScript 純終端，狀態機與 terminal lifecycle 分離；不移植 OpenCode runtime，也不新增 GUI。HTML 只是設計示範，不能作為實作完成證據。
-- 支援 80×24／120×40、resize、中文 cell width、NO_COLOR、極小終端退化；不可輸出來源控制字元。補 reducer／decoder／render／PTY 測試，提供實際畫面對照。
-- 真實 status 才能顯示監看中；尚未實作的 0.37.0 queue／dirty scope／startup 不可偽造。預覽及 clipboard 保留原有精確內容、上限、來源安全與 yes 確認。
-- 固定交接中心為 docs/handoff/，CURRENT.md 指向目前里程碑；每版本保留獨立交接。公司 Windows 人工驗收與本機測試結果分別記錄。
-實作紀錄（2026-09-23）：第 45 節程式、測試、文件與 0.36.1 版本更新已完成；本機證據見 `0.36.1-VALIDATION.md`。Windows 人工項目仍未完成，交付狀態不包含公司整庫或 Windows Terminal 已通過。
+- 以 [Seekah TUI 設計](design/SEEKAH-TUI.md) 及 [互動稿](design/seekah-tui.html) 為核准畫面：Claude Code 式單欄時間序 transcript、固定底部兩行 composer、低對比 active card，以及以 `›`／`[x]` 分離游標與選取。這只借用資訊階層，不整合 Claude Code 程式碼、服務、帳號、模型或 AI 功能。
+- `runTui()` 只在記憶體保留最多 12 筆 `{ kind, text, detail? }` workflow entries；SearchSession、選取與 context 準備真正成功後才加入。不得保存 query、結果、路徑或 TUI 狀態；`SEARCH_INDEX_CHANGED` 清除過期 workflow。
+- 搜尋結果接在最新 search block，文件預覽、已選清單、命令、roots、status 與 context 均以 transcript block 顯示真實內容與頁次。context 繼續顯示精確預覽與 UTF-8 bytes，只有完整 `yes` 可複製，不模仿 agent 回答或已送出訊息。
+- 保留 §45.5 的全部鍵盤行為、slash commands、domain service、read-only store、raw input、80 ms Esc、resize、訊號、alternate screen 及 finally cleanup；本次只改呈現與 session-local view model。
+- 支援 80×24／120×40、中文 cell width、24-bit／16 色、`NO_COLOR` 與小於 60×16 的安全退化；每行不得超過 columns，檔名、路徑、snippet、root、message 與 workflow text 都須經控制字元消毒。
+- 真實 status 才能顯示監看中；尚未實作的 0.37.0 queue／dirty scope／startup 不可偽造。HTML 明示示範資料且不連索引，只供審閱外觀，不能作為 runtime 驗收證據。
+- 固定交接中心為 docs/handoff/。公司 Windows 人工驗收與本機測試結果分別記錄。
+實作紀錄（2026-09-24）：0.36.2 TUI 呈現改為上述單欄 workflow；搜尋、選取、context、open／reveal 與 terminal lifecycle 契約未改。公司 Windows／Windows Terminal 仍待使用者驗收。
 
 ## 46. 0.37.0：日常變更發現與混合詞搜尋效能
 
@@ -1292,10 +1293,10 @@ docsearch doctor
 - 搜尋只呼叫既有 `POST /api/search`，模式值為 `phrase|all-terms`；不採 HTML 原型的 `all` 值或在瀏覽器以 `includes()` 當正式查詢。沿用 `searchDocuments` 的排序、正規化、頁次及上限，每頁最多 20 筆、最多瀏覽前 500 筆；總命中大於可瀏覽數時明示限制。
 - 根目錄／格式在本批是範圍摘要，不新增篩選功能或假的下拉選單。沒有根目錄資料時顯示全部已登錄範圍，不硬編 `D:\工作資料`。
 - 查詢使用提交快照，結果、頁碼、片段與選取來源 query 必須對應同一請求；較早請求晚回覆不可覆蓋較新結果。編輯尚未提交的文字不得改寫既有結果的查詢依據。
-- 結果呈現檔名、格式、路徑、命中原因、真實位置與原文片段。沒有位置／mtime 就不顯示，不捏造「今天更新」。僅檔名命中不得附加無關正文。
+- 結果呈現檔名、格式、路徑、命中原因、真實位置與原文片段；不顯示 ISO 建立／修改時間或相對時間等不影響選擇的索引雜訊。僅檔名命中不得附加無關正文。
 - 勾選與點列預覽是不同動作。選取依穩定 reference 保存 `{query, reference}` 與共同 mode，跨頁／查詢保留；不可用頁內編號、DOM index 或檔名辨識。相同 reference 不重複計數。
 - 索引與已選臨時文件合計最多 20 份，前後端皆驗證；第 21 份被拒絕且不破壞原集合。切換搜尋模式清空索引選取與舊結果、回第一頁、作出明確提示，保留臨時文件；不得把舊模式結果當作新模式選取。
-- 點擊結果開啟「命中片段預覽」，使用目前 server 回傳的片段與 metadata，不讀全文、不用原型 `body` 冒充來源。Esc／關閉返回原結果與捲動位置；Enter 開啟預覽，Space／checkbox 切換選取且不穿透到列操作。
+- 點擊結果開啟「命中片段預覽」，使用目前 server 回傳的片段與 metadata，不讀全文、不用原型 `body` 冒充來源。預覽必須提供「開啟檔案」與「顯示所在位置」：瀏覽器只提交此結果的 stable reference 與 `open|reveal`，伺服器重用 `actOnDocument` 重新驗證 root containment、一般檔案、可讀性與連結邊界後才交給系統。Esc／關閉返回原結果與捲動位置；Enter 開啟預覽，Space／checkbox 切換選取且不穿透到列操作。上下文面板的 × 在所有桌面與窄螢幕尺寸都必須關閉面板，並由「已選 N」重新開啟。
 - 首次未搜、搜尋中、零命中、無索引、查詢錯誤、索引變更與服務離線分開呈現。查詢失敗保留輸入與選取，過期結果不可冒充新成功結果；無索引仍能使用臨時文件。
 
 ### 47.4 臨時文件與上下文側欄
@@ -1309,24 +1310,19 @@ docsearch doctor
 
 ### 47.5 連線設定、預覽與回答閉環
 
-- 連線設定是獨立可開啟的面板／對話框，包含現有 OpenAI／xAI Provider、可編輯安全 model id、工作階段 Key 輸入與套用、已設定與來源狀態。不得像原型把設定按鈕直接導向缺少 Key／model 的預覽。
-- Key 沿用 `POST /api/providers`、環境變數優先與目前程序記憶體；輸入完成或失敗後清空欄位，狀態 API 不回傳 Key。不得要求消費訂閱登入，明示 API 分開計費。
-- 預覽對話框分為精確文字與目的地／問題／同意操作。目的地為「只複製」或「AI API」；這是 UI 狀態，不是新增 `ProviderName`。只複製不需 Key 或問題：沿用既有 `/api/preview` 接受的有效 provider／model（來自狀態），question 可空，絕不呼叫 `/api/ask`。
-- `/api/preview` 重用 `prepareContextTool`、來源核對與 `combineWorkbenchContext`；每份索引文件最多三段，1～20 份合計、256 KiB 及截短政策不變。只顯示 response.context，不在瀏覽器重建／簡化 Markdown；複製的文字須與完整可捲動預覽逐字一致。
-- 送出條件：最新預覽有效、目的地為 AI、有已設定 Key、有效 model、非空白問題、使用者已明確勾選外傳政策同意。以 server HMAC preview id 作最終授權，不能只靠按鈕 disabled。
-- 選取、mode、Provider、model、問題或目的地改變時，清除 preview id、同意及可送出狀態，舊預覽標示失效；需要重新預覽／確認。較舊預覽請求晚回覆不能恢復失效確認。僅翻頁或查看文件且內容未變時不必失效。
-- 點送出後鎖定該次 payload／確認，避免重複點擊產生重複計費；顯示進行中，不自動重試。來源已變、預覽不符、timeout、provider 拒絕與網路錯誤有明確訊息；不假稱關閉對話框能撤回已送出的要求。
-- 保留實際 AI 回答區：送出期間顯示等待，成功後顯示 server 回傳文字、對應問題／Provider／model；關閉預覽或切換導覽不丟回答。新請求失敗不能把舊回答標為新成功。回答以安全純文字顯示，不執行 HTML／Markdown 內腳本或外部資源。
-- 不新增串流、重試、聊天紀錄持久化或 Provider 清單 API；這些仍是獨立後續項目。
+- GUI 的精確上下文只提供重新驗證後的完整可捲動預覽與本機複製；不提供 Provider、model、API Key、問題、同意或送出 AI 的介面。CLI／MCP 既有 context 契約不變。
+- `/api/preview` 重用 `prepareContextTool`、來源核對與 `combineWorkbenchContext`；每份索引文件最多三段，1～20 份合計、256 KiB 及截短政策不變。GUI 的精確文字省略建立／修改時間，且複製文字必須與完整可捲動預覽逐字一致；不在瀏覽器重建／簡化 Markdown。
+- 選取或 mode 改變時清除舊預覽；較舊預覽請求晚回覆不可恢復失效預覽。僅翻頁或查看文件且內容未變時不必失效。
+- 不新增聊天、串流、重試、聊天紀錄持久化、Key 持久化或 Provider 清單 API；這些都不是本批產品功能。
 
 ### 47.6 真實索引狀態與最小 API 補齊
 
-- 現有 `/api/state` 只有 indexAvailable、格式、Provider 與 fileLimit，不能支撐原型索引計數／時間。新增受相同 Host／token 保護、no-store 的唯讀 `GET /api/index-status`，重用既有 `indexStatus`／store 狀態讀取，不另掃來源、不解壓正文、不建立或升級索引。
+- 現有 `/api/state` 只有 indexAvailable、格式與 fileLimit，不能支撐原型索引計數／時間。新增受相同 Host／token 保護、no-store 的唯讀 `GET /api/index-status`，重用既有 `indexStatus`／store 狀態讀取，不另掃來源、不解壓正文、不建立或升級索引。
+- `POST /api/index` 受相同 token、Host／Origin 防線保護。無 `root` 時只同步既有已登錄根；尚無索引時 UI 要求使用者明確輸入第一個根目錄，才可建立索引。它在背景執行既有 `sync()`，回報 running／complete／failed 與摘要，工作台不因同步而失去操作能力；不建立第二套 parser、同步服務或資料路徑。
 - 回傳可判別狀態 `available|missing|unavailable`；available 含實際文件總數、逐狀態計數、有效根目錄與每根已有的最後嘗試／最後完整同步摘要、讀取時間；missing 不建庫，unavailable 附安全錯誤碼／提示。實作以既有資料欄位映射，不將缺值補 0 或以 HTTP 成功等同索引健康。
 - 多根目錄逐根展示，不能拿最新一個時間代表全部。最近同步完整性與文件解析問題分開；最後完整同步是歷史時間，不表示來源現在最新或 daemon 正在監看。
-- 「最近活動」只列資料庫已保存的同步紀錄／本工作階段確實發生的操作，標明來源；無資料顯示尚無可用紀錄。原型的固定 299,741、202、2 分鐘、14:28 watcher 事件全部刪除。不得為補原型假資訊實作新的事件日誌、queue 或啟動 daemon。
-- 進入狀態頁及使用者按重新讀取時查詢；頂列以最近成功快照顯示時間和範圍，失敗標示未知／過期。不做持續輪詢或自動完整校正。
-- 其他 API 繼續使用 `/api/search`、`/api/files`、`/api/providers`、`/api/preview`、`/api/ask` 的既有契約；只有本節所需唯讀狀態補齊屬後端新增範圍。
+- GUI 狀態頁只顯示根目錄、文件數、完整性與問題數；不顯示 ISO／相對同步時間。API 保留原始時間欄位供其他既有 consumer 使用。
+- 其他 API 繼續使用 `/api/search`、`/api/files`、`/api/preview` 的既有契約；`POST /api/document-action` 只接受 `{reference, action:"open"|"reveal"}`，並沿用同一 Host、token、Origin 防線；瀏覽器絕不可提交任意 path。
 
 ### 47.7 安全、生命週期與無障礙
 

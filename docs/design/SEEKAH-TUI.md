@@ -1,80 +1,89 @@
-# Seekah 0.36.1：核准的 TUI 設計
+# Seekah 0.36.2：Claude Code 式單欄 TUI 契約
 
-狀態：2026-09-23 使用者核准；本文件為實作契約，**不是已完成的 TUI**。
-互動視覺參考：[seekah-tui.html](seekah-tui.html)。以瀏覽器本機開啟即可；它只有示範資料，不連接索引。
-權威行為：[SPEC §45](../SPEC.md#45-0361windows-掃描正確性與-tui-可操作性修正)；交接：[0.36.1](../handoff/0.36.1.md)。
+狀態：2026-09-24 核准並實作。本文件是 `src/tui.ts` 的視覺與互動契約；[seekah-tui.html](seekah-tui.html) 只供外觀審閱，使用示範資料且不連接索引。
+權威行為：[SPEC §45](../SPEC.md#45-0361windows-掃描正確性與-tui-可操作性修正)。搜尋、選取、context、open／reveal、TTY 與退出安全仍以 SPEC 為準。
 
 ## 視覺方向
 
-沿用使用者選定那版：OpenCode 式低噪音終端介面，石墨底色、灰階層級、青綠重點色、留白與底部固定搜尋列。不做滿版粗框線、彩虹狀態、巨大 ASCII logo 或每筆重複整條路徑。不是要求移植 OpenCode 程式碼或改用其 runtime。
+採 Claude Code 風格的資訊階層：單欄時間序 transcript、低噪音工具結果、底部固定 composer。只借用資訊排列方式，不整合 Claude Code 程式碼、服務、帳號、模型或 AI 功能。
 
-- 頂列：`▌ seekah 0.36.1`，右側簡短 root／索引狀態。
-- 中央：首頁、結果、文件預覽、已選文件、命令清單及確認畫面。
-- 底部固定 composer：左側青綠細線，輸入行與模式／根目錄／格式摘要。
-- 最下列：只列目前 focus 可用的快捷鍵；訊息不能覆蓋搜尋輸入。
-- 游標列：`›`、青綠左側線及低對比底色；選取為獨立 `[x]`。游標移動不等於勾選。
-- 結果三行：檔名＋格式／命中類型；淡色路徑＋定位；命中片段。避免原本「同一路徑重複三遍」。
-- 全部資料皆來自真實查詢。HTML 的「背景監看中／部分範圍待確認」只是設計示範，不能硬編進程式或暗示 0.37.0 已存在。
+- 頂列只有 `seekah <version>`、真實文件／root 摘要與已選數；不使用 tab 或首頁導覽列。
+- 中央依時間排列使用者查詢、真實搜尋摘要、選取與 context 結果。目前結果或其他 view 是同一 transcript 內的 block，不是另一個儀表板。
+- 使用者 prompt 右縮排；搜尋、選取、context 與 notice 靠左，以文字標籤說明種類。
+- 結果每筆固定三行：檔名與 extension／reason、`[x]` 與路徑、location 與 snippet。active card 使用 `›` 與低對比 surface；游標與選取是兩個獨立狀態。
+- 底部固定兩行 composer：`› 搜尋 › <input>` 或 `› 確認 › <input>`；第二行顯示真實 mode、root 與目前 focus 可用按鍵。狀態／錯誤另佔一行，不得覆蓋輸入。
+- context 只顯示實際 `prepareSelectedContext()` 預覽與 UTF-8 bytes，明示只有完整 `yes` 可複製、尚未傳送；不得模仿 agent 回答或已送出訊息。
 
-深色參考：背景 #131416、面板 #1e2023、正文 #dddeda、次要 #9a9eaa、重點 #95d6d5、游標 #253336、警告 #dbb879。
-淺色參考：背景 #f5f3ef、面板 #ebe8e2、正文 #272a2e、次要 #626970、重點 #226e78、游標 #dee8e6、警告 #86581c。
-終端實作按能力降級到 ANSI 16 色；支援 NO_COLOR，不依賴顏色表達選取、錯誤或 focus。0.36.1 不要求主題設定持久化；終端背景未知時採預設終端底色與安全前景。HTML 的主題切換是比較工具。
+終端色盤：graphite `#1f1f23`、panel `#27272a`、text `#e8e6e3`、muted `#a1a1aa`、accent `#8ab4f8`、warning `#d8a657`。24-bit 終端依此輸出；16 色降級仍保留 `›`、`[x]`、種類標籤與警告文字。`NO_COLOR` 不輸出 ANSI，所有狀態仍可辨識。
 
-## 畫面與操作
+## 80×24 參考
 
 ```text
- ▌ seekah 0.36.1                          本機索引 · D:\工作資料
+  seekah 0.36.2 · 12 份文件 · D:\工作資料 · 已選 1
 
- 搜尋結果                               4 份 · 已選 1
- 複製回本機 安裝                          全部關鍵字
+      › 複製回本機 安裝
+        全部關鍵字
 
- › [ ] CTM_CLIENT9.0.21安裝手冊.docx                 DOCX · 內容
-       D:\工作資料\手冊                          第 2 段
-       一、將檔案複製回本機進行安裝…
+  ◆ 搜尋  找到 4 份文件
+    └ 全部關鍵字 · 真實索引結果
 
-   [x] 安裝筆記.md                                   MD · 內容
-       D:\工作資料\筆記                          第 8 行
-       先複製回本機，再執行安裝。
+  ◆ 搜尋結果                                      4 份文件
+    複製回本機 安裝 · 全部關鍵字 · 第 1/1 頁
+  › CTM_CLIENT9.0.21安裝手冊.docx          DOCX · 內容
+    [ ] D:\工作資料\手冊\CTM_CLIENT9.0.21安裝手冊.docx
+      第 2 段 · 將檔案複製回本機進行安裝…
+    安裝筆記.md                                  MD · 內容
+    [x] D:\工作資料\筆記\安裝筆記.md
+      第 8 行 · 先複製回本機，再執行安裝。
 
- 第 1 / 1 頁
+  ◆ 選取  已選取 安裝筆記.md
+    └ 目前已選 1 份
 
- ▌ 搜尋 › 複製回本機 安裝
-   全部關鍵字 · D:\工作資料 · 全部格式
-
- ↑↓ 移動  Space 選取  Enter 預覽  Tab 切換  / 搜尋  q 離開
+  ↑↓ 移動、Space 選取、Enter 預覽、PgUp/PgDn 翻頁。
+  › 搜尋 › 複製回本機 安裝
+  全部關鍵字 · D:\工作資料 · ↑↓ · Space · Enter · PgUp/PgDn · Tab · q
 ```
 
-1. 首頁：小型 seekah 字標、簡短用途、目前 roots／索引摘要，最近搜尋僅限本次 session，不偷偷落盤使用者查詢。
-2. 搜尋：文字輸入收到一般字元；Enter 執行後 focus 結果首筆，空結果顯示下一步提示；錯誤保留 query。輸入 q、空白、斜線均為文字，不可變成全域快捷鍵。
-3. 結果：↑↓ 移動，Space 勾選，Enter 預覽，PgUp／PgDn 翻頁；跨頁選取以穩定文件代碼保存，不用列號當 identity。翻頁先完成查詢再換頁，不偽造載入成功。
-4. 預覽：頂部檔名與來源定位，中間有界文字，↑↓／PgUp／PgDn 捲動；Esc／← 回到原頁原游標。預覽不等於開啟檔案；open／reveal 保留明確動作與原有路徑安全驗證。
-5. 已選文件：可移動、取消勾選，清楚顯示數量／既有上限；進 context 前仍走現有 prepare／驗證與字節上限，不更改選取契約。
-6. context：展示即將複製的精確有界內容及大小；只有確認輸入 `yes` 才複製；Enter、Space、切換 focus 都不得替代確認。Esc 取消。
-7. 命令清單：保留 /help 等現有 slash commands。非輸入區按 / 聚焦 composer；在 composer 輸入完整命令。命令與搜尋共用一個可理解入口，不新增互相衝突的快捷鍵。
-8. Tab／Shift+Tab 循環搜尋輸入→結果→已選區（可顯示對應 view）；無已選文件時仍能進空清單並返回。預覽／確認有局部 focus 邊界，不讓背景操作穿透。
-9. 非文字 focus 的 q 正常退出 0；文字 focus 使用 /quit；全程 Ctrl+C 退出 130，EOF 安全退出。無論錯誤、取消、正常退出均還原 raw mode、游標及 alternate screen。
-10. 命令 fallback 保留。非 TTY 不啟用 raw／alternate screen，維持既有安全錯誤或 line-mode 契約；不可為了 fallback 允許無確認 context 複製。
+120×40 使用同一結構，顯示更多較舊 workflow entries 與 result cards。80×24 空間不足時按最舊到最新裁掉完整舊 block，必須保留目前 view、最新 workflow、狀態與 composer；不得以虛構折疊數取代真實資料。
 
-## 尺寸、狀態與安全
+## Session workflow model
 
-- 至少 80×24／120×40 可用；按可用高度算結果數，保留頂列、composer 和 footer。窄高不足時用緊湊兩行結果／裁減次要資訊，不把互動提示推出畫面。
-- 小於 60×16 顯示「請放大終端」及退出提示；不做負長度 slice／重畫迴圈。resize 保留 query、穩定游標 ID、勾選集合與 preview 返回位置，頁面必要時重新定位。
-- 依 terminal cell width 截斷，不依 JS 字串 length；中文、emoji、組合字元及混合中英路徑不得切壞。超長檔名保留辨識前後段，完整路徑可在 preview 看到。
-- 不可信檔名／片段的 ESC、控制字元不可直接送進 terminal；既有消毒必須保留。NO_COLOR 也要保持游標及勾選可辨識。
-- 空庫／無結果／讀取失敗／SEARCH_INDEX_CHANGED／複製失敗各有可返回畫面；索引變更時提示重新搜尋，不悄悄選取另一份文件。
-- 既有 autoupdate 可用 status 顯示真實狀態；查不到就顯示未知／未啟動，不為了亮綠燈自動啟動 daemon。0.37.0 的 queue、dirty scopes、新啟動功能不在本版。
+`runTui()` 持有最多 12 筆記憶體內 workflow entries：
 
-## 結構與驗收
+```ts
+{ kind: "prompt" | "search" | "selection" | "context" | "notice"; text: string; detail?: string }
+```
 
-維持 Node.js＋TypeScript。將純 state reducer（focus、view、cursor ID、page、selection、query）與 key decoder、render、CLI terminal lifecycle 分離；不改 search/context domain 語意。來源重點為 src/tui.ts、src/cli.ts、src/terminal.ts（若存在則沿用）及既有 m32／m33／m36 tests。
+- `SearchSession` 成功建立並取得結果後，才加入 prompt 與 search；摘要使用 `originalTotal`，mode 使用實際 phrase／all-terms。
+- 成功加入選取後記錄 basename 與目前已選數；取消選取不冒充成功加入。
+- `prepareSelectedContext()` 成功後才記錄文件數、實際 passage 數與 `Buffer.byteLength(..., "utf8")`。
+- 「正在搜尋」、尚未完成、失敗或取消不得寫成成功紀錄。notice 只用於需要留在 transcript 的可辨識 UI 狀態。
+- 超過 12 筆移除最舊項目。`SEARCH_INDEX_CHANGED` 清除過期 session 與 workflow。
+- workflow、query、結果、路徑、選取及任何 view state 都不得落盤；退出 TUI 即消失。
 
-必須交付：
+## View 與 focus
 
-- reducer 測試每個上述鍵、文字 focus 的 q／Space、空清單、跨頁選取、preview 回復、確認取消、query error 與索引更新。
-- key decoder 測分段 escape sequence、方向鍵、PgUp／PgDn、Tab／Shift+Tab、Ctrl+C；中文輸入與貼上不能逐 byte 損壞。
-- 80×24／120×40／極小尺寸、NO_COLOR 的 render fixtures；中文／emoji／惡意控制碼／長路徑；所有行 cell width 不超過 columns。
-- 真實 PTY 測 raw mode、resize、EOF、正常退出與例外 finally 清理；另列公司 CMD／PowerShell／Windows Terminal 人工清單，不冒稱通過。
-- 交付真實終端截圖或文字轉錄，對照此設計及 HTML；不是只交 /select／/next，也不是只更改顏色。
-- 契約優先順序：SPEC 安全與行為 → 本設計文件 → HTML 示範。若發現衝突，先釐清並記錄決策，不自作主張降低安全。
+1. **搜尋結果**：目前 cards 緊接在最新 search block 後；`state.cursor` 決定唯一 active `›`。↑↓ 移動，Space 切換選取，Enter 預覽，PgUp／PgDn 翻頁。
+2. **文件預覽**：以 transcript block 顯示檔名、真實路徑、extension／location、snippet、reason 與文件代碼；這不等於 open。Esc／← 回原頁原游標。
+3. **已選文件**：顯示穩定 reference 對應項目，可移動、取消與預覽。跨頁／查詢選取、20 份上限與 mixed-mode 拒絕不變。
+4. **Context**：逐頁顯示完整精確 Markdown；顯示頁次與 bytes。只有完整 `yes` 才呼叫剪貼簿；其他輸入或 Esc 取消且不複製。
+5. **Help／commands／roots／status**：保留既有 view、內容、分頁與返回語意，以標題、真實內容、頁次組成 transcript block。status 不捏造 daemon 或 0.37.0 queue 狀態。
+6. **Focus**：Tab／Shift+Tab 循環 input→results→selected。文字 focus 的 q、Space、`/` 是輸入；非文字 focus 的 q 離開。`/`、既有 slash commands、open／reveal 與 fallback 行為不變。
 
-參考來源（風格參考，不是新依賴）：[OpenCode TUI](https://opencode.ai/docs/tui/)、[主題](https://opencode.ai/docs/themes/)、[官方畫面](https://github.com/anomalyco/opencode/blob/dev/packages/web/src/assets/lander/screenshot.png)。
+## 尺寸、安全與 lifecycle
+
+- 80×24 至少顯示 header、一個 workflow block、目前結果／view 主體、狀態與 composer；120×40 顯示完整 fixture workflow 及更多 cards。
+- 小於 60×16 顯示「請放大終端」、可用 composer、`/help`、`/quit` 與 Ctrl+C 提示；不得崩潰或進入重畫迴圈。
+- header 在 80 欄以下先移除 root，再移除文件數，始終保留產品名稱與已選數。
+- 所有行依 terminal cell width 裁切，絕不依 JavaScript `string.length`。必須沿用 `displayWidth()`、`clipWidth()`、`sanitizeTerminal()`／`terminalText()`；檔名、路徑、snippet、root、message 與 workflow text 的控制字元不可到達終端。
+- resize 保留 query、focus、cursor、selection、preview 返回位置與 workflow，重新計算可見 page size。
+- 不改 `TuiEvent`、decoder、reducer、80 ms Esc、raw mode、alternate screen、SIGINT／SIGTERM、EOF 或 finally cleanup。正常 q／quit／EOF 為 0，Ctrl+C 為 130，SIGTERM 為 143。
+- 不改 `SearchSession`、`prepareSelectedContext()`、`actOnDocument()`、read-only store 或剪貼簿確認；TUI 不新增網路、LLM、agent、provider、daemon 或持久狀態。
+
+## 驗收
+
+- renderer fixture 含 prompt／search／selection／context 與兩筆 CJK／長 Windows path 結果；120×40 依輸入順序全顯示，80×24 裁掉最舊 block 且保留最新 context 與 results。
+- 驗證 header、fixed composer、真實 search total、active `›`、selected `[x]`、精確 context bytes、only-yes 文案、頁次與目前 focus hints。
+- 24-bit、16 色及 `NO_COLOR` 每行 cell width 不超過 columns；惡意 ESC、C0／C1 與 bidi control 不得原樣出現。
+- 保留 reducer、decoder、resize、CJK、interaction、explicit `yes`、取消不複製、single-copy 與 Unix PTY cleanup 測試。
+- 以隔離索引在真實 80×24 ANSI terminal 操作搜尋、選取、預覽、context、取消／確認與退出；另以 `NO_COLOR=1` 驗證無 ANSI 且 focus／selection 可辨識。Windows Terminal 只有使用者實機回報後才能標示通過。

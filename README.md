@@ -8,9 +8,9 @@
 ```
 
 
-AI 接手固定入口：[docs/handoff/CURRENT.md](docs/handoff/CURRENT.md)；完整 [SPEC](docs/SPEC.md)、[狀態](docs/STATUS.md)。GitHub 倉庫網址仍沿用 quiet-index；新的封裝名稱為 Seekah-VERSION.zip，包含新舊入口。
+新手請先讀 [使用手冊](docs/USER-GUIDE.md)；AI 接手固定入口：[docs/handoff/CURRENT.md](docs/handoff/CURRENT.md)；完整 [SPEC](docs/SPEC.md)、[狀態](docs/STATUS.md)。GitHub 倉庫為 [ododuuu/seekah](https://github.com/ododuuu/seekah)；新的封裝名稱為 Seekah-VERSION.zip，包含新舊入口。
 
-目前版本為 **0.36.2**。升級後沿用原索引，不必 rebuild。0.36.2 提供正式三區 `seekah ui`／`docsearch ui` 工作台：真實搜尋分頁與跨查詢選取、臨時文件解析、唯讀索引狀態、精確 server bytes 預覽、複製、Provider／model／Key 設定與明確 AI 回答。仍只綁 127.0.0.1，不開放 LAN；Key 不持久化，TUI、parser selection、LocalDocSearch 資料目錄與 0.37.0 範圍不變。
+目前版本為 **0.36.2**。升級後沿用原索引，不必 rebuild。Windows 雙擊 `seekah-ui.cmd`，macOS 執行一次 `chmod +x seekah-ui.command` 後雙擊 `seekah-ui.command`，即可開啟工作台。第一次會自動建立相依並顯示進度，不必先開終端執行 `npm ci` 或 `index`。已登錄根目錄會在工作台開啟後背景同步並顯示檢查進度；尚無索引時由 UI 輸入第一個根目錄。工作台提供真實搜尋分頁、跨查詢選取、臨時文件、精確 server bytes 預覽與本機複製；不提供 Provider、API Key 或聊天助手。仍只綁 127.0.0.1，不開放 LAN；TUI、parser selection、LocalDocSearch 資料目錄與 0.37.0 範圍不變。
 
 若索引很慢，用 `index <根目錄> --profile <新檔案>` 寫一份只留在本機的診斷。檔案必須是新的，拒絕覆寫，不含路徑、檔名或正文；父目錄不存在或無法存取時，錯誤會顯示 resolved parent、錯誤碼與 CMD／PowerShell 各自的安全範例，但不自動建目錄或展開字面環境變數。取消不會顯示 100% 或「同步完整」，已提交的文件保留。
 
@@ -35,7 +35,7 @@ node dist\src\cli.js index "D:\" --profile "%USERPROFILE%\Desktop\lds-profile.js
 ```
 - 進度稱為「檢查進度」。分母包含未變更與只更新 metadata 的檔案。某份超過 5 秒會提示慢檔與階段，預設不印完整路徑；`--verbose` 才印路徑，仍不印正文。
 
-0.36.2 延續 `docsearch ui` 的本機安全契約，改為左導覽／中央搜尋／右側上下文三區；狀態頁只讀既有索引，不觸發掃描。預覽與複製可完全離線；外部 AI 仍須明確同意，`auto` 只在 quota／rate limit 時依預覽列出的路由 fallback 一次。服務使用每次啟動的亂數 fragment token、Host／Origin 驗證、nonce CSP、HMAC preview 與 20 份／256 KiB 上限。公司 Windows 與真實 Provider 尚未驗收。
+0.36.2 延續 `docsearch ui` 的本機安全契約，改為左導覽／中央搜尋／右側上下文三區；狀態頁唯讀讀取既有索引，另由使用者明確啟動的「更新索引」在背景重用既有同步服務。預覽與複製可完全離線；服務使用每次啟動的亂數 fragment token、Host／Origin 驗證、nonce CSP 與 20 份／256 KiB 上限。公司 Windows 與 Linux 外部開檔尚未驗收。
 
 LocalDocSearch 0.26.2 是純本機 CLI，目前以 macOS 作為主要可執行與迭代環境，並保留 Windows 相容方向。它支援原有六種格式，並新增 `.doc`、`.xls`、`.mht`／`.mhtml`、`.html`／`.htm`／`.xhtml`、`.adoc`、`.msg` 與 `.vsd`，搜尋檔名、標題及內容。其他格式與無副檔名檔案會進入本機清冊，可依檔名及副檔名找到。文件留在原位置，索引與搜尋不需要網路或外部 AI。
 

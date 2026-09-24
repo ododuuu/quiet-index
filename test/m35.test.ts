@@ -11,6 +11,7 @@ import { workbenchHtml } from "../src/workbench-app.js";
 import { previewId, previewMatches, ProviderError, ProviderKeys, requestProvider } from "../src/workbench-provider.js";
 import { createWorkbench } from "../src/workbench.js";
 
+
 function rawStatus(url: string, host: string): Promise<number> {
   return new Promise((resolve, reject) => {
     const request = httpRequest(url, { headers: { host, "X-LocalDocSearch-Token": "test-token" } }, response => {
@@ -82,6 +83,10 @@ test("0.36.2 workbench UI is self-contained and exposes the three-zone contract"
   assert.match(html, /data-page="temporary"/u);
   assert.match(html, /data-page="activity"/u);
   assert.match(html, /index-status/u);
+  assert.match(html, /contextPanel\.hidden=true/u);
+  assert.match(html, /context-closed/u);
+  assert.match(html, /\/api\/index/u);
+  assert.match(html, /開始建立索引/u);
   assert.match(html, /dragenter/u);
   assert.match(html, /dataTransfer\.files/u);
   assert.match(html, /X-LocalDocSearch-Token/u);
@@ -138,12 +143,31 @@ test("0.36.2 loopback workbench enforces status, selection, preview, consent and
     assert.equal(statusData.roots[0]?.path, root);
     assert.equal(statusData.roots[0]?.documentCount, 1);
     assert.ok(statusData.roots[0]?.lastSuccessfulSync);
+    await writeFile(path.join(root, "fresh-http.txt"), "fresh-http-needle");
+    const refresh = await fetch(origin + "/api/index", { method: "POST", headers: postHeaders, body: JSON.stringify({}) });
+    assert.equal(refresh.status, 202);
+    assert.equal((await refresh.json() as { indexing: { state: string } }).indexing.state, "running");
+    await handle.waitForIndex();
+    const completedStatus = await fetch(origin + "/api/index-status", { headers });
+    assert.equal(completedStatus.status, 200);
+    const completedIndexing = await completedStatus.json() as { indexing: { state: string; progress: { stage: string; current: number; total: number } } };
+    assert.equal(completedIndexing.indexing.state, "complete");
+    assert.equal(completedIndexing.indexing.progress.stage, "complete");
+    assert.equal(completedIndexing.indexing.progress.current, completedIndexing.indexing.progress.total);
+    const refreshedSearch = await fetch(origin + "/api/search", { method: "POST", headers: postHeaders, body: JSON.stringify({ query: "fresh-http-needle", mode: "phrase", page: 1, pageSize: 20 }) });
+    assert.equal(refreshedSearch.status, 200);
+    assert.equal((await refreshedSearch.json() as { results: unknown[] }).results.length, 1);
 
     const search = await fetch(origin + "/api/search", { method: "POST", headers: postHeaders, body: JSON.stringify({ query: "indexed-http-needle", mode: "phrase", page: 1, pageSize: 20 }) });
     assert.equal(search.status, 200);
     const searchData = await search.json() as { query: string; results: Array<{ reference: string }> };
     assert.equal(searchData.query, "indexed-http-needle");
     assert.equal(searchData.results.length, 1);
+
+    const invalidAction = await fetch(origin + "/api/document-action", { method: "POST", headers: postHeaders, body: JSON.stringify({ reference: searchData.results[0]!.reference, action: "delete" }) });
+    assert.equal(invalidAction.status, 400);
+    const staleAction = await fetch(origin + "/api/document-action", { method: "POST", headers: postHeaders, body: JSON.stringify({ reference: "999-0000000000000000", action: "open" }) });
+    assert.equal(staleAction.status, 400);
 
     const upload = await fetch(origin + "/api/files", { method: "POST", headers: { ...headers, origin, "X-File-Name": encodeURIComponent("臨時.txt"), "content-type": "application/octet-stream" }, body: "drag-http-needle" });
     assert.equal(upload.status, 201);
@@ -157,6 +181,7 @@ test("0.36.2 loopback workbench enforces status, selection, preview, consent and
     assert.match(previewData.context, /indexed-http-needle/u);
     assert.match(previewData.context, /drag-http-needle/u);
     assert.equal(previewData.documentCount, 2);
+    assert.doesNotMatch(previewData.context, /(?:建立時間|修改時間)：|\d{4}-\d{2}-\d{2}T/u);
     assert.equal(previewData.route.primary.model, "gpt-5.6-terra");
 
     const configure = await fetch(origin + "/api/providers", { method: "POST", headers: postHeaders, body: JSON.stringify({ provider: "openai", key: "session-key" }) });

@@ -339,6 +339,12 @@ interface SelectedItem extends SelectedContextReference {
   location?: string;
 }
 
+export interface TuiWorkflowEntry {
+  kind: "prompt" | "search" | "selection" | "context" | "notice";
+  text: string;
+  detail?: string;
+}
+
 export interface TuiScreenModel {
   state: TuiReducerState;
   columns: number;
@@ -353,6 +359,7 @@ export interface TuiScreenModel {
   viewLines: readonly string[];
   message: string;
   confirming: boolean;
+  workflow: readonly TuiWorkflowEntry[];
   recentQueries?: readonly string[];
   colorDepth?: number;
 }
@@ -370,12 +377,12 @@ function viewLabel(view: TuiView): string {
 
 function footerFor(model: TuiScreenModel): string {
   const { state } = model;
-  if (model.confirming) return "PgUp/PgDn 捲動  yes+Enter 複製  Esc 取消  /quit 離開  Ctrl+C 中止";
-  if (state.view === "commands") return "↑↓ / Tab 移動  Enter 執行  Esc 返回  q 離開";
-  if (["preview", "context", "help", "commands", "roots", "status"].includes(state.view)) return "↑↓/PgUp/PgDn 捲動  Esc/← 返回  q 離開  Ctrl+C 中止";
-  if (state.focus === "input") return "Enter 搜尋  Tab 切換  / 命令  /quit 離開  Ctrl+C 中止";
-  if (state.focus === "selected") return "↑↓ 移動  Space 取消  Enter 預覽  c context  Tab 切換  q 離開";
-  return "↑↓ 移動  Space 選取  Enter 預覽  PgUp/PgDn 翻頁  Tab 切換  / 搜尋  q 離開";
+  if (model.confirming) return "yes+Enter 複製 · Esc 取消 · /quit 離開";
+  if (state.view === "commands") return "↑↓/Tab 移動 · Enter 執行 · Esc 返回 · q 離開";
+  if (["preview", "context", "help", "commands", "roots", "status"].includes(state.view)) return "↑↓/PgUp/PgDn 捲動 · Esc/← 返回 · q 離開";
+  if (state.focus === "input") return "Enter 搜尋 · Tab 切換 · / 命令 · Ctrl+C 中止";
+  if (state.focus === "selected") return "↑↓ 移動 · Space 取消 · Enter 預覽 · c context · Tab 切換 · q 離開";
+  return "↑↓ 移動 · Space 選取 · Enter 預覽 · PgUp/PgDn 翻頁 · Tab 切換 · q 離開";
 }
 
 export function renderTuiScreen(model: TuiScreenModel): string {
@@ -384,22 +391,31 @@ export function renderTuiScreen(model: TuiScreenModel): string {
   const margin = columns >= 100 ? 4 : 2;
   const width = Math.max(8, columns - margin * 2);
   const palette = {
-    bg: "19;20;22", panel: "30;32;35", active: "37;51;54",
-    text: "221;222;218", muted: "154;158;170", accent: "149;214;213",
+    bg: "31;31;35",
+    panel: "39;39;42",
+    text: "232;230;227",
+    muted: "161;161;170",
+    accent: "138;180;248",
+    warning: "216;166;87",
   };
-  type Tone = "text" | "muted" | "accent";
-  type Surface = "bg" | "panel" | "active";
+  type Tone = "text" | "muted" | "accent" | "warning";
+  type Surface = "bg" | "panel";
   const paint = (text: string, tone: Tone = "text", surface: Surface = "bg", bold = false) => {
     if (!model.color) return text;
+    const foreground = palette[tone];
+    const background = palette[surface];
     const codes = (model.colorDepth ?? 24) >= 24
-      ? `38;2;${palette[tone]};48;2;${palette[surface]}`
-      : `${tone === "accent" ? 96 : tone === "muted" ? 90 : 97};${surface === "bg" ? 40 : 100}`;
+      ? `38;2;${foreground};48;2;${background}`
+      : `${tone === "accent" ? 94 : tone === "warning" ? 93 : tone === "muted" ? 90 : 97};${surface === "bg" ? 40 : 100}`;
     return `\u001b[${bold ? "1;" : ""}${codes}m${text}\u001b[0m`;
   };
-  const pad = (text: string, cells: number) => clipWidth(text, cells) + " ".repeat(Math.max(0, cells - displayWidth(clipWidth(text, cells))));
+  const pad = (text: string, cells: number) => {
+    const clipped = clipWidth(text, cells);
+    return clipped + " ".repeat(Math.max(0, cells - displayWidth(clipped)));
+  };
   const row = (text = "", tone: Tone = "text", surface: Surface = "bg", bold = false) =>
     paint(" ".repeat(margin), tone, surface) + paint(pad(text, width), tone, surface, bold) + paint(" ".repeat(margin), tone, surface);
-  const mixed = (parts: Array<{ text: string; tone?: Tone; bold?: boolean }>, surface: Surface = "bg") => {
+  const mixed = (parts: ReadonlyArray<{ text: string; tone?: Tone; bold?: boolean }>, surface: Surface = "bg") => {
     let inner = "";
     let used = 0;
     for (const part of parts) {
@@ -411,118 +427,184 @@ export function renderTuiScreen(model: TuiScreenModel): string {
     return paint(" ".repeat(margin), "text", surface) + inner + paint(" ".repeat(margin), "text", surface);
   };
   const blank = row();
-  const root = model.roots.length === 1 ? model.roots[0]! : `${model.roots.length} 個根目錄`;
+  const root = model.roots.length === 1 ? model.roots[0]! : model.roots.length ? `${model.roots.length} 個根目錄` : "尚無根目錄";
   const mode = model.mode === "all-terms" ? "全部關鍵字" : "精確片語";
+  const selectedLabel = `已選 ${model.selected.length}`;
+  const headerParts: Array<{ text: string; tone?: Tone; bold?: boolean }> = [
+    { text: `seekah ${productVersion}`, tone: "accent", bold: true },
+  ];
+  if (columns >= 68) headerParts.push({ text: `  ·  ${model.documents} 份文件`, tone: "muted" });
+  if (columns >= 80) headerParts.push({ text: `  ·  ${root}`, tone: "muted" });
+  headerParts.push({ text: `  ·  ${selectedLabel}`, tone: "text", bold: true });
   if (columns < 60 || rows < 16) {
-    const lines = [row(`▌ seekah ${productVersion}`, "accent"), blank, row("終端空間不足：請放大至至少 60×16。")];
+    const lines = [
+      mixed(headerParts),
+      blank,
+      row("終端空間不足：請放大至至少 60×16。", "warning"),
+    ];
     while (lines.length < rows - 3) lines.push(blank);
-    lines.push(row(`搜尋 › ${model.state.input}`), row("/help  /quit 離開 · Ctrl+C 中止"));
+    lines.push(row(model.message, "muted"), mixed([{ text: "› ", tone: "accent" }, { text: `${model.confirming ? "確認" : "搜尋"} › ${model.state.input}` }], "panel"));
+    lines.push(row("/help · /quit 離開 · Ctrl+C 中止", "muted", "panel"));
     return lines.slice(0, rows).join("\n");
   }
-  const currentTab = model.state.view === "help" ? "commands"
-    : ["preview", "context"].includes(model.state.view) ? model.state.previousView
-    : model.state.view;
-  const tabs = [
-    { view: "home", label: "首頁" }, { view: "results", label: "搜尋結果" },
-    { view: "selected", label: `已選文件 ${model.selected.length}` }, { view: "commands", label: "/ 命令" },
+
+  const bodyRows = rows - 5;
+  type RenderBlock = { lines: string[]; mandatory?: boolean };
+  const workflowBlocks: RenderBlock[] = model.workflow.map((entry, index) => {
+    const latest = index === model.workflow.length - 1;
+    if (entry.kind === "prompt") {
+      return {
+        lines: [
+          mixed([{ text: "    › ", tone: "accent", bold: true }, { text: entry.text, bold: true }], "panel"),
+          mixed([{ text: "      ", tone: "muted" }, { text: entry.detail ?? "使用者查詢", tone: "muted" }], "panel"),
+          blank,
+        ],
+        mandatory: latest,
+      };
+    }
+    const labels: Record<Exclude<TuiWorkflowEntry["kind"], "prompt">, string> = {
+      search: "搜尋",
+      selection: "選取",
+      context: "Context",
+      notice: "提示",
+    };
+    return {
+      lines: [
+        mixed([
+          { text: entry.kind === "notice" ? "! " : "◆ ", tone: entry.kind === "notice" ? "warning" : "accent", bold: true },
+          { text: `${labels[entry.kind]}  `, tone: "muted" },
+          { text: entry.text, bold: true },
+        ]),
+        mixed([{ text: "  └ ", tone: "muted" }, { text: entry.detail ?? "", tone: entry.kind === "notice" ? "warning" : "muted" }]),
+        blank,
+      ],
+      mandatory: latest,
+    };
+  });
+  const titleRows = (title: string, right: string, detail: string): string[] => [
+    mixed([
+      { text: `◆ ${title}`, tone: "accent", bold: true },
+      { text: " ".repeat(Math.max(2, width - displayWidth(`◆ ${title}`) - displayWidth(right))) },
+      { text: right, tone: "muted" },
+    ]),
+    row(`  ${detail}`, "muted"),
   ];
-  const navParts: Array<{ text: string; tone?: Tone; bold?: boolean }> = [];
-  const ruleParts: Array<{ text: string; tone?: Tone }> = [];
-  for (const tab of tabs) {
-    const active = tab.view === currentTab;
-    navParts.push({ text: ` ${tab.label} `, tone: active ? "accent" : "muted" });
-    navParts.push({ text: "  " });
-    ruleParts.push({ text: (active ? "─" : " ").repeat(displayWidth(` ${tab.label} `)), tone: active ? "accent" : "muted" });
-    ruleParts.push({ text: "  " });
-  }
-  const lines = [
-    mixed([{ text: "▌ ", tone: "accent" }, { text: `seekah ${productVersion}` }, { text: " / Seekah", tone: "muted" }, { text: " ".repeat(8) }, { text: "本機文件搜尋", tone: "muted" }], "panel"),
-    blank,
-    mixed(navParts),
-    mixed(ruleParts),
-    mixed([{ text: "● 本機索引", tone: "accent" }, { text: `  ${model.documents} 份文件  ·  ${root}`, tone: "muted" }]),
-    row("─".repeat(width), "muted"),
-  ];
-  const bodyRows = rows - 13;
-  const body: string[] = [];
-  const title = (text: string, right: string, detail: string) => {
-    body.push(mixed([{ text, bold: true }, { text: " ".repeat(Math.max(2, width - displayWidth(text) - displayWidth(right))) }, { text: right, tone: "muted" }]));
-    body.push(row(detail, "muted"), blank);
-  };
-  const fileRows = (filePath: string, snippet: string, location: string, checked: boolean, current: boolean, tag = "") => {
+  const fileRows = (filePath: string, snippet: string, location: string, checked: boolean, current: boolean, tag = ""): string[] => {
     const parts = filePath.split(/[/\\]/u);
     const name = parts.pop() || filePath;
-    const dir = parts.join("\\") || filePath;
-    const surface: Surface = current ? "active" : "bg";
-    const bar = current ? "▎" : " ";
+    const surface: Surface = current ? "panel" : "bg";
     const pointer = current ? "›" : " ";
-    body.push(mixed([
-      { text: `${bar} ${pointer}  ${name}`, bold: true, tone: "text" },
-      { text: " ".repeat(4), tone: "muted" },
-      { text: tag, tone: "muted" },
-    ], surface));
-    body.push(mixed([{ text: `${bar}    ${checked ? "[x]" : "[ ]"} ${dir}`, tone: "muted" }], surface));
-    body.push(mixed([{ text: `${bar}        ${location ? `${location} · ` : ""}${snippet}`, tone: "muted" }], surface));
-    body.push(blank);
+    return [
+      mixed([
+        { text: `${pointer} ${name}`, tone: current ? "accent" : "text", bold: true },
+        { text: tag ? `  ${tag}` : "", tone: "muted" },
+      ], surface),
+      mixed([{ text: `  ${checked ? "[x]" : "[ ]"} ${filePath}`, tone: "muted" }], surface),
+      mixed([{ text: `    ${location ? `${location} · ` : ""}${snippet}`, tone: "muted" }], surface),
+    ];
   };
+
+  const activeLines: string[] = [];
   if (model.state.view === "home") {
-    if (bodyRows >= 14) body.push(blank);
-    body.push(mixed([{ text: "see", bold: true }, { text: "kah", tone: "accent", bold: true }]));
-    body.push(blank, row("從自己的文件，找到需要的答案。", "muted"), blank);
-    body.push(row("最近搜尋 · 本次工作階段", "muted"));
-    for (const query of (model.recentQueries ?? []).slice(0, 3)) body.push(mixed([{ text: "↗  " }, { text: query }], "panel"));
-    if (!model.recentQueries?.length) body.push(row("尚無搜尋紀錄。輸入關鍵字後按 Enter。", "muted"));
+    if (!model.workflow.length) {
+      activeLines.push(
+        mixed([{ text: "seekah", tone: "accent", bold: true }]),
+        row("從自己的文件，找到需要的答案。", "muted"),
+        blank,
+        row("輸入關鍵字後按 Enter；本次完成的操作會依時間顯示在這裡。", "muted"),
+      );
+    }
   } else if (model.state.view === "results") {
-    title("搜尋結果", `${model.page?.total ?? 0} 份文件`, `${model.conditions.join(" → ") || "尚未搜尋"} · ${mode}`);
-    if (!model.page?.results.length) body.push(row("找不到符合的文件。試著減少關鍵字。", "muted"));
+    activeLines.push(...titleRows(
+      "搜尋結果",
+      `${model.page?.total ?? 0} 份文件`,
+      `${model.conditions.join(" → ") || "尚未搜尋"} · ${mode} · 第 ${model.page?.page ?? 1}/${model.page?.pageCount ?? 1} 頁`,
+    ));
+    if (!model.page?.results.length) activeLines.push(row("找不到符合的文件。試著減少關鍵字。", "muted"));
     const refs = new Set(model.selected.map(item => item.reference));
     for (const [offset, result] of (model.page?.results ?? []).entries()) {
-      fileRows(result.path, result.snippet, result.location ?? "", refs.has(result.reference),
+      activeLines.push(...fileRows(
+        result.path,
+        result.snippet,
+        result.location ?? "",
+        refs.has(result.reference),
         model.state.focus === "results" && offset === model.state.cursor,
-        `${result.extension.replace(/^\./u, "").toUpperCase()} · ${result.reason}`);
+        `${result.extension.replace(/^\./u, "").toUpperCase() || "無副檔名"} · ${result.reason}`,
+      ));
     }
   } else if (model.state.view === "selected") {
-    title("已選文件", `${model.selected.length} 份文件`, "選取跨頁保留 · 最多 20 份");
-    const capacity = Math.max(1, Math.floor((bodyRows - 3) / 4));
+    activeLines.push(...titleRows("已選文件", `${model.selected.length} 份文件`, "選取跨頁保留 · 最多 20 份"));
+    const capacity = Math.max(1, Math.floor((bodyRows - 2) / 3));
     const start = Math.floor(model.state.selectedCursor / capacity) * capacity;
     for (const [offset, item] of model.selected.slice(start, start + capacity).entries()) {
-      fileRows(item.path, item.snippet ?? `搜尋：${item.query}`, item.location ?? "", true,
-        model.state.focus === "selected" && start + offset === model.state.selectedCursor);
+      activeLines.push(...fileRows(
+        item.path,
+        item.snippet ?? `搜尋：${item.query}`,
+        item.location ?? "",
+        true,
+        model.state.focus === "selected" && start + offset === model.state.selectedCursor,
+      ));
     }
-    if (!model.selected.length) body.push(row("還沒有選取文件。Tab 回搜尋結果，按 Space 加入。", "muted"));
+    if (!model.selected.length) activeLines.push(row("還沒有選取文件。Tab 回搜尋結果，按 Space 加入。", "muted"));
   } else if (model.state.view === "commands") {
-    title("命令", "Esc 返回", "選擇操作後按 Enter");
+    activeLines.push(...titleRows("命令", "Esc 返回", "選擇操作後按 Enter"));
     const shortcuts: Record<string, string> = { home: "/", search: "/", selected: "Tab", context: "↵", status: "↵", quit: "q" };
     for (const [index, name] of paletteCommands.entries()) {
       const command = tuiCommands.find(item => item.name === name)!;
       const current = index === model.state.cursor;
-      body.push(mixed([
-        { text: current ? "›  " : "   ", tone: current ? "accent" : "text" },
+      activeLines.push(mixed([
+        { text: current ? "› " : "  ", tone: current ? "accent" : "text" },
         { text: `/${name.padEnd(12)} ${command.summary}`, tone: current ? "accent" : "text" },
-        { text: " ".repeat(4) },
-        { text: shortcuts[name] ?? "", tone: "muted" },
-      ], current ? "active" : "panel"));
-      if (bodyRows >= 16) body.push(row("", "text", "panel"));
+        { text: `  ${shortcuts[name] ?? ""}`, tone: "muted" },
+      ], current ? "panel" : "bg"));
     }
   } else {
-    const available = Math.max(1, bodyRows - 3);
+    const available = Math.max(1, rows - 16);
     const pages = Math.max(1, Math.ceil(model.viewLines.length / available));
     const current = Math.min(pages, model.state.viewPage);
-    title(viewLabel(model.state.view), `第 ${current}/${pages} 頁`, "Esc／← 返回");
-    for (const text of model.viewLines.slice((current - 1) * available, current * available)) body.push(row(`  ${text}`));
+    const detail = model.confirming
+      ? "只有輸入完整 yes 才會複製；尚未傳送"
+      : "Esc／← 返回";
+    activeLines.push(...titleRows(viewLabel(model.state.view), `第 ${current}/${pages} 頁`, detail));
+    for (const text of model.viewLines.slice((current - 1) * available, current * available)) activeLines.push(row(`  ${text}`));
   }
+
+  const activeBlock: RenderBlock = { lines: activeLines, mandatory: true };
+  const blocks: RenderBlock[] = [];
+  const latestSearch = model.state.view === "results"
+    ? model.workflow.reduce((found, entry, index) => entry.kind === "search" ? index : found, -1)
+    : -1;
+  for (const [index, block] of workflowBlocks.entries()) {
+    blocks.push(block);
+    if (index === latestSearch) blocks.push(activeBlock);
+  }
+  if (latestSearch < 0) blocks.push(activeBlock);
+  let total = blocks.reduce((sum, block) => sum + block.lines.length, 0);
+  while (total > bodyRows) {
+    const removable = blocks.findIndex(block => !block.mandatory);
+    if (removable < 0) break;
+    total -= blocks[removable]!.lines.length;
+    blocks.splice(removable, 1);
+  }
+  const body = blocks.flatMap(block => block.lines);
+  if (body.length > bodyRows) body.splice(0, body.length - bodyRows);
   while (body.length < bodyRows) body.push(blank);
-  lines.push(...body.slice(0, bodyRows));
-  const pagebar = model.state.view === "results"
-    ? `第 ${model.page?.page ?? 1} / ${model.page?.pageCount ?? 1} 頁 · PgUp / PgDn 翻頁`
-    : model.state.view === "selected" ? "選取跨頁保留 · Space 取消選取" : "";
-  lines.push(mixed([{ text: pagebar, tone: "muted" }, { text: " ".repeat(4) }, { text: model.selected.length ? "c 預覽選取內容 →" : "", tone: "accent" }]));
-  lines.push(blank);
+
+  const header = mixed(headerParts);
+  const messageTone: Tone = /(?:錯|失敗|取消|不可|未知|不足|SEARCH_)/u.test(model.message) ? "warning" : "muted";
   const query = model.state.input || (model.state.focus !== "input" ? model.conditions.at(-1) ?? "" : "");
-  lines.push(mixed([{ text: "▎ ", tone: "accent" }, { text: `${model.confirming ? "確認" : "搜尋"} ›  ${query}` }, { text: " ".repeat(4) }, { text: "↵", tone: "accent" }], "panel"));
-  lines.push(mixed([{ text: "▎ ", tone: "accent" }, { text: model.confirming ? "輸入完整 yes 才複製 · 尚未傳送" : `${mode}   ${root}   全部格式   本機搜尋`, tone: "muted" }], "panel"));
-  lines.push(blank, row(footerFor(model), "muted"), row(model.message, "muted"));
-  return lines.slice(0, rows).join("\n");
+  const composerLabel = model.confirming ? "確認" : "搜尋";
+  const composerDetail = model.confirming
+    ? `${footerFor(model)} · 尚未傳送`
+    : `${mode} · ${root} · ${footerFor(model)}`;
+  return [
+    header,
+    blank,
+    ...body,
+    row(model.message, messageTone),
+    mixed([{ text: "› ", tone: "accent", bold: true }, { text: `${composerLabel} › ${query}` }], "panel"),
+    row(composerDetail, "muted", "panel"),
+  ].slice(0, rows).join("\n");
 }
 
 function stopCode(io: TuiIO): number {
@@ -552,12 +634,17 @@ export async function runTui(
   let state = initialTuiState();
   const selected = new Map<string, SelectedItem>();
   const recentQueries: string[] = [];
+  const workflow: TuiWorkflowEntry[] = [];
   let message = "輸入關鍵字開始搜尋；/help 顯示全部命令。";
   let viewLines: string[] = [];
   let mode: SearchMode = "phrase";
   let pendingContext: { text: string; createdAt: string; passages: number; mode: SearchMode } | null = null;
   let cleaned = false;
 
+  const appendWorkflow = (...entries: readonly TuiWorkflowEntry[]) => {
+    workflow.push(...entries);
+    if (workflow.length > 12) workflow.splice(0, workflow.length - 12);
+  };
   const restore = () => {
     if (cleaned || !io.ansi) return;
     cleaned = true;
@@ -596,7 +683,7 @@ export async function runTui(
     const screen = renderTuiScreen({
       state, columns: measured.columns, rows: measured.rows,
       color: io.ansi && io.color !== false,
-      colorDepth: io.colorDepth ?? 24, recentQueries,
+      colorDepth: io.colorDepth ?? 24, recentQueries, workflow,
       roots: store.roots(), documents: Object.values(counts).reduce((sum, count) => sum + count, 0),
       page, conditions: session?.conditions ?? [], mode, selected: selectedValues(), viewLines, message,
       confirming: pendingContext !== null,
@@ -617,15 +704,21 @@ export async function runTui(
     message = selected.size ? `已選 ${selected.size}/20。` : "選取籃目前是空的。";
   };
   const search = (query: string, searchMode: SearchMode) => {
-    if (!query.trim()) { message = "搜尋文字不可為空白。"; return; }
+    const normalizedQuery = query.trim();
+    if (!normalizedQuery) { message = "搜尋文字不可為空白。"; return; }
     mode = searchMode;
-    session = new SearchSession(store, query.trim(), undefined, undefined, searchMode);
-    const recentIndex = recentQueries.indexOf(query.trim());
+    session = new SearchSession(store, normalizedQuery, undefined, undefined, searchMode);
+    const recentIndex = recentQueries.indexOf(normalizedQuery);
     if (recentIndex >= 0) recentQueries.splice(recentIndex, 1);
-    recentQueries.unshift(query.trim());
+    recentQueries.unshift(normalizedQuery);
     recentQueries.length = Math.min(5, recentQueries.length);
     state = { ...state, view: "results", focus: "results", cursor: 0, page: 1, input: "" };
     refreshPage();
+    const modeLabel = searchMode === "all-terms" ? "全部關鍵字" : "精確片語";
+    appendWorkflow(
+      { kind: "prompt", text: normalizedQuery, detail: modeLabel },
+      { kind: "search", text: `找到 ${session.originalTotal} 份文件`, detail: `${modeLabel} · 真實索引結果` },
+    );
     message = session.originalTotal ? "↑↓ 移動、Space 選取、Enter 預覽、PgUp/PgDn 翻頁。" : "沒有符合的結果。";
   };
   const movePage = (delta: number) => {
@@ -651,6 +744,11 @@ export async function runTui(
     if (selected.size >= 20) { message = "選取籃最多 20 份文件；請先移除部分項目。"; return; }
     selected.set(result.reference, { query: active.conditions.at(-1)!, reference: result.reference, path: result.path, mode: active.mode, snippet: result.snippet, location: result.location ?? "" });
     message = `已選取：${path.basename(result.path)}`;
+    appendWorkflow({
+      kind: "selection",
+      text: `已選取 ${path.basename(result.path)}`,
+      detail: `目前已選 ${selected.size} 份`,
+    });
   };
   const previewResult = (result: SearchResult) => {
     openView("preview", [
@@ -666,8 +764,15 @@ export async function runTui(
     const prepared = await prepareSelectedContext(store, selectedValues().map(({ query, reference }) => ({ query, reference })), {
       passages, format: "md", ...(selectedMode === "all-terms" ? { allTerms: true } : {}),
     });
+    const contextBytes = Buffer.byteLength(prepared.text, "utf8");
+    const passageCount = prepared.data.documents.reduce((total, document) => total + document.passages.length, 0);
     pendingContext = { text: prepared.text, createdAt: prepared.data.createdAt, passages, mode: selectedMode };
-    openView("context", prepared.text.split("\n").map(line => terminalText(line)), `完整預覽：${selected.size} 份，${Buffer.byteLength(prepared.text, "utf8")} bytes；輸入完整 yes 才複製。`, "input");
+    appendWorkflow({
+      kind: "context",
+      text: `已準備 ${selected.size} 份文件`,
+      detail: `${passageCount} 個 passages · ${contextBytes} bytes`,
+    });
+    openView("context", prepared.text.split("\n").map(line => terminalText(line)), `完整預覽：${selected.size} 份，${contextBytes} bytes；輸入完整 yes 才複製。`, "input");
     state = { ...state, input: "" };
   };
   const finishContext = async (answer: string): Promise<number | null> => {
@@ -893,7 +998,7 @@ export async function runTui(
         }
       } catch (error) {
         if (error instanceof SearchIndexChangedError) {
-          session = null; page = null; pendingContext = null;
+          session = null; page = null; pendingContext = null; workflow.length = 0;
           state = { ...initialTuiState(), input: "" };
           message = `SEARCH_INDEX_CHANGED：${error.message} 請重新搜尋。`;
         } else message = error instanceof Error ? error.message : String(error);

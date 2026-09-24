@@ -21,6 +21,45 @@ export interface ContextOptions {
   format?: "json" | "md";
   passages?: number;
   allTerms?: boolean;
+  includeTimestamps?: boolean;
+}
+
+export interface ContextPassage {
+  query: string;
+  reason: string;
+  heading: string | null;
+  location: string | null;
+  snippet: string;
+  snippetTruncated: boolean;
+}
+
+export interface ContextDocument {
+  query: string;
+  reference: string;
+  path: string;
+  root: string;
+  status: SearchResult["status"];
+  reason: string;
+  filenameOnly: boolean;
+  location: string | null;
+  snippet: string;
+  snippetTruncated: boolean;
+  heading: string | null;
+  passages: ContextPassage[];
+  modifiedAt: string;
+  lastSuccessfulSync: string | null;
+  lastSyncComplete: boolean | null;
+}
+
+export interface ContextBundle {
+  schemaVersion: 4;
+  createdAt: string;
+  query: string;
+  queries: string[];
+  matchMode: SearchMode;
+  format: "json" | "md";
+  note: string;
+  documents: ContextDocument[];
 }
 export interface ContextIO {
   interactive: boolean;
@@ -135,7 +174,7 @@ async function bundle(store: IndexStore, options: ContextOptions, picked: readon
   if (!picked.length) throw new ContextError("CONTEXT_SELECTION_EMPTY", "尚未選取文件。");
   const passageLimit = options.passages ?? 3;
   const searches = new Map<string, Map<string, SearchResult>>();
-  const documents = [];
+  const documents: ContextDocument[] = [];
   const mode: SearchMode = options.allTerms ? "all-terms" : "phrase";
   for (const pick of picked) {
     const { query, result } = pick;
@@ -185,13 +224,13 @@ async function bundle(store: IndexStore, options: ContextOptions, picked: readon
   };
 }
 
-function renderMarkdown(data: Awaited<ReturnType<typeof bundle>>): string {
+function renderMarkdown(data: ContextBundle, includeTimestamps: boolean): string {
   const lines = [
     "# Seekah 上下文",
     "",
     `- 查詢：${data.queries.join("；")}`,
     `- 搜尋模式：${data.matchMode === "all-terms" ? "全部關鍵字" : "精確片語"}`,
-    `- 建立時間：${data.createdAt}`,
+    ...(includeTimestamps ? [`- 建立時間：${data.createdAt}`] : []),
     `- 說明：${data.note}`,
     "",
   ];
@@ -201,7 +240,7 @@ function renderMarkdown(data: Awaited<ReturnType<typeof bundle>>): string {
     lines.push(`- 選取查詢：${document.query}`);
     lines.push(`- 根目錄：${document.root}`);
     lines.push(`- 狀態：${document.status}${document.filenameOnly ? "（僅檔名命中）" : ""}`);
-    lines.push(`- 修改時間：${document.modifiedAt}`);
+    if (includeTimestamps) lines.push(`- 修改時間：${document.modifiedAt}`);
     for (const [passageIndex, passage] of document.passages.entries()) {
       lines.push("");
       lines.push(`### 命中 ${passageIndex + 1}（${passage.reason}；查詢：${passage.query}）`);
@@ -215,16 +254,15 @@ function renderMarkdown(data: Awaited<ReturnType<typeof bundle>>): string {
   return `${lines.join("\n")}\n`;
 }
 
-export type ContextBundle = Awaited<ReturnType<typeof bundle>>;
 
-export function serializeContext(data: ContextBundle, format: "json" | "md"): string {
-  return format === "md" ? renderMarkdown(data) : `${JSON.stringify(data, null, 2)}\n`;
+export function serializeContext(data: ContextBundle, format: "json" | "md", includeTimestamps = true): string {
+  return format === "md" ? renderMarkdown(data, includeTimestamps) : `${JSON.stringify(data, null, 2)}\n`;
 }
 
 export async function prepareSelectedContext(
   store: IndexStore,
   selections: readonly SelectedContextReference[],
-  options: Pick<ContextOptions, "types" | "root" | "subtree" | "passages" | "allTerms"> & { format?: "json" | "md" } = {},
+  options: Pick<ContextOptions, "types" | "root" | "subtree" | "passages" | "allTerms" | "includeTimestamps"> & { format?: "json" | "md" } = {},
   createdAt = new Date().toISOString(),
 ): Promise<{ data: ContextBundle; text: string }> {
   if (!selections.length || selections.length > 20 || new Set(selections.map(item => item.reference)).size !== selections.length) {
@@ -253,9 +291,10 @@ export async function prepareSelectedContext(
     ...(options.root ? { root: options.root } : {}),
     ...(options.subtree ? { subtree: options.subtree } : {}),
     ...(options.allTerms ? { allTerms: true } : {}),
+    ...(options.includeTimestamps === false ? { includeTimestamps: false } : {}),
   };
   const data = await bundle(store, bundleOptions, picked, createdAt);
-  const text = serializeContext(data, bundleOptions.format!);
+  const text = serializeContext(data, bundleOptions.format!, bundleOptions.includeTimestamps);
   if (Buffer.byteLength(text, "utf8") > 256 * 1024) {
     throw new ContextError("CONTEXT_OUTPUT_LIMIT", "上下文超過 256 KiB，請減少選取內容。");
   }

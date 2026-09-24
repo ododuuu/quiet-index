@@ -3,7 +3,7 @@
 使用者指定由 Luna Max 接手；文件本身不會切換模型，也不表示已啟動該模型。
 
 ```text
-請接手 ododuuu/quiet-index 最新 main，依已核准設計稿完整實作 Seekah 0.36.2 本機 GUI 工作台。
+請接手 ododuuu/seekah 最新 main，依已核准設計稿完整實作 Seekah 0.36.2 本機 GUI 工作台。
 
 先依 AGENTS.md 讀 docs/SPEC.md、docs/STATUS.md、docs/DECISIONS.md、docs/handoff/README.md、docs/handoff/CURRENT.md、docs/handoff/0.36.2.md，再讀 docs/design/SEEKAH-WORKBENCH.md 與 seekah-workbench.html。
 

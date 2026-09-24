@@ -301,7 +301,35 @@ test("0.36.1 TUI reducer keeps cursor, selection focus and text input semantics 
   assert.equal(state.focus, "results");
 });
 
-test("0.36.1 TUI key decoder and approved layouts handle escape sequences, CJK and tiny terminals", () => {
+test("0.36.2 TUI workflow records only completed session actions, caps at 12, and does not persist", () => fixture(async (root, store) => {
+  await writeFile(path.join(root, "workflow.txt"), "工作流測試");
+  await sync(root, store);
+  const answers = ["   ", "查詢一", "查詢二", "查詢三", "查詢四", "查詢五", "查詢六", "查詢七", "/quit"];
+  const output: string[] = [];
+  assert.equal(await runTui(store, {
+    ansi: false,
+    write: value => output.push(value),
+    ask: async () => answers.shift() ?? null,
+    size: () => ({ columns: 120, rows: 100 }),
+  }), 0);
+  assert.doesNotMatch(output[1]!, /◆ 搜尋/u);
+  const finalScreen = output.at(-1)!;
+  assert.doesNotMatch(finalScreen, /查詢一/u);
+  assert.match(finalScreen, /查詢二/u);
+  assert.match(finalScreen, /查詢七/u);
+  assert.equal((finalScreen.match(/真實索引結果/gu) ?? []).length, 6);
+
+  const restarted: string[] = [];
+  assert.equal(await runTui(store, {
+    ansi: false,
+    write: value => restarted.push(value),
+    ask: async () => "/quit",
+    size: () => ({ columns: 120, rows: 40 }),
+  }), 0);
+  assert.doesNotMatch(restarted.join("\n"), /查詢七/u);
+}));
+
+test("0.36.2 TUI key decoder and Claude workflow layouts handle CJK, sanitization and terminal sizes", () => {
   assert.deepEqual(decodeTuiKey("\u001b[A"), { type: "up" });
   assert.deepEqual(decodeTuiKey("\u001b[6~"), { type: "page-down" });
   assert.deepEqual(decodeTuiKey("\u001b[Z"), { type: "shift-tab" });
@@ -311,54 +339,128 @@ test("0.36.1 TUI key decoder and approved layouts handle escape sequences, CJK a
   assert.deepEqual(decoder.push("A中文"), [{ type: "up" }, { type: "text", text: "中文" }]);
   assert.deepEqual(decoder.push("\u001b"), []);
   assert.deepEqual(decoder.flush(), [{ type: "escape" }]);
+
   const common = {
-    state: { ...initialTuiState(), view: "home" as const },
+    state: { ...initialTuiState(), view: "results" as const, focus: "results" as const },
     color: false,
     roots: ["D:\\工作資料"],
     documents: 12,
-    page: null,
-    conditions: [],
-    mode: "phrase" as const,
-    selected: [],
+    conditions: ["複製回本機", "安裝"],
+    mode: "all-terms" as const,
+    selected: [{
+      query: "複製回本機 安裝",
+      reference: "1-aaaaaaaaaaaaaaaa",
+      path: "D:\\工作資料\\安裝指引\\部署筆記.txt",
+      mode: "all-terms" as const,
+      snippet: "部署前複製回本機。",
+      location: "第 2 行",
+    }],
     viewLines: [],
-    message: "本機索引已就緒",
+    message: "↑↓ 移動、Space 選取、Enter 預覽。",
     confirming: false,
+    workflow: [
+      { kind: "prompt", text: "最舊提示\u001b[31m", detail: "全部關鍵字" },
+      { kind: "search", text: "找到 2 份文件", detail: "全部關鍵字 · 真實索引結果" },
+      { kind: "selection", text: "已選取 部署筆記.txt", detail: "目前已選 1 份" },
+      { kind: "context", text: "已準備 1 份文件", detail: "2 個 passages · 846 bytes" },
+    ] as const,
+    page: {
+      page: 1, pageSize: 2, total: 2, pageCount: 1, start: 1, end: 2,
+      results: [
+        {
+          reference: "1-aaaaaaaaaaaaaaaa",
+          path: "D:\\工作資料\\安裝指引\\部署筆記.txt",
+          extension: ".txt",
+          modifiedAtMs: 0,
+          heading: null,
+          location: "第 2 行",
+          snippet: "部署前複製回本機，核對版本後再安裝。",
+          rank: 1,
+          reason: "內容",
+          filenameOnly: false,
+          status: "indexed" as const,
+          snippetTruncated: false,
+        },
+        {
+          reference: "2-bbbbbbbbbbbbbbbb",
+          path: "D:\\工作資料\\超長中文資料夾\\第二層目錄\\第三層目錄\\惡意\u0007檔名\u202e.md",
+          extension: ".md",
+          modifiedAtMs: 0,
+          heading: null,
+          location: "第 18 行",
+          snippet: "這是很長的中文片段，用來驗證終端 cell width 與控制字元\u009b不會穿透。",
+          rank: 2,
+          reason: "內容",
+          filenameOnly: false,
+          status: "indexed" as const,
+          snippetTruncated: false,
+        },
+      ],
+    },
   };
-  for (const dimensions of [{ columns: 80, rows: 24 }, { columns: 120, rows: 40 }]) {
-    const screen = renderTuiScreen({ ...common, ...dimensions });
-    assert.match(screen, /▌ seekah 0\.36\.2/);
-    assert.match(screen, /首頁/);
-    assert.match(screen, /搜尋結果/);
-    assert.match(screen, /已選文件 0/);
-    assert.match(screen, /\/ 命令/);
-    assert.match(screen, /seekah/);
-    assert.match(screen, /搜尋 ›/);
-    assert.match(screen, /本機搜尋/);
-    for (const line of screen.split("\n")) assert.ok(displayWidth(line) <= dimensions.columns, line);
-    const results = renderTuiScreen({
-      ...common, ...dimensions, color: true, colorDepth: 24,
-      state: { ...common.state, view: "results", focus: "results" },
-      conditions: ["複製回本機", "安裝"],
-      mode: "all-terms",
-      selected: [{ query: "複製回本機 安裝", reference: "1-aaaaaaaaaaaaaaaa", path: "D:\\工作資料\\安裝指引\\用戶端安裝手冊.docx", mode: "all-terms", snippet: "將安裝檔複製回本機後，執行安裝程式。", location: "第 2 段" }],
-      page: {
-        page: 1, pageSize: 4, total: 4, pageCount: 1, start: 1, end: 4,
-        results: [
-          { reference: "1-aaaaaaaaaaaaaaaa", path: "D:\\工作資料\\安裝指引\\用戶端安裝手冊.docx", extension: ".docx", modifiedAtMs: 0, heading: null, location: "第 2 段", snippet: "將安裝檔複製回本機後，執行安裝程式。", rank: 1, reason: "內容", filenameOnly: false, status: "indexed", snippetTruncated: false },
-          { reference: "2-bbbbbbbbbbbbbbbb", path: "D:\\工作資料\\技術筆記\\系統部署筆記.md", extension: ".md", modifiedAtMs: 0, heading: null, location: "第 18 行", snippet: "部署前先複製回本機，核對版本後再開始安裝。", rank: 2, reason: "內容", filenameOnly: false, status: "indexed", snippetTruncated: false },
-        ],
-      },
-    });
-    assert.match(results, /▎/);
-    assert.match(results, /\[x\]/);
-    assert.match(results, /用戶端安裝手冊\.docx/);
-    assert.match(results, /搜尋 ›/);
-    assert.match(results, /全部關鍵字/);
-    for (const line of results.split("\n")) assert.ok(displayWidth(line) <= dimensions.columns, line);
-  }
+
+  const screen80 = renderTuiScreen({ ...common, columns: 80, rows: 24 });
+  assert.equal(screen80.split("\n").length, 24);
+  assert.match(screen80, new RegExp(`seekah ${productVersion.replaceAll(".", "\\.")}`));
+  assert.match(screen80, /找到 2 份文件/u);
+  assert.match(screen80, /已準備 1 份文件/u);
+  assert.match(screen80, /› 部署筆記\.txt/u);
+  assert.match(screen80, /\[x\]/u);
+  assert.match(screen80, /› 搜尋 ›/u);
+  assert.doesNotMatch(screen80, /最舊提示/u);
+  assert.doesNotMatch(screen80, /\u001b/u);
+  assert.doesNotMatch(screen80, /\u202e/u);
+  for (const line of screen80.split("\n")) assert.ok(displayWidth(line) <= 80, line);
+
+  const screen120 = renderTuiScreen({ ...common, columns: 120, rows: 40 });
+  assert.equal(screen120.split("\n").length, 40);
+  const promptAt = screen120.indexOf("最舊提示");
+  const searchAt = screen120.indexOf("找到 2 份文件");
+  const selectionAt = screen120.indexOf("已選取 部署筆記.txt");
+  const contextAt = screen120.indexOf("已準備 1 份文件");
+  assert.ok(promptAt >= 0 && promptAt < searchAt && searchAt < selectionAt && selectionAt < contextAt);
+  for (const line of screen120.split("\n")) assert.ok(displayWidth(line) <= 120, line);
+
+  const color24 = renderTuiScreen({ ...common, columns: 120, rows: 40, color: true, colorDepth: 24 });
+  assert.match(color24, /\u001b\[1;38;2;138;180;248;/u);
+  for (const line of color24.split("\n")) assert.ok(displayWidth(line) <= 120, line);
+  const color16 = renderTuiScreen({ ...common, columns: 80, rows: 24, color: true, colorDepth: 8 });
+  assert.match(color16, /\u001b\[(?:1;)?94;/u);
+  for (const line of color16.split("\n")) assert.ok(displayWidth(line) <= 80, line);
+
+  const contextScreen = renderTuiScreen({
+    ...common,
+    columns: 80,
+    rows: 24,
+    confirming: true,
+    message: "完整預覽：1 份，846 bytes；輸入完整 yes 才複製。",
+    viewLines: ["# 已選文件上下文", "", "部署前複製回本機。"],
+    state: {
+      ...common.state,
+      view: "context",
+      focus: "input",
+      input: "",
+      previousView: "results",
+      previousFocus: "results",
+    },
+  });
+  assert.match(contextScreen, /選取內容預覽/u);
+  assert.match(contextScreen, /完整預覽：1 份，846 bytes/u);
+  assert.match(contextScreen, /只有輸入完整 yes 才會複製/u);
+  assert.match(contextScreen, /› 確認 ›/u);
+  for (const line of contextScreen.split("\n")) assert.ok(displayWidth(line) <= 80, line);
+
+  const narrow = renderTuiScreen({ ...common, columns: 70, rows: 24 });
+  assert.match(narrow.split("\n")[0]!, /12 份文件/u);
+  assert.doesNotMatch(narrow.split("\n")[0]!, /D:\\工作資料/u);
+  const minimum = renderTuiScreen({ ...common, columns: 60, rows: 24 });
+  assert.doesNotMatch(minimum.split("\n")[0]!, /12 份文件|D:\\工作資料/u);
+  assert.match(minimum.split("\n")[0]!, /已選 1/u);
+
   const tiny = renderTuiScreen({ ...common, columns: 40, rows: 12 });
-  assert.match(tiny, /請放大至至少 60×16/);
-  assert.match(tiny, /\/quit 離開/);
+  assert.match(tiny, /請放大至至少 60×16/u);
+  assert.match(tiny, /\/quit 離開/u);
+  for (const line of tiny.split("\n")) assert.ok(displayWidth(line) <= 40, line);
 });
 
 test("0.36.1 real PTY handles navigation, Ctrl+C, EOF and SIGTERM with terminal cleanup", { skip: process.platform === "win32" ? "Windows PTY harness 需在本機手動複驗" : false }, async () => {
