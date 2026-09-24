@@ -6,9 +6,20 @@ import { spawn } from "node:child_process";
 
 const project = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const cli = path.join(project, "dist", "src", "cli.js");
+const thisFile = fileURLToPath(import.meta.url);
 
 function say(text) {
   process.stdout.write(`${text}\n`);
+}
+
+export function resolveNpmCli(execPath = process.execPath) {
+  const binDir = path.dirname(execPath);
+  const found = [
+    path.join(binDir, "node_modules", "npm", "bin", "npm-cli.js"),
+    path.join(binDir, "..", "lib", "node_modules", "npm", "bin", "npm-cli.js"),
+  ].find(existsSync);
+  if (!found) throw new Error("找不到 npm。請重裝 Node.js 22.17.0 以上，並確認安裝包含 npm。");
+  return found;
 }
 
 function startBrowser(url) {
@@ -19,20 +30,16 @@ function startBrowser(url) {
   child.unref();
 }
 
-function run(command, args, options = {}) {
+function run(command, args) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       cwd: project,
-      stdio: ["ignore", "pipe", "pipe"],
-      shell: options.shell === true,
+      stdio: "inherit",
       windowsHide: false,
       env: process.env,
     });
-    const print = chunk => process.stdout.write(chunk);
-    child.stdout.on("data", print);
-    child.stderr.on("data", print);
     child.on("error", reject);
-    child.on("exit", code => code === 0 ? resolve() : reject(new Error(`${command} 結束碼 ${code ?? "未知"}`)));
+    child.on("exit", code => code === 0 ? resolve() : reject(new Error(`${path.basename(command)} 結束碼 ${code ?? "未知"}`)));
   });
 }
 
@@ -64,14 +71,13 @@ function waitForWorkbench(child) {
   });
 }
 
-try {
+export async function main() {
   if (!process.execPath) throw new Error("找不到 Node.js。");
   say("Seekah 正在啟動。這個視窗會顯示進度，完成前請不要關閉。");
   if (!existsSync(path.join(project, "node_modules")) || !existsSync(cli)) {
     say(existsSync(cli) ? "正在建立相依套件（程式已存在，略過重建）…" : "正在建立相依套件並編譯程式…");
-    const npm = process.platform === "win32" ? "npm.cmd" : "npm";
     const args = existsSync(cli) ? ["ci", "--ignore-scripts"] : ["ci"];
-    await run(npm, args, { shell: process.platform === "win32" });
+    await run(process.execPath, [resolveNpmCli(), ...args]);
     if (!existsSync(cli)) throw new Error("相依建立完成，但找不到 Seekah 程式。");
   } else {
     say("相依與程式已就緒，略過安裝。");
@@ -88,7 +94,13 @@ try {
   startBrowser(url);
   const code = await new Promise(resolve => child.once("exit", value => resolve(value ?? 0)));
   process.exitCode = code;
-} catch (error) {
-  say(`啟動失敗：${error instanceof Error ? error.message : error}`);
-  process.exitCode = 1;
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === thisFile) {
+  try {
+    await main();
+  } catch (error) {
+    say(`啟動失敗：${error instanceof Error ? error.message : error}`);
+    process.exitCode = 1;
+  }
 }

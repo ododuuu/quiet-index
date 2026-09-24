@@ -1,6 +1,6 @@
 # 專案狀態
 
-最後更新：2026-09-24（0.36.2 GUI 與 TUI 單欄 workflow 均已完成本機驗收；公司 Windows、Node.js 22.17.0 與 Linux 外部開檔未驗證）
+最後更新：2026-09-24（0.36.2 GUI 與 TUI 單欄 workflow 均已完成本機驗收；公司 Windows 雙擊啟動器已改找 node.exe／npm-cli.js，尚未由使用者複驗）
 
 ## 目前狀態
 
