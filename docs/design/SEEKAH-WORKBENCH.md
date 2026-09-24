@@ -4,6 +4,16 @@
 
 互動設計稿：[seekah-workbench.html](seekah-workbench.html)。以瀏覽器直接開啟即可；只使用示範資料，不讀取索引、不開網路連線、不呼叫 AI API。
 
+## 畫面預覽
+
+### 桌面
+
+![Seekah 三區工作台桌面設計稿](seekah-workbench-desktop.png)
+
+### 行動版
+
+![Seekah 工作台行動版設計稿](seekah-workbench-mobile.png)
+
 ## 問題
 
 現有 0.35.0 工作台把搜尋、拖曳、Provider、確認、預覽與回答拆成六張等權卡片。功能完整，但主要工作流不清楚：
