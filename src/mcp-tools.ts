@@ -117,9 +117,13 @@ export function indexStatus(store: IndexStore) {
     const report = store.getLastSyncReport(root);
     return {
       path: root,
+      documentCount: store.documentCountForRoot(root),
       lastAttemptedSync: report.attemptedAt,
       lastSuccessfulSync: report.successfulAt,
       lastSyncComplete: report.complete,
+      errors: report.errors,
+      notices: report.notices,
+      summary: report.summary,
       diagnostics: report.diagnostics.length,
     };
   });

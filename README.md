@@ -10,7 +10,7 @@
 
 AI 接手固定入口：[docs/handoff/CURRENT.md](docs/handoff/CURRENT.md)；完整 [SPEC](docs/SPEC.md)、[狀態](docs/STATUS.md)。GitHub 倉庫網址仍沿用 quiet-index；新的封裝名稱為 Seekah-VERSION.zip，包含新舊入口。
 
-目前版本為 **0.36.1**。升級後沿用原索引，不必 rebuild。局部目錄掃描失敗只保護該失敗範圍；可確認的 sibling 刪除仍會從索引移除，根目錄本身無法讀取時則保護整根。Windows volume／UNC root 直接子目錄 `$RECYCLE.BIN` 與 `System Volume Information` 會由完整掃描、watch 與局部更新一致排除；相似名稱及一般子目錄中的同名資料夾不受影響。
+目前版本為 **0.36.2**。升級後沿用原索引，不必 rebuild。0.36.2 提供正式三區 `seekah ui`／`docsearch ui` 工作台：真實搜尋分頁與跨查詢選取、臨時文件解析、唯讀索引狀態、精確 server bytes 預覽、複製、Provider／model／Key 設定與明確 AI 回答。仍只綁 127.0.0.1，不開放 LAN；Key 不持久化，TUI、parser selection、LocalDocSearch 資料目錄與 0.37.0 範圍不變。
 
 若索引很慢，用 `index <根目錄> --profile <新檔案>` 寫一份只留在本機的診斷。檔案必須是新的，拒絕覆寫，不含路徑、檔名或正文；父目錄不存在或無法存取時，錯誤會顯示 resolved parent、錯誤碼與 CMD／PowerShell 各自的安全範例，但不自動建目錄或展開字面環境變數。取消不會顯示 100% 或「同步完整」，已提交的文件保留。
 
@@ -35,7 +35,7 @@ node dist\src\cli.js index "D:\" --profile "%USERPROFILE%\Desktop\lds-profile.js
 ```
 - 進度稱為「檢查進度」。分母包含未變更與只更新 metadata 的檔案。某份超過 5 秒會提示慢檔與階段，預設不印完整路徑；`--verbose` 才印路徑，仍不印正文。
 
-LocalDocSearch 0.35.0 新增 `docsearch ui` 本機工作台，把既有索引搜尋、人工勾選、拖曳臨時文件、精確上下文預覽與可選 OpenAI／xAI API 放在同一介面。服務只綁 `127.0.0.1` 並使用每次啟動的亂數 token；拖曳原檔解析後立即刪除，擷取文字與 UI 輸入的 API Key 只留在目前程序記憶體。真正傳送前必須預覽、勾選同意並使用綁定 provider／model／問題／內容的確認碼。公司 Windows、真實 MCP Apps Host 及真實 Provider 尚未驗收。
+0.36.2 延續 `docsearch ui` 的本機安全契約，改為左導覽／中央搜尋／右側上下文三區；狀態頁只讀既有索引，不觸發掃描。預覽與複製可完全離線；外部 AI 仍須明確同意，`auto` 只在 quota／rate limit 時依預覽列出的路由 fallback 一次。服務使用每次啟動的亂數 fragment token、Host／Origin 驗證、nonce CSP、HMAC preview 與 20 份／256 KiB 上限。公司 Windows 與真實 Provider 尚未驗收。
 
 LocalDocSearch 0.26.2 是純本機 CLI，目前以 macOS 作為主要可執行與迭代環境，並保留 Windows 相容方向。它支援原有六種格式，並新增 `.doc`、`.xls`、`.mht`／`.mhtml`、`.html`／`.htm`／`.xhtml`、`.adoc`、`.msg` 與 `.vsd`，搜尋檔名、標題及內容。其他格式與無副檔名檔案會進入本機清冊，可依檔名及副檔名找到。文件留在原位置，索引與搜尋不需要網路或外部 AI。
 

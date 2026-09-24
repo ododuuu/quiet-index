@@ -2,6 +2,7 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { chmodSync, renameSync, unlinkSync, writeFileSync, readFileSync, existsSync } from "node:fs";
 import net from "node:net";
 import path from "node:path";
+import os from "node:os";
 import { canonicalIndexPath } from "./live-lease.js";
 import { dataDirectory } from "./store.js";
 
@@ -88,7 +89,7 @@ export function controlEndpoint(databasePath: string): string {
   const canonical = canonicalIndexPath(databasePath);
   const hash = instanceHash(canonical);
   if (process.platform === "win32") return `\\\\.\\pipe\\LocalDocSearch-${hash}`;
-  return path.join(dataDirectory(canonical), `autoupdate-${hash}.sock`);
+  return path.join(os.tmpdir(), `localdocsearch-autoupdate-${hash}.sock`);
 }
 
 export function stateFilePath(databasePath: string): string {

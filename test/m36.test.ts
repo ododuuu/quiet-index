@@ -326,7 +326,7 @@ test("0.36.1 TUI key decoder and approved layouts handle escape sequences, CJK a
   };
   for (const dimensions of [{ columns: 80, rows: 24 }, { columns: 120, rows: 40 }]) {
     const screen = renderTuiScreen({ ...common, ...dimensions });
-    assert.match(screen, /▌ seekah 0\.36\.1/);
+    assert.match(screen, /▌ seekah 0\.36\.2/);
     assert.match(screen, /首頁/);
     assert.match(screen, /搜尋結果/);
     assert.match(screen, /已選文件 0/);

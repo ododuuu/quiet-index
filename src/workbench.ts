@@ -6,11 +6,11 @@ import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { IndexStore } from "./store.js";
-import { searchDocuments, prepareContextTool } from "./mcp-tools.js";
+import { indexStatus, prepareContextTool, searchDocuments } from "./mcp-tools.js";
 import { MAX_FILE_BYTES } from "./parser.js";
 import { supportedExtensions } from "./model.js";
 import { combineWorkbenchContext, importDocument, sanitizeUploadName, uploadExtension, WORKBENCH_FILE_LIMIT, type ImportedDocument } from "./workbench-context.js";
-import { previewId, previewMatches, ProviderError, ProviderKeys, providerNames, requestProvider, validateModel, validateProvider, type ProviderName } from "./workbench-provider.js";
+import { modelChoices, previewId, previewMatches, ProviderError, ProviderKeys, providerNames, providerSelections, requestProvider, requestProviderWithFallback, resolveModelRoute, routeSignature, validateModel, validateProvider, validateProviderSelection, type ProviderName, type ProviderSelection, type ProviderState, type RoutedProviderResult } from "./workbench-provider.js";
 import { workbenchHtml } from "./workbench-app.js";
 import { productVersion } from "./version.js";
 
@@ -19,7 +19,7 @@ const JSON_LIMIT = 128 * 1024;
 
 interface Selection { query: string; reference: string }
 interface ContextRequest {
-  provider: ProviderName;
+  provider: ProviderSelection;
   model: string;
   question: string;
   mode: "phrase" | "all-terms";
@@ -80,7 +80,7 @@ async function readJson(request: IncomingMessage): Promise<Record<string, unknow
 }
 
 function contextRequest(body: Record<string, unknown>): ContextRequest {
-  const provider = validateProvider(body.provider);
+  const provider = validateProviderSelection(body.provider);
   const model = validateModel(body.model);
   if (typeof body.question !== "string" || body.question.length > 8000) throw new Error("問題長度無效。");
   const question = body.question.trim();
@@ -101,12 +101,29 @@ function contextRequest(body: Record<string, unknown>): ContextRequest {
   const uniqueReferences = new Set(selections.map(item => item.reference));
   const uniqueFiles = new Set(fileIds);
   if (uniqueReferences.size !== selections.length || uniqueFiles.size !== fileIds.length
-    || selections.length + fileIds.length < 1 || selections.length + fileIds.length > 20) throw new Error("索引與拖曳文件合計需要 1～20 份不重複項目。");
+    || selections.length + fileIds.length < 1 || selections.length + fileIds.length > WORKBENCH_FILE_LIMIT) throw new Error("索引與拖曳文件合計需要 1～20 份不重複項目。");
   return { provider, model, question, mode, selections, fileIds };
 }
 
 function providerStates(keys: ProviderKeys) {
-  return Object.fromEntries(providerNames.map(provider => [provider, keys.state(provider)]));
+  const states = Object.fromEntries(providerNames.map(provider => [provider, keys.state(provider)])) as Record<ProviderName, ProviderState>;
+  const source = states.openai.source === "session" || states.xai.source === "session"
+    ? "session"
+    : states.openai.source === "environment" || states.xai.source === "environment" ? "environment" : null;
+  return {
+    ...states,
+    auto: { configured: states.openai.configured || states.xai.configured, source, defaultModel: "auto" },
+  };
+}
+
+function modelRoute(input: ContextRequest, keys: ProviderKeys) {
+  return resolveModelRoute({
+    provider: input.provider,
+    model: input.model,
+    question: input.question,
+    openaiConfigured: Boolean(keys.get("openai")),
+    xaiConfigured: Boolean(keys.get("xai")),
+  });
 }
 
 async function openStore<T>(databasePath: string, operation: (store: IndexStore) => T | Promise<T>): Promise<T> {
@@ -115,11 +132,24 @@ async function openStore<T>(databasePath: string, operation: (store: IndexStore)
   try { return await operation(store); } finally { store.close(); }
 }
 
+async function readWorkbenchIndexStatus(databasePath: string) {
+  const readAt = new Date().toISOString();
+  if (!existsSync(databasePath)) return { state: "missing" as const, readAt };
+  try {
+    const status = await openStore(databasePath, store => indexStatus(store));
+    return { state: "available" as const, readAt, ...status };
+  } catch (error) {
+    const code = error instanceof Error && "code" in error ? String((error as NodeJS.ErrnoException).code) : "INDEX_READ_FAILED";
+    return { state: "unavailable" as const, readAt, errorCode: code, message: "索引目前無法唯讀讀取，請稍後重試。" };
+  }
+}
+
 export async function createWorkbench(options: WorkbenchOptions): Promise<WorkbenchHandle> {
   const token = options.token ?? randomBytes(24).toString("base64url");
   const secret = options.secret ?? randomBytes(32);
   const keys = new ProviderKeys(options.environment);
   const documents = new Map<string, ImportedDocument>();
+  const consumedPreviews = new Set<string>();
   const tempRoot = await mkdtemp(path.join(options.tempParent ?? os.tmpdir(), "localdocsearch-ui-"));
   const sessionCreatedAt = new Date().toISOString();
   let origin = "";
@@ -148,9 +178,7 @@ export async function createWorkbench(options: WorkbenchOptions): Promise<Workbe
       const host = request.headers.host;
       const currentAddress = server.address();
       const currentPort = currentAddress && typeof currentAddress === "object" ? currentAddress.port : options.port ?? 0;
-      if (!host || host !== `${HOST}:${currentPort}`) {
-        json(response, 421, { error: "Host 不允許。" }); return;
-      }
+      if (!host || host !== `${HOST}:${currentPort}`) { json(response, 421, { error: "Host 不允許。" }); return; }
       const url = new URL(request.url ?? "/", origin);
       if (request.method === "GET" && url.pathname === "/") {
         const nonce = randomBytes(18).toString("base64url");
@@ -171,14 +199,27 @@ export async function createWorkbench(options: WorkbenchOptions): Promise<Workbe
       if (request.method !== "GET" && request.headers.origin !== origin) { json(response, 403, { error: "跨來源要求已拒絕。" }); return; }
 
       if (request.method === "GET" && url.pathname === "/api/state") {
-        json(response, 200, { indexAvailable: existsSync(options.databasePath), supportedExtensions: [...supportedExtensions].sort(), providers: providerStates(keys), fileLimit: WORKBENCH_FILE_LIMIT }); return;
+        json(response, 200, {
+          indexAvailable: existsSync(options.databasePath),
+          supportedExtensions: [...supportedExtensions].sort(),
+          providers: providerStates(keys),
+          providerChoices: [...providerSelections],
+          modelChoices,
+          fileLimit: WORKBENCH_FILE_LIMIT,
+        }); return;
+      }
+      if (request.method === "GET" && url.pathname === "/api/index-status") {
+        json(response, 200, await readWorkbenchIndexStatus(options.databasePath)); return;
       }
       if (request.method === "POST" && url.pathname === "/api/search") {
         const body = await readJson(request);
+        const page = Number(body.page);
+        const pageSize = Number(body.pageSize);
+        if (!Number.isSafeInteger(page) || !Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 20) throw new Error("工作台每頁最多 20 筆。");
         const result = await openStore(options.databasePath, store => searchDocuments(store, {
           query: typeof body.query === "string" ? body.query : "",
           mode: body.mode === "all-terms" ? "all-terms" : "phrase",
-          page: Number(body.page), pageSize: Number(body.pageSize),
+          page, pageSize,
         }));
         json(response, 200, result); return;
       }
@@ -215,8 +256,16 @@ export async function createWorkbench(options: WorkbenchOptions): Promise<Workbe
       if (request.method === "POST" && url.pathname === "/api/preview") {
         const input = contextRequest(await readJson(request));
         const built = await buildContext(input);
-        const id = previewId(secret, { provider: input.provider, model: input.model, question: input.question, context: built.text });
-        json(response, 200, { previewId: id, context: built.text, bytes: built.bytes, truncated: built.truncated }); return;
+        const route = modelRoute(input, keys);
+        const id = previewId(secret, { provider: input.provider, model: input.model, question: input.question, context: built.text, route: routeSignature(route) });
+        json(response, 200, {
+          previewId: id,
+          context: built.text,
+          bytes: built.bytes,
+          documentCount: input.selections.length + input.fileIds.length,
+          truncated: built.truncated,
+          route,
+        }); return;
       }
       if (request.method === "POST" && url.pathname === "/api/ask") {
         const body = await readJson(request);
@@ -224,12 +273,26 @@ export async function createWorkbench(options: WorkbenchOptions): Promise<Workbe
         if (!input.question) throw new Error("送出 AI 前需要填寫問題。");
         if (body.confirmed !== true) throw new Error("尚未確認外部傳送。");
         const built = await buildContext(input);
-        const expected = previewId(secret, { provider: input.provider, model: input.model, question: input.question, context: built.text });
+        const route = modelRoute(input, keys);
+        const expected = previewId(secret, { provider: input.provider, model: input.model, question: input.question, context: built.text, route: routeSignature(route) });
         if (!previewMatches(expected, body.previewId)) throw Object.assign(new Error("預覽已失效；請重新預覽並確認。"), { statusCode: 409 });
-        const apiKey = keys.get(input.provider);
-        if (!apiKey) throw new Error("尚未設定此 Provider 的 API Key。");
-        const answer = await requestProvider({ provider: input.provider, model: input.model, question: input.question, context: built.text, apiKey }, options.fetcher);
-        json(response, 200, { answer }); return;
+        if (typeof body.previewId !== "string" || consumedPreviews.has(body.previewId)) throw Object.assign(new Error("這次確認已送出或已失效，請重新產生預覽。"), { statusCode: 409 });
+        consumedPreviews.add(body.previewId);
+        const primaryKey = keys.get(route.primary.provider);
+        const fallbackKey = route.fallback ? keys.get(route.fallback.provider) : undefined;
+        let result: RoutedProviderResult;
+        if (primaryKey) {
+          result = await requestProviderWithFallback(
+            { ...route.primary, question: input.question, context: built.text, apiKey: primaryKey },
+            route.fallback && fallbackKey ? { ...route.fallback, question: input.question, context: built.text, apiKey: fallbackKey } : undefined,
+            options.fetcher,
+          );
+        } else if (route.fallback && fallbackKey) {
+          result = { answer: await requestProvider({ ...route.fallback, question: input.question, context: built.text, apiKey: fallbackKey }, options.fetcher), provider: route.fallback.provider, model: route.fallback.model, fallbackUsed: true };
+        } else {
+          throw new Error("尚未設定主要 Provider 的 API Key。");
+        }
+        json(response, 200, { answer: result.answer, provider: result.provider, model: result.model, fallbackUsed: result.fallbackUsed }); return;
       }
       json(response, 404, { error: "找不到本機 API。" });
     } catch (error) {
@@ -262,6 +325,7 @@ export async function createWorkbench(options: WorkbenchOptions): Promise<Workbe
       closed = true;
       keys.destroy();
       documents.clear();
+      consumedPreviews.clear();
       await new Promise<void>(resolve => server.close(() => resolve()));
       await rm(tempRoot, { recursive: true, force: true });
     },

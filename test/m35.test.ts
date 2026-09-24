@@ -39,22 +39,22 @@ test("0.35 drag context reuses parsers, sanitizes names and applies a byte-safe 
   } finally { await rm(temp, { recursive: true, force: true }); }
 });
 
-test("0.35 provider keys stay in memory and preview ids bind all disclosed values", () => {
+test("0.36.2 provider keys stay in memory and preview ids bind route values", () => {
   const keys = new ProviderKeys({ OPENAI_API_KEY: "env-openai" });
-  assert.deepEqual(keys.state("openai"), { configured: true, source: "environment", defaultModel: "gpt-5.6-terra" });
+  assert.deepEqual(keys.state("openai"), { configured: true, source: "environment", defaultModel: "auto" });
   keys.configure("openai", "session-openai");
   assert.equal(keys.get("openai"), "session-openai");
   assert.equal(keys.state("openai").source, "session");
   const secret = Buffer.alloc(32, 7);
-  const first = previewId(secret, { provider: "openai", model: "gpt-5.6-terra", question: "問題", context: "內容" });
-  const second = previewId(secret, { provider: "openai", model: "gpt-5.6-terra", question: "另一題", context: "內容" });
+  const first = previewId(secret, { provider: "openai", model: "gpt-5.6-terra", question: "問題", context: "內容", route: "route-a" });
+  const second = previewId(secret, { provider: "openai", model: "gpt-5.6-terra", question: "問題", context: "內容", route: "route-b" });
   assert.equal(previewMatches(first, first), true);
   assert.equal(previewMatches(first, second), false);
   keys.destroy();
   assert.equal(keys.get("openai"), "env-openai");
 });
 
-test("0.35 provider adapter uses fixed Responses endpoints and never echoes keys", async () => {
+test("0.36.2 provider adapter uses fixed Responses endpoints and never echoes keys", async () => {
   const calls: Array<{ url: string; init: RequestInit; body: Record<string, unknown> }> = [];
   const fakeFetch = (async (input: string | URL | Request, init?: RequestInit) => {
     calls.push({ url: String(input), init: init ?? {}, body: JSON.parse(String(init?.body)) as Record<string, unknown> });
@@ -77,8 +77,11 @@ test("0.35 provider adapter uses fixed Responses endpoints and never echoes keys
   });
 });
 
-test("0.35 workbench UI is self-contained and does not persist credentials", () => {
+test("0.36.2 workbench UI is self-contained and exposes the three-zone contract", () => {
   const html = workbenchHtml("fixed-nonce");
+  assert.match(html, /data-page="temporary"/u);
+  assert.match(html, /data-page="activity"/u);
+  assert.match(html, /index-status/u);
   assert.match(html, /dragenter/u);
   assert.match(html, /dataTransfer\.files/u);
   assert.match(html, /X-LocalDocSearch-Token/u);
@@ -90,7 +93,7 @@ test("0.35 workbench UI is self-contained and does not persist credentials", () 
   assert.doesNotMatch(html, /https?:\/\//iu);
 });
 
-test("0.35 loopback workbench enforces host, origin, token, preview and explicit consent", async () => {
+test("0.36.2 loopback workbench enforces status, selection, preview, consent and one-shot ask", async () => {
   const temp = await mkdtemp(path.join(os.tmpdir(), "lds-m35-http-"));
   const root = path.join(temp, "docs");
   const databasePath = path.join(temp, "data", "index.db");
@@ -100,8 +103,13 @@ test("0.35 loopback workbench enforces host, origin, token, preview and explicit
   await sync(root, store);
   store.close();
   const outbound: Array<{ url: string; body: string }> = [];
+  let quotaNext = false;
   const fakeFetch = (async (input: string | URL | Request, init?: RequestInit) => {
     outbound.push({ url: String(input), body: String(init?.body) });
+    if (quotaNext && String(input) === "https://api.openai.com/v1/responses") {
+      quotaNext = false;
+      return new Response(JSON.stringify({ error: { message: "quota exceeded" } }), { status: 429 });
+    }
     return new Response(JSON.stringify({ output_text: "local-fake-answer" }), { status: 200 });
   }) as typeof fetch;
   const handle = await createWorkbench({ databasePath, token: "test-token", secret: Buffer.alloc(32, 3), environment: {}, fetcher: fakeFetch, tempParent: temp });
@@ -116,11 +124,25 @@ test("0.35 loopback workbench enforces host, origin, token, preview and explicit
     assert.equal(await rawStatus(origin + "/api/state", "localhost"), 421);
     const state = await fetch(origin + "/api/state", { headers });
     assert.equal(state.status, 200);
-    assert.equal((await state.json() as { indexAvailable: boolean }).indexAvailable, true);
+    const stateData = await state.json() as { indexAvailable: boolean; providerChoices: string[]; modelChoices: Array<{ id: string }>; providers: { auto: { defaultModel: string } } };
+    assert.equal(stateData.indexAvailable, true);
+    assert.deepEqual(stateData.providerChoices, ["auto", "openai", "xai"]);
+    assert.ok(stateData.modelChoices.some(item => item.id === "astra-6"));
+    assert.equal(stateData.providers.auto.defaultModel, "auto");
+
+    const status = await fetch(origin + "/api/index-status", { headers });
+    assert.equal(status.status, 200);
+    const statusData = await status.json() as { state: string; counts: Record<string, number>; roots: Array<{ path: string; documentCount: number; lastSuccessfulSync: string | null }> };
+    assert.equal(statusData.state, "available");
+    assert.equal(statusData.counts.indexed, 1);
+    assert.equal(statusData.roots[0]?.path, root);
+    assert.equal(statusData.roots[0]?.documentCount, 1);
+    assert.ok(statusData.roots[0]?.lastSuccessfulSync);
 
     const search = await fetch(origin + "/api/search", { method: "POST", headers: postHeaders, body: JSON.stringify({ query: "indexed-http-needle", mode: "phrase", page: 1, pageSize: 20 }) });
     assert.equal(search.status, 200);
-    const searchData = await search.json() as { results: Array<{ reference: string }> };
+    const searchData = await search.json() as { query: string; results: Array<{ reference: string }> };
+    assert.equal(searchData.query, "indexed-http-needle");
     assert.equal(searchData.results.length, 1);
 
     const upload = await fetch(origin + "/api/files", { method: "POST", headers: { ...headers, origin, "X-File-Name": encodeURIComponent("臨時.txt"), "content-type": "application/octet-stream" }, body: "drag-http-needle" });
@@ -131,9 +153,11 @@ test("0.35 loopback workbench enforces host, origin, token, preview and explicit
     const base = { provider: "openai", model: "gpt-5.6-terra", question: "請回答", mode: "phrase", selections: [{ query: "indexed-http-needle", reference: searchData.results[0]!.reference }], fileIds: [uploaded.id] };
     const preview = await fetch(origin + "/api/preview", { method: "POST", headers: postHeaders, body: JSON.stringify(base) });
     assert.equal(preview.status, 200);
-    const previewData = await preview.json() as { previewId: string; context: string };
+    const previewData = await preview.json() as { previewId: string; context: string; bytes: number; documentCount: number; route: { primary: { provider: string; model: string } } };
     assert.match(previewData.context, /indexed-http-needle/u);
     assert.match(previewData.context, /drag-http-needle/u);
+    assert.equal(previewData.documentCount, 2);
+    assert.equal(previewData.route.primary.model, "gpt-5.6-terra");
 
     const configure = await fetch(origin + "/api/providers", { method: "POST", headers: postHeaders, body: JSON.stringify({ provider: "openai", key: "session-key" }) });
     assert.equal(configure.status, 200);
@@ -143,11 +167,25 @@ test("0.35 loopback workbench enforces host, origin, token, preview and explicit
     assert.equal(outbound.length, 0);
     const ask = await fetch(origin + "/api/ask", { method: "POST", headers: postHeaders, body: JSON.stringify({ ...base, previewId: previewData.previewId, confirmed: true }) });
     assert.equal(ask.status, 200);
-    assert.deepEqual(await ask.json(), { answer: "local-fake-answer" });
+    assert.deepEqual(await ask.json(), { answer: "local-fake-answer", provider: "openai", model: "gpt-5.6-terra", fallbackUsed: false });
+    const duplicate = await fetch(origin + "/api/ask", { method: "POST", headers: postHeaders, body: JSON.stringify({ ...base, previewId: previewData.previewId, confirmed: true }) });
+    assert.equal(duplicate.status, 409);
     assert.equal(outbound.length, 1);
-    assert.equal(outbound[0]?.url, "https://api.openai.com/v1/responses");
-    assert.match(outbound[0]?.body ?? "", /indexed-http-needle/u);
-    assert.match(outbound[0]?.body ?? "", /drag-http-needle/u);
+
+    const configureXai = await fetch(origin + "/api/providers", { method: "POST", headers: postHeaders, body: JSON.stringify({ provider: "xai", key: "xai-session-key" }) });
+    assert.equal(configureXai.status, 200);
+    assert.doesNotMatch(await configureXai.text(), /xai-session-key/u);
+    quotaNext = true;
+    const autoBase = { ...base, provider: "auto", model: "auto", question: "請設計 schema migration 的 rollback plan" };
+    const autoPreview = await fetch(origin + "/api/preview", { method: "POST", headers: postHeaders, body: JSON.stringify(autoBase) });
+    assert.equal(autoPreview.status, 200);
+    const autoPreviewData = await autoPreview.json() as { previewId: string; route: { primary: { provider: string; model: string }; fallback?: { provider: string; model: string } } };
+    assert.deepEqual(autoPreviewData.route.primary, { provider: "openai", model: "gpt-6-astra" });
+    assert.deepEqual(autoPreviewData.route.fallback, { provider: "xai", model: "grok-4.6" });
+    const autoAsk = await fetch(origin + "/api/ask", { method: "POST", headers: postHeaders, body: JSON.stringify({ ...autoBase, previewId: autoPreviewData.previewId, confirmed: true }) });
+    assert.equal(autoAsk.status, 200);
+    assert.deepEqual(await autoAsk.json(), { answer: "local-fake-answer", provider: "xai", model: "grok-4.6", fallbackUsed: true });
+    assert.equal(outbound.length, 3);
   } finally {
     await handle.close();
     const leftovers = (await readdir(temp)).filter(name => name.startsWith("localdocsearch-ui-"));

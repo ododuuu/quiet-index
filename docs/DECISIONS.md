@@ -7,6 +7,13 @@
 - 原型的假 bytes／事件／文件計數不能成為實作。容量只接受 server 預覽 bytes，未知如實顯示；命中預覽不是全文。只複製不要求 Key，外傳仍需 HMAC、來源重驗與明確同意。
 - 固定交接入口改為 0.36.2，提供指定給 Luna Max 的實作 prompt。本工具介面無模型切換功能，沒有宣稱已切換或已啟動；規格提交不改 package、程式或發佈包。
 
+## D062：0.36.2 正式 GUI 只補狀態讀取，維持本機安全邊界
+
+- 日期：2026-09-24。依 SPEC §47 完成正式三區工作台；外觀原型不作資料來源，搜尋／parser／context／Provider 服務維持單一契約。
+- GUI 新增的後端面只有受 token、Host／Origin 保護且 `no-store` 的 `GET /api/index-status`；它使用既有唯讀 `IndexStore`／`indexStatus`，不掃描、升級、寫入索引或啟動 watcher。
+- 精確 bytes 只採 server context 預覽，選取／Provider／model／問題／目的地改變即失效；AI preview HMAC 單次消費，`auto` 只在 quota／rate limit fallback 一次。Key、文件與查詢不持久化。
+- 本批不修改 TUI、不實作 0.37.0，不改既有資料路徑、schema、parser selection、MCP／IPC 識別或 LAN 邊界。
+
 
 ## D058：本機工作台 GUI 採三區工作流設計，先交互動稿
 

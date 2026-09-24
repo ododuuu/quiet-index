@@ -1,11 +1,11 @@
 # 專案狀態
 
-最後更新：2026-09-24（0.36.2 GUI 規格完成、待實作；程式仍為 0.36.1）
+最後更新：2026-09-24（0.36.2 GUI 已實作；本機 GUI／Provider 注入驗收完成；公司 Windows、Node.js 22.17.0 與真實 Provider 未驗證）
 
 ## 目前狀態
 
-- **目前程式版本為 0.36.1；當前實作里程碑改為 0.36.2 GUI，依 SPEC §47／D059。** 使用者核准三區工作台設計，要求先寫規格，再由 Luna Max 接手。規格與交接已完成，正式 GUI 尚未修改、未升版本。
-- 核准稿：[設計說明](design/SEEKAH-WORKBENCH.md)／[互動稿](design/seekah-workbench.html)；實作入口：[0.36.2 交接](handoff/0.36.2.md)。本工作階段沒有模型切換工具，不能聲稱 Luna Max 已啟動。0.37.0 §46 暫緩，既有範圍不變。
+- **目前程式版本為 0.36.2；0.36.2 GUI 依 SPEC §47／D059 已完成。** 正式工作台使用真實 API 與資料，完成三區版面、搜尋分頁／跨查詢選取、臨時文件、唯讀索引狀態、精確預覽／複製、Provider／model／Key 設定與明確 AI 回答。
+- `/api/index-status` 只讀既有 store／indexStatus，沒有掃描來源、啟動 watcher 或建立／升級索引；容量只使用 server 預覽 bytes。Provider `auto` 僅在 quota／rate limit 時依預覽列出的 fallback 呼叫一次。Key 只留程序記憶體，TUI 與 0.37.0 §46 不在本批。
 - Scanner 現在回報最小 `protectedScopes`。`removeMissing()` 只保留位於失敗 scope 的舊文件；正常 sibling 的已刪文件仍移除。root `readdir` 失敗保護整根，rebuild 也不會先清掉失敗 subtree；同步摘要顯示受掃描失敗保護的數量。
 - `$RECYCLE.BIN` 與 `System Volume Information` 改用唯一的 Windows path 判定，僅排除 drive／UNC share root 的精確直接子目錄及其後代，case-insensitive。完整掃描、watch 與局部更新共用；相似名稱、一般子目錄內同名路徑及非 Windows 路徑不排除。
 - `--profile` 仍以 exclusive create 拒絕覆寫，也不建立父目錄。失敗診斷顯示 resolved parent、錯誤碼、CMD `%USERPROFILE%` 與 PowerShell `$env:USERPROFILE` 範例；疑似傳入另一 shell 的字面變數只提示，不自動展開。失敗發生在索引寫入前。
@@ -13,7 +13,7 @@
 - 聚焦回歸 58 項全數通過。短 `TMPDIR=/tmp` 的完整套件在 Node.js 26.7.0 與正式最低 22.17.0 都是 250 項、248 通過、0 失敗、2 項 Windows CMD launcher 略過；真實 80×24 PTY 已完成翻頁、選取、preview、Esc 返回與 q 退出。公司 Windows 尚未驗收，不能以 macOS path semantics／PTY 代替。
 - 使用者已在公司 Windows 實測 0.36.0：舊索引沿用；一次性 `文字解析升級=60014` 完成後第二次為 0；約 299,530 份未變更文件會直接略過。0.36.1 不更改此 parser selection，也不處理固定 parser errors。
 - 普通 `index D:/` 仍是完整 reconciliation，約 30 萬檔的 2～4 分鐘枚舉成本不屬 0.36.1。0.37.0 將驗收並擴充既有 `autoupdate` 日常路徑、持久 queue、可接續校正與 mixed all-terms pruning；不使用 USN、不要求管理員權限。
-- 下一步：由指定模型依 SPEC §47 完成正式 GUI、真實 API／瀏覽器驗收與交付；不是繼續修改原型。0.36.1 公司 Windows 驗收保留但不阻塞本批開發；不得用公司整庫做破壞性實驗。
+- 本批已完成：由隔離合成索引與真正 `ui --no-open` 執行瀏覽器驗收；詳細證據見 `docs/0.36.2-VALIDATION.md`。公司 Windows、Node.js 22.17.0 實機、真實 Provider 尚未驗收，不以本機結果替代。
 
 ## 已交付基線與歷史紀錄
 
