@@ -77,6 +77,29 @@ node dist/src/cli.js tui
 
 在結果畫面用 ↑／↓ 移動、Space 勾選、Enter 看片段、PgUp／PgDn 換頁、Esc／← 返回；Tab／Shift+Tab 切換輸入、結果與已選清單。輸入 `/help` 查看所有 fallback 命令。要複製 context，必須在確認列完整輸入 `yes`；`q` 在非文字輸入焦點退出。
 
+## 接到 Codex
+
+工作台的「複製預覽」只進本機剪貼簿，不會自動成為 Codex 上下文。要讓 Codex 搜尋並引用 Seekah 索引，用本機 MCP，不是把 GUI 嵌進 Codex。
+
+1. 先用工作台或 `index` 建好索引。
+2. 確認這台電腦能執行 `codex`（Codex CLI／Desktop）。在 Seekah 解壓目錄執行：
+
+```bat
+node dist\src\cli.js doctor
+node dist\src\cli.js setup codex --dry-run
+node dist\src\cli.js setup codex
+```
+
+macOS／Linux 把反斜線改成 `/`。Windows 也可用 `.\seekah.cmd setup codex`。
+
+3. 重新開啟 Codex 工作階段，輸入 `/mcp`。應看到名稱 `localdocsearch`（相容舊識別，不是 seekah）。
+4. 在對話裡請它搜尋關鍵字。它會呼叫 `search_documents`，列出文件代碼與短片段。你明確指定要哪些代碼後，它才呼叫 `prepare_context`；這份有界 Markdown 才進入該次 Codex 上下文。
+
+上限 20 份文件、總計 256 KiB；沒有全選或整庫灌入。來源被改過會拒絕舊代碼，請再搜一次。若 Codex 顯示 MCP Apps 工作台，可改請它呼叫 `open_search_app` 勾選後加入上下文；沒有嵌入 UI 時，用上面的搜尋→選代碼流程即可。
+
+ChatGPT 網頁讀不到這台電腦的 MCP，不要當成已連上。
+
+
 ## 常見問題
 
 | 現象 | 處理方式 |
@@ -84,8 +107,10 @@ node dist/src/cli.js tui
 | 工作台顯示沒有索引 | 到「索引狀態」輸入第一個資料夾，按「開始建立索引」。 |
 | 搜不到剛修改的檔案 | 到「索引狀態」按「更新索引」，完成後再搜尋。 |
 | 雙擊後出現「不是內部或外部命令」或「不是可執行的外部指令」 | 命令視窗找不到 Node.js。安裝 Node.js 22.17.0 以上並勾選 Add to PATH，關掉視窗後再雙擊。可先執行 `node -v` 確認。 |
+| Codex 沒有 Seekah／搜不到文件 | 先建索引，再執行 `setup codex`，重開 Codex 後用 `/mcp` 核對 `localdocsearch`。複製預覽不會自動進 Codex。 |
+| `setup codex` 說找不到 codex | 先安裝或更新 Codex CLI／Desktop，確認終端能執行 `codex`。 |
 | 無法開啟檔案 | 確認檔案未移動、不是連結且有讀取權限；更新索引後再搜尋。 |
-| 沒有 AI 送出功能 | 這是預期行為；工作台僅建立預覽與複製，CLI／MCP 行為不變。 |
+| 沒有 AI 送出功能 | 工作台只複製到剪貼簿。要給 Codex 用 MCP：`setup codex` 後請它搜尋並選定文件代碼。 |
 | 關閉工作台後臨時文件消失 | 這是預期行為：臨時文件只保留在本次程序。 |
 
 ## 隱私與邊界
