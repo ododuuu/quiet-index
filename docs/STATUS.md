@@ -1,19 +1,23 @@
 # 專案狀態
 
-最後更新：2026-09-24（0.36.2 GUI 已實作；本機 GUI／Provider 注入驗收完成；公司 Windows、Node.js 22.17.0 與真實 Provider 未驗證）
+最後更新：2026-09-24（0.36.2 GUI 與 TUI 單欄 workflow 均已完成本機驗收；公司 Windows、Node.js 22.17.0 與 Linux 外部開檔未驗證）
 
 ## 目前狀態
 
-- **目前程式版本為 0.36.2；0.36.2 GUI 依 SPEC §47／D059 已完成。** 正式工作台使用真實 API 與資料，完成三區版面、搜尋分頁／跨查詢選取、臨時文件、唯讀索引狀態、精確預覽／複製、Provider／model／Key 設定與明確 AI 回答。
-- `/api/index-status` 只讀既有 store／indexStatus，沒有掃描來源、啟動 watcher 或建立／升級索引；容量只使用 server 預覽 bytes。Provider `auto` 僅在 quota／rate limit 時依預覽列出的 fallback 呼叫一次。Key 只留程序記憶體，TUI 與 0.37.0 §46 不在本批。
+- **目前程式版本為 0.36.2；0.36.2 GUI 依 SPEC §47／D059／D064／D066 已完成。** 正式工作台使用真實 API 與資料，完成三區版面、搜尋分頁／跨查詢選取、臨時文件、狀態讀取與背景索引、精確預覽／複製；命中預覽可直接開啟原檔或顯示所在位置。
+- `/api/document-action` 僅接受搜尋結果的 stable reference 與 `open|reveal`，重用 `actOnDocument` 的 root／連結／一般檔案／可讀性驗證；瀏覽器不提交任意 path。GUI 搜尋列、上下文與狀態頁不顯示 ISO 時間，GUI context 產物亦省略建立／修改時間。
+- `/api/index-status` 只讀既有 store／indexStatus；`POST /api/index` 才在背景重用既有 `sync()` 同步使用者已登錄或明確輸入的根目錄。兩者不建立第二套 parser、資料目錄或 schema；0.37.0 §46 不在本批。
 - Scanner 現在回報最小 `protectedScopes`。`removeMissing()` 只保留位於失敗 scope 的舊文件；正常 sibling 的已刪文件仍移除。root `readdir` 失敗保護整根，rebuild 也不會先清掉失敗 subtree；同步摘要顯示受掃描失敗保護的數量。
 - `$RECYCLE.BIN` 與 `System Volume Information` 改用唯一的 Windows path 判定，僅排除 drive／UNC share root 的精確直接子目錄及其後代，case-insensitive。完整掃描、watch 與局部更新共用；相似名稱、一般子目錄內同名路徑及非 Windows 路徑不排除。
 - `--profile` 仍以 exclusive create 拒絕覆寫，也不建立父目錄。失敗診斷顯示 resolved parent、錯誤碼、CMD `%USERPROFILE%` 與 PowerShell `$env:USERPROFILE` 範例；疑似傳入另一 shell 的字面變數只提示，不自動展開。失敗發生在索引寫入前。
-- TUI 已依核准稿改為低噪音鍵盤介面：首頁、三行結果、內部 preview、已選清單、context 確認、命令與真實索引狀態共用固定 composer／footer。raw decoder 支援分段 CSI、單獨 Esc 與 UTF-8；↑／↓、Space、Enter、PgUp／PgDn、Esc／←、Tab／Shift+Tab、`/`、q、Ctrl+C、EOF、resize 均有 reducer／render／PTY 證據。輸入焦點中的 q 是文字，context 仍逐字 `yes` 才複製。
-- 聚焦回歸 58 項全數通過。短 `TMPDIR=/tmp` 的完整套件在 Node.js 26.7.0 與正式最低 22.17.0 都是 250 項、248 通過、0 失敗、2 項 Windows CMD launcher 略過；真實 80×24 PTY 已完成翻頁、選取、preview、Esc 返回與 q 退出。公司 Windows 尚未驗收，不能以 macOS path semantics／PTY 代替。
+- TUI 已依 SPEC §45.8／D063 改為 Claude Code 式單欄 transcript：本次 session 只在記憶體保留最多 12 筆真正完成的 prompt／search／selection／context，結果 cards 與 preview／selected／context／help／roots／status 共用固定 composer。三行結果、`›` active、`[x]` selected、context 精確 bytes 與逐字 `yes` 保留；raw decoder、reducer、slash commands、open／reveal、訊號及 terminal cleanup 未改。
+- 本機 Node.js v26.7.0／Darwin 27.0.0：完整 `npm test` 256 項、254 通過、0 失敗、2 項 Windows CMD launcher 略過。聚焦 m32／m33／m36 22 項全通過。80×24 PTY 已走完搜尋、選取、preview、context `yes` 複製、q 退出與 `NO_COLOR`；公司 Windows／Windows Terminal 未驗收。
 - 使用者已在公司 Windows 實測 0.36.0：舊索引沿用；一次性 `文字解析升級=60014` 完成後第二次為 0；約 299,530 份未變更文件會直接略過。0.36.1 不更改此 parser selection，也不處理固定 parser errors。
 - 普通 `index D:/` 仍是完整 reconciliation，約 30 萬檔的 2～4 分鐘枚舉成本不屬 0.36.1。0.37.0 將驗收並擴充既有 `autoupdate` 日常路徑、持久 queue、可接續校正與 mixed all-terms pruning；不使用 USN、不要求管理員權限。
-- 本批已完成：由隔離合成索引與真正 `ui --no-open` 執行瀏覽器驗收；詳細證據見 `docs/0.36.2-VALIDATION.md`。公司 Windows、Node.js 22.17.0 實機、真實 Provider 尚未驗收，不以本機結果替代。
+- 本批已完成：`npm run build` 與聚焦 `m35` 5 項通過；隔離合成索引的正式 `ui --no-open` 經 Chromium 驗證搜尋、命中預覽的開啟／顯示位置按鈕與無 ISO 時間 context。新增 GUI 背景索引與啟動器後尚待同一實機流程複驗。使用手冊：`docs/USER-GUIDE.md`。公司 Windows、Node.js 22.17.0 實機與 Linux 外部開檔尚未驗收，不以本機結果替代。
+- GitHub 儲存庫已於 2026-09-24 由 `ododuuu/quiet-index` 改名為 [`ododuuu/seekah`](https://github.com/ododuuu/seekah)，本機 `origin` 已改指向新網址；這不改動 LocalDocSearch 相容資料目錄、環境變數、IPC／MCP 識別或 CLI 行為。
+- GUI 已修正上下文面板 ×：桌面與窄螢幕都能關閉，右上「已選 N」可重新開啟。工作台開啟時背景同步已登錄根目錄；狀態頁「更新索引」會重用 `sync()` 取得新增／修改／刪除，尚無索引時要求使用者明確輸入第一個根目錄。
+- GUI 精確上下文現在只供本機複製，已不顯示 Provider、model、API Key、問題、外傳同意或 AI 回答。新增 `seekah-ui.cmd` 與 `seekah-ui.command` 直接開啟圖形工作台；首次 `npm ci` 後不必每次重跑。
 
 ## 已交付基線與歷史紀錄
 

@@ -1,5 +1,35 @@
 # 設計決策紀錄
 
+## D067：雙擊啟動自行建立相依並顯示索引進度
+
+- 日期：2026-09-24。使用者要求不必先開終端執行 `npm ci` 或 `index`。`seekah-ui.cmd`／`seekah-ui.command` 先開本機啟動畫面，缺少 `node_modules` 或 `dist` 時自動 `npm ci`，完成後再開工作台。
+- 首次索引與之後的「更新索引」都在 GUI 顯示 `sync()` 既有進度（階段與 current／total）。啟動畫面只綁 `127.0.0.1`，以一次性 token 讀狀態；不改資料目錄、parser 或 CLI／MCP。
+
+## D066：GUI 回到本機索引與複製，不提供聊天 Provider
+
+- 日期：2026-09-24。使用者確認目前沒有聊天助手需求；GUI 隱藏 Provider／model／Key、外部送出與回答面，精確上下文只重驗後複製至本機剪貼簿。CLI／MCP 不變。
+- 工作台開啟後背景同步既有根目錄；使用者可按「更新索引」。尚無索引時必須由使用者在受 token、Host／Origin 保護的 UI 明確輸入第一個根目錄，背景工作重用既有 `sync()`，不另建 parser、資料目錄或同步核心。
+
+## D065：GitHub 儲存庫改名為 seekah，不觸碰相容識別
+
+- 日期：2026-09-24。使用者要求統一產品的 GitHub 名稱；遠端儲存庫由 `ododuuu/quiet-index` 改名為 [`ododuuu/seekah`](https://github.com/ododuuu/seekah)，本機 `origin` 同步更新。
+- 此改動只影響 GitHub repository slug 與 clone URL。依 D057，LocalDocSearch 資料目錄、`LOCALDOCSEARCH_DATA_DIR`、ignore、IPC／MCP 識別、認證 header、`docsearch` 相容入口、schema、parser selection 與 CLI／MCP 行為均不變。
+
+## D064：GUI 文件操作以 stable reference 交給既有安全服務，時間雜訊不進工作流
+
+- 日期：2026-09-24。使用者要求命中預覽可直接選擇開啟檔案，並移除無助於選擇的 ISO 時間；新增 `POST /api/document-action`，只接受 `{reference, action:"open"|"reveal"}`。
+- 伺服器重用 `actOnDocument`，不接受瀏覽器 path，不另做 OS launch 或放寬 root containment、連結、一般檔案及可讀性檢查。GUI 以完成或安全錯誤訊息回報，不把送出請求誤稱外部程式已顯示。
+- GUI 省略搜尋、狀態與 context 文字中的建立／修改時間；`prepareContextTool` 的預設仍保留時間，確保 CLI 與 MCP context 契約不變。新增 `docs/USER-GUIDE.md` 作為產品操作入口。
+
+## D063：TUI 改採 Claude Code 式 session-local 單欄 workflow
+
+- 日期：2026-09-24。使用者核准把既有 OpenCode 式 tab／首頁面板改為單欄時間序 transcript；D057 的品牌、安全、鍵盤與交接決策保留，視覺方向由本決策及更新後的 SPEC §45.8 取代。
+- `runTui()` 以最多 12 筆 in-memory union 記錄真正完成的 prompt／search／selection／context；退出或索引版本改變即清除，不落盤 query、結果、路徑或 view state。
+- renderer 使用真實搜尋總數、選取數、passage 數與 UTF-8 bytes；結果 card 保留三行、`›` active 與 `[x]` selected。固定 composer 與 message 分列，80×24 裁掉最舊 block，120×40 顯示更多歷史。
+- 保留 decoder、reducer、slash commands、SearchSession、context 重驗、剪貼簿 `yes`、open／reveal、read-only store、raw mode、訊號與 alternate-screen cleanup。不新增 LLM、agent、Claude Code runtime、Provider、daemon 或持久狀態。
+- `docs/design/seekah-tui.html` 只使用明示的示範資料，供 120×40／80×24 外觀審閱；不把 agent activity、AI 回答、daemon 或假索引統計列為產品需求。
+
+
 ## D059：核准 GUI 稿落為 0.36.2 規格，優先於 0.37.0
 
 - 日期：2026-09-24。使用者要求照 D058 設計稿寫 SPEC，再由 Luna Max 實作。以 SPEC §47 定義 0.36.2 相容 GUI 改版；0.37.0 既有規劃暫緩，不混入本批。

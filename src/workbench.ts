@@ -12,7 +12,10 @@ import { supportedExtensions } from "./model.js";
 import { combineWorkbenchContext, importDocument, sanitizeUploadName, uploadExtension, WORKBENCH_FILE_LIMIT, type ImportedDocument } from "./workbench-context.js";
 import { modelChoices, previewId, previewMatches, ProviderError, ProviderKeys, providerNames, providerSelections, requestProvider, requestProviderWithFallback, resolveModelRoute, routeSignature, validateModel, validateProvider, validateProviderSelection, type ProviderName, type ProviderSelection, type ProviderState, type RoutedProviderResult } from "./workbench-provider.js";
 import { workbenchHtml } from "./workbench-app.js";
+import { actOnDocument, type DocumentAction } from "./open-document.js";
+import { sync, type SyncReport } from "./sync.js";
 import { productVersion } from "./version.js";
+import type { ProgressUpdate } from "./progress.js";
 
 const HOST = "127.0.0.1";
 const JSON_LIMIT = 128 * 1024;
@@ -41,6 +44,7 @@ export interface WorkbenchHandle {
   url: string;
   port: number;
   token: string;
+  waitForIndex(): Promise<void>;
   close(): Promise<void>;
 }
 
@@ -143,6 +147,22 @@ async function readWorkbenchIndexStatus(databasePath: string) {
     return { state: "unavailable" as const, readAt, errorCode: code, message: "索引目前無法唯讀讀取，請稍後重試。" };
   }
 }
+interface WorkbenchIndexingState {
+  state: "idle" | "running" | "complete" | "failed";
+  message: string;
+  roots: string[];
+  reports: Pick<SyncReport, "root" | "complete" | "found" | "updated" | "unchanged" | "removed">[];
+  progress: ProgressUpdate | null;
+}
+function indexingMessage(progress: ProgressUpdate): string {
+  if (progress.current === undefined) return progress.message;
+  if (progress.total === undefined) return `${progress.message}；已發現 ${progress.current} 份`;
+  if (progress.total === 0) return `${progress.message}；沒有找到文件`;
+  const percent = progress.stage === "complete" ? 100 : Math.min((progress.current / progress.total) * 100, 99.99);
+  return `${progress.message}：${progress.current}／${progress.total}（${percent.toFixed(2)}%）`;
+}
+
+
 
 export async function createWorkbench(options: WorkbenchOptions): Promise<WorkbenchHandle> {
   const token = options.token ?? randomBytes(24).toString("base64url");
@@ -153,6 +173,54 @@ export async function createWorkbench(options: WorkbenchOptions): Promise<Workbe
   const tempRoot = await mkdtemp(path.join(options.tempParent ?? os.tmpdir(), "localdocsearch-ui-"));
   const sessionCreatedAt = new Date().toISOString();
   let origin = "";
+  let indexing: WorkbenchIndexingState = { state: "idle", message: "尚未開始索引。", roots: [], reports: [], progress: null };
+  let indexingTask: Promise<void> | undefined;
+  let indexAbort: AbortController | undefined;
+
+  function startIndex(root: string | undefined): WorkbenchIndexingState {
+    if (indexingTask) return indexing;
+    const store = new IndexStore(options.databasePath);
+    const roots = root ? [root] : store.roots();
+    if (!roots.length) {
+      store.close();
+      throw new Error("尚無索引根目錄；請先在工作台選擇要建立索引的資料夾。");
+    }
+    indexing = { state: "running", message: "正在初始化索引…", roots, reports: [], progress: null };
+    indexAbort = new AbortController();
+    const abort = indexAbort;
+    indexingTask = (async () => {
+      try {
+        for (const target of roots) {
+          const report = await sync(target, store, {
+            requireRegistered: !root,
+            signal: abort.signal,
+            onProgress: progress => { indexing = { ...indexing, progress, message: indexingMessage(progress) }; },
+          });
+          indexing.reports.push({
+            root: report.root,
+            complete: report.complete,
+            found: report.found,
+            updated: report.updated,
+            unchanged: report.unchanged,
+            removed: report.removed,
+          });
+        }
+        indexing = {
+          ...indexing,
+          state: "complete",
+          message: indexing.reports.every(report => report.complete) ? "索引已更新。" : "索引完成，但部分根目錄未完整同步。",
+        };
+      } catch (error) {
+        indexing = { ...indexing, state: "failed", message: error instanceof Error ? error.message : "索引無法完成。" };
+      } finally {
+        store.close();
+        if (indexAbort === abort) indexAbort = undefined;
+        indexingTask = undefined;
+      }
+    })();
+    return indexing;
+  }
+
 
   const buildContext = async (input: ContextRequest) => {
     let indexedText = "";
@@ -162,6 +230,7 @@ export async function createWorkbench(options: WorkbenchOptions): Promise<Workbe
         mode: input.mode,
         passages: 3,
         createdAt: sessionCreatedAt,
+        includeTimestamps: false,
       }));
       indexedText = prepared.text;
     }
@@ -209,7 +278,15 @@ export async function createWorkbench(options: WorkbenchOptions): Promise<Workbe
         }); return;
       }
       if (request.method === "GET" && url.pathname === "/api/index-status") {
-        json(response, 200, await readWorkbenchIndexStatus(options.databasePath)); return;
+        json(response, 200, { ...await readWorkbenchIndexStatus(options.databasePath), indexing }); return;
+      }
+      if (request.method === "POST" && url.pathname === "/api/index") {
+        const body = await readJson(request);
+        const root = body.root;
+        if (root !== undefined && (typeof root !== "string" || !root.trim() || root.length > 16_384)) {
+          throw new Error("索引根目錄無效。");
+        }
+        json(response, 202, { indexing: startIndex(typeof root === "string" ? root.trim() : undefined) }); return;
       }
       if (request.method === "POST" && url.pathname === "/api/search") {
         const body = await readJson(request);
@@ -252,6 +329,16 @@ export async function createWorkbench(options: WorkbenchOptions): Promise<Workbe
         if (typeof body.key !== "string") throw new Error("缺少 API Key。");
         keys.configure(provider, body.key);
         json(response, 200, { providers: providerStates(keys) }); return;
+      }
+      if (request.method === "POST" && url.pathname === "/api/document-action") {
+        const body = await readJson(request);
+        if (typeof body.reference !== "string" || (body.action !== "open" && body.action !== "reveal")) {
+          throw new Error("文件操作需要搜尋結果的文件代碼與有效動作。");
+        }
+        const reference = body.reference;
+        const action: DocumentAction = body.action;
+        const target = await openStore(options.databasePath, store => actOnDocument(store, reference, action));
+        json(response, 200, { action, ...target }); return;
       }
       if (request.method === "POST" && url.pathname === "/api/preview") {
         const input = contextRequest(await readJson(request));
@@ -320,9 +407,12 @@ export async function createWorkbench(options: WorkbenchOptions): Promise<Workbe
     url: `${origin}/#${encodeURIComponent(token)}`,
     port: address.port,
     token,
+    waitForIndex: async () => { await indexingTask; },
     close: async () => {
       if (closed) return;
       closed = true;
+      indexAbort?.abort();
+      await indexingTask;
       keys.destroy();
       documents.clear();
       consumedPreviews.clear();

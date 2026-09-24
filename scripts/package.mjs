@@ -14,7 +14,7 @@ async function add(relative) {
   }
 }
 for (const folder of ['src', 'test', 'dist', 'docs', 'scripts', 'vendor']) await add(folder);
-for (const file of ['README.md', 'seekah.cmd', 'docsearch.cmd', 'AGENTS.md', 'package.json', 'package-lock.json', 'tsconfig.json', '.gitignore']) {
+for (const file of ['README.md', 'seekah.cmd', 'seekah-ui.cmd', 'seekah-ui.command', 'docsearch.cmd', 'AGENTS.md', 'package.json', 'package-lock.json', 'tsconfig.json', '.gitignore']) {
   entries[`Seekah/${file}`] = await readFile(path.join(project, file));
 }
 const metadata = JSON.parse(await readFile(path.join(project, "package.json"), "utf8"));
