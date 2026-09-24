@@ -4,7 +4,14 @@
 - [x] 核准 TUI 規格與互動稿存入 [design/](design/SEEKAH-TUI.md)，交接集中 [handoff/CURRENT.md](handoff/CURRENT.md)。
 - [x] 在 0.36.1 落地核准的整體排版與完整焦點／鍵盤操作，不只增加 /select 或 /next；已以 80×24、120×40 render fixture 與真實 PTY 終端轉錄驗收。
 
-更新：2026-09-23。0.36.1 已完成本機實作與版本更新；公司 Windows 人工驗收待回報。接續依 SPEC §46 實作 0.37.0。
+更新：2026-09-24。0.36.1 為程式基線；當前優先依 SPEC §47 實作 0.36.2 GUI，0.37.0 暫緩。公司 Windows 未驗項保留。
+
+## 當前優先：0.36.2 GUI
+
+- [x] 使用者核准工作台設計；SPEC §47、D059 與固定交接完成。
+- [ ] 正式三區 GUI、搜尋／分頁／選取、命中預覽、臨時文件與真實唯讀狀態。
+- [ ] 連線設定、精確上下文、失效確認、複製／送出與實際回答。
+- [ ] 正式瀏覽器尺寸／無障礙／安全驗收、完整回歸、升版與 GitHub 交付；詳見 handoff/0.36.2.md。
 
 ## 已完成：0.36.1 correctness／UX
 
@@ -15,7 +22,7 @@
 - [x] README、STATUS、DECISIONS、HANDOFF 與 `0.36.1-VALIDATION.md` 已更新；package／lockfile 升至 0.36.1。
 - [ ] 公司 Windows 以無機密測試樹驗證 sibling 權限失敗、系統目錄排除及 80×24／120×40 TUI；不得以本機 PTY 代替。
 
-## 當前優先：0.37.0 performance／daily incremental
+## 暫緩：0.37.0 performance／daily incremental
 
 - [ ] 以正確 CMD／PowerShell profile 路徑取得 full reconciliation 的 enumerate、stat／compare、parser、compression／Bloom、write／commit 成本；相同資料至少三次，不以目前總耗時猜各階段比例。
 - [ ] 驗證並產品化既有 `autoupdate`：啟動校正完成後，單檔新增／修改／刪除只走事件路徑或最小子樹，不掃 30 萬檔；status 顯示 daemon 健康、最近局部事件、上次／下次完整校正與降級原因。

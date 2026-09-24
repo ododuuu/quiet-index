@@ -1,15 +1,15 @@
-# 目前交接：Seekah 0.36.1 驗收
+# 目前交接：Seekah 0.36.2 GUI 實作
 
 更新：2026-09-24。
 
-**0.36.1 本機實作已完成；目前只接受驗收、缺陷修正與交付核對，不要提前實作 0.37.0。**
+**使用者已核准工作台設計稿並要求寫 SPEC 後由 Luna Max 實作。當前允許實作範圍改為 SPEC §47／D059，不再限於 0.36.1 驗收；0.37.0 仍暫緩。**
 
-package／lockfile 已為 0.36.1。Windows volume-root 系統目錄排除、scope-aware deletion、profile 錯誤提示及核准的新 TUI 均已落地；舊 LocalDocSearch 索引路徑、`LOCALDOCSEARCH_DATA_DIR`、`.localdocsearchignore`、IPC／MCP 識別與 `docsearch` 入口保持相容，不需 rebuild。
+程式與 package／lockfile 仍為 0.36.1。0.36.2 規格已完成，正式 GUI 尚未改動；實作驗收後才升版。指定接手模型不等於已切換模型，本工作階段沒有可用的 Luna Max 切換工具。
 
-設計權威：[SEEKAH-TUI.md](../design/SEEKAH-TUI.md)；視覺參考：[seekah-tui.html](../design/seekah-tui.html)；實作與驗證：[0.36.1.md](0.36.1.md)、[0.36.1-VALIDATION.md](../0.36.1-VALIDATION.md)。
+- [0.36.2 實作交接](0.36.2.md)：順序、已完成／未完成、驗收與禁止擴張。
+- [給 Luna Max 的實作指令](PROMPT.md)。
+- [SPEC §47](../SPEC.md#47-0362核准的本機-gui-工作台改版)：行為權威，安全沿用 §43。
+- [核准 GUI 設計說明](../design/SEEKAH-WORKBENCH.md)／[互動稿](../design/seekah-workbench.html)。
+- [0.36.1 驗收交接](0.36.1.md)：保留歷史與公司 Windows 待驗，不阻塞本批 GUI 開發。
 
-2026-09-24 另新增 [本機工作台 GUI 設計提案](../design/SEEKAH-WORKBENCH.md) 與 [互動稿](../design/seekah-workbench.html)，供使用者先在 GitHub 審閱。它尚未套用到 `docsearch ui`，不改變 0.36.1 驗收範圍，也不表示 0.37.0 已開工。
-
-公司 Windows 的 0.36.1 人工驗收尚未進行。下一個 AI 應先讀 [SPEC §45](../SPEC.md#45-0361windows-掃描正確性與-tui-可操作性修正)、[STATUS](../STATUS.md)、[DECISIONS](../DECISIONS.md) D054／D057，再依版本交接執行無機密 Windows 測試；不得把 macOS／PTY 結果宣稱為公司 Windows 通過。
-
-固定交接中心：[README.md](README.md)。0.37.0 僅保留在既有規格／版本交接中，不屬目前可實作範圍。
+固定交接中心：[README.md](README.md)。不移動既有資料、不改 parser selection、不開放 LAN；不得把原型畫面冒充正式介面驗收。

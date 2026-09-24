@@ -1,11 +1,11 @@
 # 專案狀態
 
-最後更新：2026-09-23（0.36.1 本機實作完成；公司 Windows 人工驗收待回報）
+最後更新：2026-09-24（0.36.2 GUI 規格完成、待實作；程式仍為 0.36.1）
 
 ## 目前狀態
 
-- **目前程式版本為 0.36.1；權威規格為 SPEC §45／D054。** 已完成 Windows 系統目錄排除、scope-aware deletion、profile 路徑診斷與可操作 TUI。0.37.0 仍依 §46／D055／D056 處理日常變更發現及 all-terms 效能，未提前實作。
-- 2026-09-24 依使用者要求新增本機工作台 GUI 設計提案：[設計說明](design/SEEKAH-WORKBENCH.md)／[互動稿](design/seekah-workbench.html)。提案將既有搜尋、拖曳、上下文預覽與可選 AI API 收斂為「左側導覽／中央結果／右側上下文」三區工作台，並完成桌面與行動版響應式示範；目前只新增設計稿，尚未修改 `docsearch ui` 正式介面、產品行為、版本或 0.37.0 範圍。
+- **目前程式版本為 0.36.1；當前實作里程碑改為 0.36.2 GUI，依 SPEC §47／D059。** 使用者核准三區工作台設計，要求先寫規格，再由 Luna Max 接手。規格與交接已完成，正式 GUI 尚未修改、未升版本。
+- 核准稿：[設計說明](design/SEEKAH-WORKBENCH.md)／[互動稿](design/seekah-workbench.html)；實作入口：[0.36.2 交接](handoff/0.36.2.md)。本工作階段沒有模型切換工具，不能聲稱 Luna Max 已啟動。0.37.0 §46 暫緩，既有範圍不變。
 - Scanner 現在回報最小 `protectedScopes`。`removeMissing()` 只保留位於失敗 scope 的舊文件；正常 sibling 的已刪文件仍移除。root `readdir` 失敗保護整根，rebuild 也不會先清掉失敗 subtree；同步摘要顯示受掃描失敗保護的數量。
 - `$RECYCLE.BIN` 與 `System Volume Information` 改用唯一的 Windows path 判定，僅排除 drive／UNC share root 的精確直接子目錄及其後代，case-insensitive。完整掃描、watch 與局部更新共用；相似名稱、一般子目錄內同名路徑及非 Windows 路徑不排除。
 - `--profile` 仍以 exclusive create 拒絕覆寫，也不建立父目錄。失敗診斷顯示 resolved parent、錯誤碼、CMD `%USERPROFILE%` 與 PowerShell `$env:USERPROFILE` 範例；疑似傳入另一 shell 的字面變數只提示，不自動展開。失敗發生在索引寫入前。
@@ -13,7 +13,7 @@
 - 聚焦回歸 58 項全數通過。短 `TMPDIR=/tmp` 的完整套件在 Node.js 26.7.0 與正式最低 22.17.0 都是 250 項、248 通過、0 失敗、2 項 Windows CMD launcher 略過；真實 80×24 PTY 已完成翻頁、選取、preview、Esc 返回與 q 退出。公司 Windows 尚未驗收，不能以 macOS path semantics／PTY 代替。
 - 使用者已在公司 Windows 實測 0.36.0：舊索引沿用；一次性 `文字解析升級=60014` 完成後第二次為 0；約 299,530 份未變更文件會直接略過。0.36.1 不更改此 parser selection，也不處理固定 parser errors。
 - 普通 `index D:/` 仍是完整 reconciliation，約 30 萬檔的 2～4 分鐘枚舉成本不屬 0.36.1。0.37.0 將驗收並擴充既有 `autoupdate` 日常路徑、持久 queue、可接續校正與 mixed all-terms pruning；不使用 USN、不要求管理員權限。
-- 下一步：在公司 Windows 以無機密測試樹驗證 sibling 權限失敗、系統目錄排除與 80×24／120×40 TUI；不得直接用公司整庫做破壞性刪除實驗。其後依 SPEC §46 實作 0.37.0。
+- 下一步：由指定模型依 SPEC §47 完成正式 GUI、真實 API／瀏覽器驗收與交付；不是繼續修改原型。0.36.1 公司 Windows 驗收保留但不阻塞本批開發；不得用公司整庫做破壞性實驗。
 
 ## 已交付基線與歷史紀錄
 

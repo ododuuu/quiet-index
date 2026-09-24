@@ -1,8 +1,8 @@
-# Seekah 本機工作台 GUI 設計提案
+# Seekah 本機工作台 GUI 核准設計
 
-狀態：2026-09-24 設計提案，**尚未套用到 `docsearch ui` 正式介面**。
+狀態：2026-09-24 使用者核准依此稿實作；行為權威為 [SPEC §47](../SPEC.md#47-0362核准的本機-gui-工作台改版)，交接見 [0.36.2](../handoff/0.36.2.md)。**尚未套用到 `docsearch ui` 正式介面**。
 
-互動設計稿：[seekah-workbench.html](seekah-workbench.html)。以瀏覽器直接開啟即可；只使用示範資料，不讀取索引、不開網路連線、不呼叫 AI API。
+互動設計稿：[seekah-workbench.html](seekah-workbench.html)。它只有示範資料、不讀取索引、不呼叫 AI API；檔名加入原型清單不代表解析成功。原型的假容量／狀態、缺少 model／Key 設定及回答、行動版設定入口等缺口，正式版必須依 §47 補齊。
 
 ## 畫面預覽
 
