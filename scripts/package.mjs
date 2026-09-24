@@ -5,17 +5,21 @@ import { fileURLToPath } from 'node:url';
 import { zipSync, unzipSync } from 'fflate';
 
 const project = fileURLToPath(new URL('../', import.meta.url));
+function zipBytes(relative, buf) {
+  if (!relative.endsWith(".cmd")) return buf;
+  return Buffer.from(buf.toString("utf8").replace(/\r?\n/g, "\r\n"));
+}
 const entries = {};
 async function add(relative) {
   for (const item of await readdir(path.join(project, relative), { withFileTypes: true })) {
     const child = path.posix.join(relative, item.name);
     if (item.isDirectory()) await add(child);
-    else if (item.isFile()) entries[`Seekah/${child}`] = await readFile(path.join(project, child));
+    else if (item.isFile()) entries[`Seekah/${child}`] = zipBytes(child, await readFile(path.join(project, child)));
   }
 }
 for (const folder of ['src', 'test', 'dist', 'docs', 'scripts', 'vendor']) await add(folder);
 for (const file of ['README.md', 'seekah.cmd', 'seekah-ui.cmd', 'seekah-ui.command', 'docsearch.cmd', 'AGENTS.md', 'package.json', 'package-lock.json', 'tsconfig.json', '.gitignore']) {
-  entries[`Seekah/${file}`] = await readFile(path.join(project, file));
+  entries[`Seekah/${file}`] = zipBytes(file, await readFile(path.join(project, file)));
 }
 const metadata = JSON.parse(await readFile(path.join(project, "package.json"), "utf8"));
 const destination = path.join(project, `Seekah-${metadata.version}.zip`);

@@ -2,8 +2,8 @@
 
 ## D067：雙擊啟動自行建立相依並顯示索引進度
 
-- 日期：2026-09-24。使用者要求不必先開終端執行 `npm ci` 或 `index`。`seekah-ui.cmd`／`seekah-ui.command` 先開本機啟動畫面，缺少 `node_modules` 或 `dist` 時自動 `npm ci`，完成後再開工作台。
-- 首次索引與之後的「更新索引」都在 GUI 顯示 `sync()` 既有進度（階段與 current／total）。啟動畫面只綁 `127.0.0.1`，以一次性 token 讀狀態；不改資料目錄、parser 或 CLI／MCP。
+- 日期：2026-09-24。使用者要求不必先開終端執行 `npm ci` 或 `index`。`seekah-ui.cmd`／`seekah-ui.command` 在命令視窗顯示進度；缺少 `node_modules` 或 `dist` 時自動安裝相依，完成後才開工作台。
+- Windows 啟動器必須自己找出 `node.exe`（略過 Microsoft Store 別名），並用同一份 Node 執行 `npm-cli.js`；不得 `spawn npm.cmd`。`.cmd` 使用 CRLF。
 
 ## D066：GUI 回到本機索引與複製，不提供聊天 Provider
 
