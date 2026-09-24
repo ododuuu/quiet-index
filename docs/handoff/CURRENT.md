@@ -7,7 +7,7 @@
 程式與 package／lockfile已為 0.36.2。正式工作台為左導覽／中央搜尋／右上下文三區；命中預覽可經 stable reference 安全地開啟原檔或顯示所在位置，GUI 不顯示 ISO 時間。工作台開啟後背景同步既有根目錄，尚無索引時由使用者在 UI 選擇第一個根目錄；精確上下文只供本機複製，不提供聊天 Provider。TUI 另依 SPEC §45.8／D063 改為 session-local 單欄 workflow。兩者都重用既有搜尋、選取與 context 安全契約，不開始 0.37.0。
 
 - [產品使用手冊](../USER-GUIDE.md)：安裝、索引、GUI、TUI、CLI、上下文複製與排錯的操作入口。
-- 本批已檢視並更新使用手冊：Windows 雙擊改找 `node.exe`，安裝相依改由同一份 Node 執行 `npm-cli.js`，避免 `npm.cmd` 被 cmd 判成不是外部指令。
+- 本批已檢視並更新使用手冊：補上 Codex MCP 註冊與 `prepare_context` 成為對話上下文的步驟；GUI 複製仍不自動外送。
 - [0.36.2 實作交接](0.36.2.md)：完成項目、驗證與禁止擴張。
 - [給 Luna Max 的實作指令](PROMPT.md)：保留歷史入口，已由本批完成。
 - [SPEC §47](../SPEC.md#47-0362核准的本機-gui-工作台改版)：行為權威，安全沿用 §43。
