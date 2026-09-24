@@ -5,6 +5,7 @@
 ## 目前狀態
 
 - **目前程式版本為 0.36.1；權威規格為 SPEC §45／D054。** 已完成 Windows 系統目錄排除、scope-aware deletion、profile 路徑診斷與可操作 TUI。0.37.0 仍依 §46／D055／D056 處理日常變更發現及 all-terms 效能，未提前實作。
+- 2026-09-24 依使用者要求新增本機工作台 GUI 設計提案：[設計說明](design/SEEKAH-WORKBENCH.md)／[互動稿](design/seekah-workbench.html)。提案將既有搜尋、拖曳、上下文預覽與可選 AI API 收斂為「左側導覽／中央結果／右側上下文」三區工作台，並完成桌面與行動版響應式示範；目前只新增設計稿，尚未修改 `docsearch ui` 正式介面、產品行為、版本或 0.37.0 範圍。
 - Scanner 現在回報最小 `protectedScopes`。`removeMissing()` 只保留位於失敗 scope 的舊文件；正常 sibling 的已刪文件仍移除。root `readdir` 失敗保護整根，rebuild 也不會先清掉失敗 subtree；同步摘要顯示受掃描失敗保護的數量。
 - `$RECYCLE.BIN` 與 `System Volume Information` 改用唯一的 Windows path 判定，僅排除 drive／UNC share root 的精確直接子目錄及其後代，case-insensitive。完整掃描、watch 與局部更新共用；相似名稱、一般子目錄內同名路徑及非 Windows 路徑不排除。
 - `--profile` 仍以 exclusive create 拒絕覆寫，也不建立父目錄。失敗診斷顯示 resolved parent、錯誤碼、CMD `%USERPROFILE%` 與 PowerShell `$env:USERPROFILE` 範例；疑似傳入另一 shell 的字面變數只提示，不自動展開。失敗發生在索引寫入前。
